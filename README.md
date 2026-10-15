@@ -230,6 +230,17 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 
 `Common/Web/TraceIdMiddleware` 가 하고, `UseSkeletonWeb()` 이 파이프라인 맨 앞에 둔다. 콘솔 로그에 scope 를 찍는 설정은 `appsettings.json` 의 `Logging:Console` 이다(`FormatterName: simple` 과 `FormatterOptions:IncludeScopes: true` — 이름을 적지 않으면 옵션이 적용되지 않는다). AsyncLocal 이라 `await` · `Task.Run` 을 따라 흐르므로 Spring 의 `MdcTaskDecorator` 같은 전달 장치는 필요 없다.
 
+### 느린 쿼리 · 요청 경고
+
+임계값을 넘으면 경고 로그를 남긴다. 추적 ID 는 scope 로 함께 찍히므로 같은 요청의 느린 쿼리와 느린 요청을 이어 볼 수 있다.
+
+| 대상 | 임계값 (`appsettings.json`) | 남기는 것 |
+|---|---|---|
+| DB 명령 하나 — `SlowQueryInterceptor` | `Diagnostics:SlowQueryThreshold` (기본 500ms) | 실행 시간, SQL(매개변수 값은 남지 않는다, 1000자에서 자름) |
+| HTTP 요청 하나 — `SlowRequestMiddleware` | `Diagnostics:SlowRequestThreshold` (기본 1s) | 메서드, 경로(쿼리 문자열 제외), 상태 코드, 처리 시간 |
+
+형제 스켈레톤의 `@SlowMethod`(AOP)는 두 레포 모두 적용된 곳이 없었다. 여기서는 메서드마다 붙이지 않고 경계(DB 명령 · HTTP 요청) 두 곳에서 모두 잰다. 특정 구간을 따로 재야 하면 `ActivitySource` span 이나 `Stopwatch` 를 그 자리에 둔다.
+
 ### 감사 — 누가 언제 만들고 고쳤나
 
 감사 필드는 `AuditSaveChangesInterceptor` 가 저장 직전에 채운다(시각은 `TimeProvider` 의 UTC). EntityService 나 매퍼가 직접 넣지 않는다. 엔티티의 기반은 행의 성격으로 고른다.
@@ -298,6 +309,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 | MDC · `TaskDecorator` | 로깅 scope · AsyncLocal (전달 장치가 필요 없다) |
 | `StringEnum` · `@JsonValue` · `AbstractStringEnumConverter` | `[JsonStringEnumMemberName]` 하나 — JSON · DB · 쿼리 공통 |
 | `SoftDeletable` + `@SQLRestriction` (엔티티마다) | `ISoftDeletable` — 인터셉터 + 전역 쿼리 필터가 자동으로 |
+| `@SlowMethod` + `SlowMethodAspect` | `SlowQueryInterceptor` · `SlowRequestMiddleware` — 경계에서 모두 잰다 |
 
 ### 선언
 
@@ -397,7 +409,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | Azure Key Vault · GCP Secret Manager 비밀 이름 | `:` → `--` | `ConnectionStrings--Default` |
 | AWS Secrets Manager JSON 비밀의 키 | 구성 키 그대로 | `{"ConnectionStrings:Default": "…"}` |
 
-비밀이 아닌 환경별 값은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — 외부 API 주소 `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`, 감사 헤더 신뢰 `Audit:TrustUserHeader` ← `Audit__TrustUserHeader`.
+비밀이 아닌 환경별 값은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — 외부 API 주소 `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`, 감사 헤더 신뢰 `Audit:TrustUserHeader` ← `Audit__TrustUserHeader`, 느린 쿼리 · 요청 임계값 `Diagnostics:*`.
 
 평문 자격증명은 어느 appsettings 에도 적지 않는다. `appsettings.Local.json` 의 docker compose 계정만 예외다(로컬 컨테이너 전용 값). 비밀을 추가하면 이 표의 각 출처에 같은 이름으로 넣고, Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에도 추가한다.
 

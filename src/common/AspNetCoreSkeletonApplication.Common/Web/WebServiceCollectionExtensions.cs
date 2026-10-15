@@ -34,12 +34,13 @@ public static class WebServiceCollectionExtensions
     }
 
     /// <summary>
-    /// 파이프라인 맨 앞에 둔다. 추적 ID 를 먼저 정하고(에러 응답에도 실리도록), 그 뒤에서 나는 예외를 모두
-    /// ProblemDetails 로 바꾼다.
+    /// 파이프라인 맨 앞에 둔다. 추적 ID 를 먼저 정하고(에러 응답 · 느린 요청 로그에도 실리도록), 요청 시간을 잰 뒤,
+    /// 그 안에서 나는 예외를 모두 ProblemDetails 로 바꾼다.
     /// </summary>
     public static IApplicationBuilder UseSkeletonWeb(this IApplicationBuilder app)
     {
         app.UseMiddleware<TraceIdMiddleware>();
+        app.UseMiddleware<SlowRequestMiddleware>();
         app.UseExceptionHandler();
 
         return app;
