@@ -290,6 +290,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 | `@Transactional` | `IMainTransaction.ExecuteAsync` |
 | `ErrorResponseModel` | ProblemDetails + `code` · `divisionCode` |
 | MDC · `TaskDecorator` | 로깅 scope · AsyncLocal (전달 장치가 필요 없다) |
+| `StringEnum` · `@JsonValue` · `AbstractStringEnumConverter` | `[JsonStringEnumMemberName]` 하나 — JSON · DB · 쿼리 공통 |
 
 ### 선언
 
@@ -297,7 +298,8 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 - **Entity** — `internal` `class` + `{ get; set; }`, `BaseEntity`(`long Id`) 상속, navigation property 없음(참조는 `long` 컬럼). 감사가 필요하면 `BaseAuditedEntity`.
 - **Domain** — EF · DI · ASP.NET 을 모르는 순수 클래스. `static` 함수나 불변 record.
 - **매퍼** — `[Mapper] static partial class`. 계산하지 않는다 — 계산된 값은 MappingService 가 추가 매개변수로 넘긴다.
-- **DB** — 식별자 `BIGINT`, FOREIGN KEY 제약 없음, 열거형은 이름 문자열로 저장, 조회 기본 NoTracking.
+- **열거형** — 멤버마다 `[JsonStringEnumMemberName("코드")]` 로 외부 코드를 단다. JSON 본문 · 응답, 쿼리 · 라우트 바인딩, DB 컬럼이 모두 이 코드를 쓴다(`Common/Enums/EnumCodes`). C# 멤버 이름을 바꿔도 저장된 데이터와 API 계약이 바뀌지 않는다. EF 변환기는 `AppDbContext` 가 모든 열거형 속성에 자동으로 붙이므로 엔티티 구성에 적지 않는다(길이만 `HasMaxLength`).
+- **DB** — 식별자 `BIGINT`, FOREIGN KEY 제약 없음, 열거형은 외부 코드 문자열로 저장, 조회 기본 NoTracking.
 
 ### Mapperly 엄격 모드와 남은 함정
 
@@ -317,6 +319,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 | 접미사 ↔ 네임스페이스, 맨 `Service` 금지, `I~EntityService` 구현 | `NamingConventionTests` |
 | Model · Dto 는 기본값 없는 `sealed record`, 매퍼는 static, 엔티티에 navigation 없음 | `DeclarationConventionTests` |
 | Domain 은 Dto · 열거형 · 에러 · System 만 참조 (시그니처 수준) | `DeclarationConventionTests` |
+| 열거형 멤버마다 중복 없는 외부 코드 | `DeclarationConventionTests` |
 
 규약 테스트(`UnitTests/Conventions/`)는 앱 어셈블리를 리플렉션으로 훑고, 계층은 네임스페이스로 판정한다. 접미사 ↔ 네임스페이스 검사가 판정의 어긋남도 잡으므로, 검사 대상을 못 찾아 그냥 통과하는 일이 없다. 샘플을 모두 지워도 규약 테스트는 깨지지 않는다(대상 개수 하한을 두지 않는다). 새 앱을 더하면 `ConventionScan` 의 어셈블리 목록에 넣는다.
 

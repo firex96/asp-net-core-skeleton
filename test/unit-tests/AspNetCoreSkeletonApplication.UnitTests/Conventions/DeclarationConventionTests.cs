@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using System.Text.Json.Serialization;
 using AspNetCoreSkeletonApplication.Common.Persistence.Entities.Backbone;
 
 namespace AspNetCoreSkeletonApplication.UnitTests.Conventions;
@@ -40,6 +41,26 @@ public class DeclarationConventionTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void Enums_DeclareUniqueExternalCodeOnEveryMember()
+    {
+        // 외부 코드가 JSON · DB · 쿼리의 계약이다 — C# 이름에 기대지 않는다.
+        var violations = new List<string>();
+        foreach (var enumType in ConventionScan.Types.Where(type => type.IsEnum))
+        {
+            var codes = enumType.GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Select(field => (field.Name, Code: field.GetCustomAttribute<JsonStringEnumMemberNameAttribute>()?.Name))
+                .ToArray();
+            violations.AddRange(codes.Where(member => member.Code is null)
+                .Select(member => $"{enumType.FullName}.{member.Name} — [JsonStringEnumMemberName] 이 없다"));
+            violations.AddRange(codes.Where(member => member.Code is not null)
+                .GroupBy(member => member.Code).Where(group => group.Count() > 1)
+                .Select(group => $"{enumType.FullName} — 코드 '{group.Key}' 가 중복이다"));
+        }
+
+        ConventionScan.AssertNoViolations(violations);
     }
 
     [Fact]

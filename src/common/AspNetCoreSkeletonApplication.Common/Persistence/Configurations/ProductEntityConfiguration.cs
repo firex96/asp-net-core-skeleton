@@ -11,7 +11,7 @@ internal sealed class ProductEntityConfiguration : IEntityTypeConfiguration<Prod
         builder.ToTable("product");
         builder.Property(product => product.Name).HasMaxLength(200);
         builder.Property(product => product.Price).HasPrecision(18, 2);
-        // 열거형은 이름 문자열로 저장한다 — 순서를 바꿔도 기존 데이터의 뜻이 바뀌지 않는다.
-        builder.Property(product => product.Status).HasConversion<string>().HasMaxLength(20);
+        // 열거형은 외부 코드 문자열로 저장된다(AppDbContext 의 UseStringEnumCodes) — 여기서는 길이만 정한다.
+        builder.Property(product => product.Status).HasMaxLength(20);
     }
 }

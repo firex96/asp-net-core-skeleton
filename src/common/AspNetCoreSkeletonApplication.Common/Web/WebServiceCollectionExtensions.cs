@@ -24,9 +24,11 @@ public static class WebServiceCollectionExtensions
 
         services.AddOptions<AuditOptions>().BindConfiguration("Audit");
 
-        // 열거형은 JSON 에서 이름 문자열로 주고받는다("OnSale") — 숫자는 순서가 바뀌면 뜻이 바뀐다.
+        // 열거형은 숫자가 아니라 외부 코드([JsonStringEnumMemberName])로 주고받는다 — JSON 본문도, 쿼리 · 라우트도.
         services.Configure<JsonOptions>(options =>
             options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        services.Configure<MvcOptions>(options =>
+            options.ModelBinderProviders.Insert(0, new StringEnumModelBinderProvider()));
 
         return services;
     }

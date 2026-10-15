@@ -1,3 +1,4 @@
+using AspNetCoreSkeletonApplication.Common.Persistence.Conventions;
 using AspNetCoreSkeletonApplication.Common.Persistence.Entities.Main;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,5 +14,6 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbC
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly)
+            .UseStringEnumCodes();
 }
