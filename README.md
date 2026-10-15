@@ -208,9 +208,9 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 요청마다 추적 ID 하나를 정해 로그와 응답, 나가는 호출을 한 줄로 잇는다. 헤더 이름과 검증 규칙은 Spring 형제 스켈레톤과 같다.
 
 1. 받은 `X-Trace-Id` 가 `^[A-Za-z0-9._-]{1,64}$` 이면 그 값을 쓴다. 없거나 어긋나면(개행 주입 등) 버리고 새로 만든다 — 현재 W3C trace-id, 없으면 GUID.
-2. 그 값을 `TraceIdContext.Current`(AsyncLocal), 로깅 scope `TraceId`, `HttpContext.TraceIdentifier`, 응답 헤더 `X-Trace-Id`, 에러 응답의 `traceId` 에 싣는다.
+2. 그 값을 `TraceIdContext.Current`(AsyncLocal), 로깅 scope `X-Trace-Id:{XTraceId}`, `HttpContext.TraceIdentifier`, 응답 헤더 `X-Trace-Id`, 에러 응답의 `traceId` 에 싣는다. scope 키를 `XTraceId` 로 둔 것은 ASP.NET Core 가 넣는 W3C `TraceId` scope 와 구분하려는 것이다 — 헤더 없이 들어온 요청은 두 값이 같다.
 
-`Common/Web/TraceIdMiddleware` 가 하고, `UseSkeletonWeb()` 이 파이프라인 맨 앞에 둔다. 콘솔 로그에 scope 를 찍는 설정은 `appsettings.json` 의 `Logging:Console:FormatterOptions:IncludeScopes` 다. AsyncLocal 이라 `await` · `Task.Run` 을 따라 흐르므로 Spring 의 `MdcTaskDecorator` 같은 전달 장치는 필요 없다.
+`Common/Web/TraceIdMiddleware` 가 하고, `UseSkeletonWeb()` 이 파이프라인 맨 앞에 둔다. 콘솔 로그에 scope 를 찍는 설정은 `appsettings.json` 의 `Logging:Console` 이다(`FormatterName: simple` 과 `FormatterOptions:IncludeScopes: true` — 이름을 적지 않으면 옵션이 적용되지 않는다). AsyncLocal 이라 `await` · `Task.Run` 을 따라 흐르므로 Spring 의 `MdcTaskDecorator` 같은 전달 장치는 필요 없다.
 
 ### 감사 — 누가 언제 만들고 고쳤나
 
