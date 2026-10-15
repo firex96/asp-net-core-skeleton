@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Removed
+- 쓰지 않던 `LanguageExt.Core` · `FluentValidation` 패키지
+
 ## [0.1.0] - 2026-10-15
 
 ### Added

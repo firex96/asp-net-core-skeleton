@@ -59,9 +59,7 @@
     <PackageReference Include="Amazon.Extensions.Configuration.SystemsManager" />
     <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" />
     <PackageReference Include="Azure.Identity" />
-    <PackageReference Include="FluentValidation" />
     <PackageReference Include="Google.Cloud.SecretManager.V1" />
-    <PackageReference Include="LanguageExt.Core" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
