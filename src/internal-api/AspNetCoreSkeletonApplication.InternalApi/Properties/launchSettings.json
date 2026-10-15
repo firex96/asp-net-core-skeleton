@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "scalar",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Local"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5257"
+    },
+    "https": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "scalar",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Local"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7276;http://localhost:5257"
+    },
+    "Aws": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Aws"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7276;http://localhost:5257"
+    },
+    "Azure": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Azure"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7276;http://localhost:5257"
+    },
+    "Gcp": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Gcp"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7276;http://localhost:5257"
+    }
+  }
+}

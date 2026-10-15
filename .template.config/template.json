@@ -11,7 +11,7 @@
   ],
   "identity": "AspNetCoreSpaSkeleton",
   "name": "ASP.NET Core + SPA Skeleton",
-  "description": "ASP.NET Core Web API + SPA(Angular · SvelteKit · Nuxt) 스켈레톤. 클라우드별 비밀값 출처 프로파일(Local · Aws · Azure · Gcp)과 테스트 3분류가 배선돼 있다.",
+  "description": "ASP.NET Core Web API + SPA(Angular · SvelteKit · Nuxt) 스켈레톤. 공유 라이브러리(Common)와 앱(Server · InternalApi)으로 나눈 레이어드 구조, 클라우드별 비밀값 출처 프로파일(Local · Aws · Azure · Gcp), 테스트 3분류가 배선돼 있다.",
   "shortName": "aspnet-spa-skeleton",
   "sourceName": "AspNetCoreSkeletonApplication",
   "preferNameDirectory": true,
@@ -52,6 +52,12 @@
         }
       ]
     },
+    "internalApi": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "게이트웨이 뒤 내부 API 앱(InternalApi)을 함께 만든다 — Server 와 Common 을 같이 쓴다",
+      "defaultValue": "true"
+    },
     "kebabName": {
       "type": "derived",
       "valueSource": "name",
@@ -91,6 +97,13 @@
         "**/*.svg"
       ],
       "modifiers": [
+        {
+          "condition": "(!internalApi)",
+          "exclude": [
+            "src/internal-api/**",
+            "test/*/*/InternalApi/**"
+          ]
+        },
         {
           "condition": "(frontend != \"angular\" && frontend != \"all\")",
           "exclude": [

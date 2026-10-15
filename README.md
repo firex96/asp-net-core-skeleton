@@ -10,7 +10,7 @@
 
 | 스켈레톤 | 쓰는 곳 |
 |---|---|
-| **`asp-net-core-skeleton`** (이 레포) | ASP.NET Core API + SPA 한 벌 |
+| **`asp-net-core-skeleton`** (이 레포) | ASP.NET Core API + SPA 한 벌, 같은 Common 을 쓰는 내부 API(선택) |
 | `spring-boot-public-api-skeleton` | 외부에 노출되는 API (Spring Security + JWT) |
 | `spring-boot-internal-api-skeleton` | 게이트웨이 뒤의 내부 API |
 | `spring-batch-skeleton` | 배치·스케줄 작업 |
@@ -56,10 +56,11 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend sveltekit
 |---|---|---|
 | `-n` | 솔루션·프로젝트 이름. `AspNetCoreSkeletonApplication` 은 이 값으로, `asp-net-core-skeleton-application` 은 kebab-case(`contoso-shop`)로 바뀐다 | 출력 폴더 이름 |
 | `--frontend` | `angular` · `sveltekit` · `nuxt` · `all`(셋 다 두고 `SpaClient` 로 전환) | `angular` |
+| `--internalApi` | 게이트웨이 뒤 내부 API 앱(`InternalApi`)을 함께 만든다. `false` 면 앱과 테스트의 `InternalApi/` 폴더가 빠진다 | `true` |
 
 user-secrets ID 도 새로 만들어진다. 템플릿을 지우려면 `dotnet new uninstall <경로>`.
 
-**복사해서** 쓴다면 `AspNetCoreSkeletonApplication`(PascalCase)과 `asp-net-core-skeleton-application`(kebab-case)을 폴더·파일 이름과 내용에서 모두 바꾸고, 서버 csproj 의 `UserSecretsId` 를 새 GUID 로 바꾼다. 쓰지 않는 SPA 는 「프론트엔드 선택」의 표대로 지운다.
+**복사해서** 쓴다면 `AspNetCoreSkeletonApplication`(PascalCase)과 `asp-net-core-skeleton-application`(kebab-case)을 폴더·파일 이름과 내용에서 모두 바꾸고, 두 앱 csproj(Server · InternalApi)의 `UserSecretsId` 를 같은 새 GUID 로 바꾼다. 쓰지 않는 SPA 는 「프론트엔드 선택」의 표대로 지운다.
 
 ### 3. 프론트엔드를 고른다
 
@@ -117,6 +118,7 @@ curl -k https://localhost:7274/api/products             # []
 src/
   common/             Common   공유 라이브러리 — 영속 계층, 공유 BizService·Domain, Dto, 비밀값 출처 구성
   web-application/    Server   public 앱 — SPA 호스트, 컨트롤러, MappingService, 앱 전용 BizService
+  internal-api/       InternalApi  게이트웨이 뒤 내부 API 앱 — SPA 없음 (템플릿 --internalApi)
   spa/                client.angular · client.sveltekit · client.nuxt
 test/
   unit-tests/         UnitTests        외부 의존 없음
@@ -124,7 +126,7 @@ test/
   integration-tests/  IntegrationTests Docker 필요 (Testcontainers SQL Server · LocalStack)
 ```
 
-**프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 계층은 프로젝트 안의 폴더(네임스페이스)로 나눈다 — 「요청 흐름」 참고. 의존은 `Server → Common` 한 방향이다.
+**프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 계층은 프로젝트 안의 폴더(네임스페이스)로 나눈다 — 「요청 흐름」 참고. 의존은 앱(`Server` · `InternalApi`) → `Common` 한 방향이고, 앱끼리는 서로 참조하지 않는다. 배치 앱도 같은 자리(`Common` 을 쓰는 앱)에 들어올 예정이다.
 
 | 프로젝트 | 폴더 | 들어가는 것 |
 |---|---|---|
@@ -132,11 +134,12 @@ test/
 | | `Persistence/` | `Context/AppDbContext`, `Entities/`, `Services/` (`I~EntityService` · `~EntityService`), `Mappers/` (Entity↔Dto) |
 | | `Services/Biz/` · `Domain/` · `Dtos/` · `Enums/` | 여러 앱이 쓰는 BizService · 업무 규칙 · Dto · 열거형 |
 | `Server` | `Controllers/` · `Services/Mapping/` · `Models/` · `Mappers/` | HTTP 입출력과 화면용 변환 |
-| | `Services/Biz/` · `Dtos/` | 이 앱만 쓰는 BizService 와 Dto |
+| | `Services/Biz/` · `Dtos/` · `Clients/` | 이 앱만 쓰는 BizService · Dto · 외부 API 클라이언트 |
+| `InternalApi` | Server 와 같은 폴더 규칙 | 같은 공유 BizService 를 자기 Model 로 노출한다(예: 감사 주체 ID 까지 내보내는 `ProductModel`) |
 
 **Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다.** 앱은 DbContext 를 볼 수 없고, EntityService 의 public 메서드에 Entity 를 쓰면 접근성 불일치(CS0050 · CS0051)로 컴파일이 깨진다 — 「Entity 는 EntityService 위로 올라가지 않는다」를 컴파일러가 지킨다.
 
-**컴포지션 루트는 각 앱의 `Program.cs`** 다. 비밀값 출처(`AddSecretSource<Program>()`), Common(`AddCommon()`), 앱의 계층 서비스(`AddLayeredServices(typeof(Program).Assembly)`) 순서로 붙인다. 계층 서비스는 이름 접미사로 찾아 scoped 로 등록하므로 서비스를 추가할 때 등록 코드를 쓰지 않는다 — `~MappingService` · `~BizService` 는 자기 타입으로, `~EntityService` 는 `I~EntityService` 로.
+**컴포지션 루트는 각 앱의 `Program.cs`** 다(`InternalApi` 는 top-level 문 대신 네임스페이스 안의 `Program` 클래스 — 테스트가 두 앱을 함께 참조해도 이름이 겹치지 않는다). 비밀값 출처(`AddSecretSource<Program>()`), Common(`AddCommon()`), 앱의 계층 서비스(`AddLayeredServices(typeof(Program).Assembly)`) 순서로 붙인다. 계층 서비스는 이름 접미사로 찾아 scoped 로 등록하므로 서비스를 추가할 때 등록 코드를 쓰지 않는다 — `~MappingService` · `~BizService` 는 자기 타입으로, `~EntityService` 는 `I~EntityService` 로.
 
 엔티티를 추가하면 `AppDbContext` 에 `DbSet` 을 두고 마이그레이션을 만든다.
 
@@ -239,7 +242,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 | 2 | `X-User-Id` 헤더 | `Audit:TrustUserHeader=true` 일 때만 (기본 false) |
 | 3 | `AuditorIds.System` (`0`) | 위가 없을 때 — 시스템 자신이거나 주체를 모른다는 뜻 |
 
-값은 `long.TryParse` 로만 읽는다 — 빈 값 · 숫자 아님 · 범위 초과는 버린다(자르면 남의 ID 가 된다). **`X-User-Id` 는 외부 입력이다.** 그대로 믿으면 호출자가 다른 사용자로 감사 기록을 위조할 수 있으므로, 게이트웨이가 인증 결과로 헤더를 덮어쓰고 밖에서 온 같은 이름의 헤더를 지우는 배포에서만 켠다. 미들웨어는 인증 주체를 읽으므로 `UseAuthorization()` 뒤에 `UseAuditorContext()` 로 붙인다. 배치처럼 HTTP 가 아닌 실행은 진입점에서 `AuditorContext.Begin(userId)` 로 채운다.
+값은 `long.TryParse` 로만 읽는다 — 빈 값 · 숫자 아님 · 범위 초과는 버린다(자르면 남의 ID 가 된다). **`X-User-Id` 는 외부 입력이다.** 그대로 믿으면 호출자가 다른 사용자로 감사 기록을 위조할 수 있으므로, 게이트웨이가 인증 결과로 헤더를 덮어쓰고 밖에서 온 같은 이름의 헤더를 지우는 배포에서만 켠다. 내부 API 는 인증이 없어 헤더가 유일한 출처다 — 게이트웨이 뒤에 둘 때 `Audit__TrustUserHeader=true` 로 켠다. 미들웨어는 인증 주체를 읽으므로 `UseAuthorization()` 뒤에 `UseAuditorContext()` 로 붙인다. 배치처럼 HTTP 가 아닌 실행은 진입점에서 `AuditorContext.Begin(userId)` 로 채운다.
 
 ## 아키텍처 선택
 
@@ -351,11 +354,13 @@ dotnet build AspNetCoreSkeletonApplication.slnx
 dotnet run --project src/web-application/AspNetCoreSkeletonApplication.Server --launch-profile https
 dotnet publish src/web-application/AspNetCoreSkeletonApplication.Server -c Release -p:SpaClient=angular -o out
 ASPNETCORE_ENVIRONMENT=Local dotnet out/AspNetCoreSkeletonApplication.Server.dll
+dotnet run --project src/internal-api/AspNetCoreSkeletonApplication.InternalApi --launch-profile https
 ```
 
 | 항목 | 값 |
 |---|---|
 | 서버 | https://localhost:7274 · http://localhost:5255 |
+| 내부 API | https://localhost:7276 · http://localhost:5257 (SPA 없음, `Local` 에서 `/scalar`) |
 | 헬스 체크 | `/health` — `AppDbContext` 연결 확인 |
 | 패키지 버전 | `Directory.Packages.props` 중앙 관리 (전이 의존도 고정) |
 | macOS 참고 | VS JavaScript SDK 가 SPA 폴더에 `obj\Debug/\package.g.props` 같은 이름의 파일을 만든다. 빌드에 영향 없고 `.gitignore` 에 들어 있다 |

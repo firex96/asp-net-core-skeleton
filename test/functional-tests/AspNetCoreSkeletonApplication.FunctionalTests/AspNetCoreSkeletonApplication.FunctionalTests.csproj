@@ -5,5 +5,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\web-application\AspNetCoreSkeletonApplication.Server\AspNetCoreSkeletonApplication.Server.csproj" />
+    <!--#if (internalApi) -->
+    <ProjectReference Include="..\..\..\src\internal-api\AspNetCoreSkeletonApplication.InternalApi\AspNetCoreSkeletonApplication.InternalApi.csproj" />
+    <!--#endif -->
   </ItemGroup>
 </Project>

@@ -3,6 +3,11 @@
   <Folder Name="/src/Common/">
     <Project Path="src/common/AspNetCoreSkeletonApplication.Common/AspNetCoreSkeletonApplication.Common.csproj" />
   </Folder>
+  <!--#if (internalApi) -->
+  <Folder Name="/src/Internal API/">
+    <Project Path="src/internal-api/AspNetCoreSkeletonApplication.InternalApi/AspNetCoreSkeletonApplication.InternalApi.csproj" />
+  </Folder>
+  <!--#endif -->
   <Folder Name="/src/SPA/">
     <!--#if (frontend == "angular" || frontend == "all") -->
     <Project Path="src/spa/asp-net-core-skeleton-application.client.angular/asp-net-core-skeleton-application.client.angular.esproj">
@@ -43,6 +48,7 @@
     <File Path="CLAUDE.md" />
     <File Path="Directory.Packages.props" />
     <File Path="docker-compose.yml" />
+    <File Path="dotnet-tools.json" />
     <File Path="global.json" />
     <File Path="README.md" />
     <File Path="test/Directory.Build.props" />

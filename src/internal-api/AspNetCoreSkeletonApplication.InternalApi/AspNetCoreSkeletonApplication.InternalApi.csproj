@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    게이트웨이 뒤의 내부 API 앱. SPA 를 서빙하지 않는다. Common 을 Server 와 함께 쓴다.
+    UserSecretsId 는 Server 와 같다 — 로컬에서 같은 비밀(DB 연결 문자열)을 읽는다.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AspNetCoreSkeletonApplication.InternalApi</RootNamespace>
+    <UserSecretsId>352c4267-d2dd-461e-8203-8604ccb52ac8</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Riok.Mapperly" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\common\AspNetCoreSkeletonApplication.Common\AspNetCoreSkeletonApplication.Common.csproj" />
+  </ItemGroup>
+</Project>
