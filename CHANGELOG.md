@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- 로그인 — ASP.NET Core Identity + 쿠키(`__Host-session`, HttpOnly · Secure · SameSite=Strict), `/api/auth` register · login · logout · me, 5회 실패 시 30분 잠금(423 `ACCOUNT_LOCKED_ERROR`), 역할 `Administrator` 시드, 계정 테이블 `identity_*`(마이그레이션 `AddIdentity`)
+- Data Protection 키를 Redis 에 저장 — 여러 인스턴스가 쿠키 · antiforgery 토큰을 함께 읽는다
 - Batch 운영 대시보드 `/quartz`(Quartz.Dashboard) — Basic 인증 운영자 정책 뒤(정적 자산 포함), 계정 미설정 시 fail-closed, 다룰 Job 타입을 앱의 `Jobs` 로 제한
 - Batch 수동 실행 웹훅 `POST /api/jobs/{Job}/trigger` — API 키 인증(상수 시간 비교, 기동 시 검증), 키별 허용 Job(403), 파라미터 화이트리스트(400), Quartz `TriggerJob` 으로 실행해 동시 실행 방지 · 실행 이력 적용, 202 + 추적 ID
 - 본문 없는 4xx 응답도 ProblemDetails(`UseStatusCodePages`), 에러 코드 `UNAUTHORIZED_ERROR`(401, G015)
@@ -25,6 +27,7 @@
 - 게이트웨이 뒤 내부 API 앱 `InternalApi` — Server 와 같은 Common 을 쓰고 SPA 를 서빙하지 않는다. 템플릿 선택지 `--internalApi`(기본 true)
 
 ### Changed
+- 최소 API 의 검증 실패(`HttpValidationProblemDetails`)도 `NOT_VALID_ERROR` 로 분류
 - 프로젝트를 공유·배포 단위로 재편 — 빈 `ApplicationCore` · `Infrastructure.*` 를 지우고 공유 라이브러리 `Common` 을 둔다. `AppDbContext`(internal) 와 비밀값 출처 구성(`AddSecretSource<TUserSecrets>()`)이 `Common` 으로 옮겨졌다
 - 계층 `Controller → MappingService → BizService → EntityService` 를 도입하고 WeatherForecast 를 이 흐름으로 옮겼다(응답 JSON 은 같다). 계층 서비스는 `AddLayeredServices` 가 이름 접미사로 등록한다
 - Mapperly 엄격 모드 — 대상 누락(RMG012)·빈 매핑(RMG066)은 빌드 오류, 속성 null 불일치는 런타임 예외

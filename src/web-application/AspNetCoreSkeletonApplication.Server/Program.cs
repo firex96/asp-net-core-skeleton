@@ -12,6 +12,8 @@ builder.AddSecretSource<Program>();
 builder.Services.AddCommon();
 builder.Services.AddLayeredServices(typeof(Program).Assembly);
 builder.Services.AddSkeletonWeb();
+// 로그인 — Identity + 쿠키(같은 출처 SPA). README 「인증」
+builder.Services.AddSkeletonIdentity();
 
 // 외부 API 클라이언트 — 구성 바인딩 · 재시도 · 추적 ID 전파 · 실패 → ApiCallException
 builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:ExampleApi");
@@ -35,11 +37,13 @@ if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 app.UseAuditorContext();
 
 app.MapHealthChecks("/health");
 
+app.MapSkeletonAuthEndpoints();
 app.MapControllers();
 
 app.MapFallbackToFile("/index.html");

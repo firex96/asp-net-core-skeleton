@@ -233,6 +233,7 @@ EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis
 | `ItemNotFoundException` | 404 `NOT_FOUND_ERROR` (G009) | 예외 메시지 |
 | `ClientBadRequestException` | 400 `BAD_REQUEST_ERROR` (G001) | 예외 메시지 |
 | `ConflictException` | 409 `CONFLICT_ERROR` (G013) | 예외 메시지 |
+| 로그인 — 계정 잠김 | 423 `ACCOUNT_LOCKED_ERROR` (AUTH001) | 안내 문구 |
 | `ApiCallException` (외부 API 실패) | 502 `EXTERNAL_API_ERROR` (G014) | 없음 — 로그에만 남는다 |
 | DataAnnotations 검증 실패 (`[ApiController]` 자동 400) | 400 `NOT_VALID_ERROR` (G011), `errors` 에 필드별 메시지 | — |
 | 컨트롤러가 돌려준 상태 코드(`NotFound()` 등) | 상태 코드로 고른 코드 | — |
@@ -359,6 +360,30 @@ dotnet user-secrets set "Batch:Dashboard:Password" "$(openssl rand -hex 16)"
 4. 재실행해도 결과가 같은지(멱등) 확인하는 통합 테스트 — `DiscontinueStaleDraftJobTests` 를 본뜬다
 5. Job 고유 설정이 있으면 `Configuration/{이름}JobOptions` 를 같은 구성 섹션에 바인딩한다(`DiscontinueStaleDraftJobOptions` 참고)
 
+## 인증
+
+Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출처 SPA 가 호출하는 앱이라 토큰을 JS 에 두지 않는다. Spring Security 의 자리는 ASP.NET Core 의 인증 · 인가 미들웨어가, `UserDetailsService` · `PasswordEncoder` · 사용자 테이블 · 계정 잠금은 Identity 가 맡는다. InternalApi 는 인증 없이 게이트웨이 헤더(`X-User-Id`)로 감사 주체만 받고, Batch 는 웹훅 API 키 · 대시보드 계정을 따로 쓴다.
+
+| 엔드포인트 (`Common/Web/AuthenticationEndpoints`) | 동작 |
+|---|---|
+| `POST /api/auth/register` `{email, password}` | 201. 비밀번호 10자 이상 · 대소문자 · 숫자 · 기호(Identity 기본). 어기면 400 `NOT_VALID_ERROR` |
+| `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드) |
+| `POST /api/auth/logout` | 204, 쿠키 삭제 |
+| `GET /api/auth/me` | `{id, email, roles}`. 로그인하지 않았으면 401 |
+
+- **쿠키** — `__Host-session`, HttpOnly · Secure · SameSite=Strict, 8시간(쓰면 연장). 로그인 페이지가 없으므로 인증이 필요하면 리다이렉트 대신 401, 권한이 없으면 403 을 ProblemDetails 로 돌려준다.
+- **여러 인스턴스** — 쿠키를 암호화하는 Data Protection 키를 Redis 에 둔다(`{Cache:KeyPrefix}data-protection-keys`). 어느 인스턴스가 만든 쿠키든 다른 인스턴스가 읽는다. 키는 Redis 에 평문으로 있으므로 Redis 접근을 앱으로 제한한다.
+- **감사** — 로그인한 요청은 사용자 ID(`NameIdentifier` claim)가 감사 주체가 된다(「추적 ID 와 감사」의 1순위).
+- **계정 테이블** — Identity 정본 스키마를 `identity_` 접두사로 둔다(`identity_user`, `identity_role`, `identity_user_role` …). 프레임워크 소유라 업무 테이블 규칙(FOREIGN KEY 금지 · `BaseEntity`)의 대상이 아니다. 업무 데이터는 이 테이블에 칼럼을 더하지 않고, 사용자 ID 로 가리키는 별도 엔티티에 둔다.
+- **역할** — `Administrator` 가 시드돼 있다. 관리자 지정은 가입한 뒤 SQL 로 한다(관리 API 는 두지 않는다).
+
+```sql
+INSERT INTO identity_user_role (UserId, RoleId)
+SELECT u.Id, r.Id FROM identity_user AS u CROSS JOIN identity_role AS r
+WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADMINISTRATOR';
+-- 역할은 다음 로그인부터 쿠키에 실린다
+```
+
 ## 아키텍처 선택
 
 **레이어드를 쓴다 — 헥사고날 · 클린 아키텍처가 아니다.** 소규모 팀이 쓰는 CRUD 중심 스켈레톤에서는 포트 인터페이스와 도메인·영속 모델 이중화의 비용이 회수되지 않는다. 그 구조가 주는 이점 중 실제로 필요한 둘은 이미 있다 — 영속성 격리는 `internal` Entity 와 Dto 경계가, 테스트 용이성은 `I~EntityService` 대역이 맡는다. 계층 이름은 Spring 형제 스켈레톤과 같아서 스택이 달라도 같은 어휘로 읽힌다.
@@ -409,6 +434,9 @@ dotnet user-secrets set "Batch:Dashboard:Password" "$(openssl rand -hex 16)"
 | `SoftDeletable` + `@SQLRestriction` (엔티티마다) | `ISoftDeletable` — 인터셉터 + 전역 쿼리 필터가 자동으로 |
 | `@SlowMethod` + `SlowMethodAspect` | `SlowQueryInterceptor` · `SlowRequestMiddleware` — 경계에서 모두 잰다 |
 | `@Cacheable` · `@CachePut` · `@CacheEvict` (EntityService) | `EntityCache` — 조회 캐시 + 변경 시 태그 무효화(커밋 뒤) |
+| Spring Security(`SecurityFilterChain` · 필터) | ASP.NET Core 인증 · 인가 미들웨어(인증 스킴 · 정책) |
+| `UserDetailsService` · `BCryptPasswordEncoder` · `users` · 로그인 시도 카운터 | ASP.NET Core Identity(`identity_*` · `PasswordHasher` · lockout) |
+| JWT access/refresh + `user_sessions` + Redis 세션 캐시 | Identity 쿠키 + Redis 의 Data Protection 키(같은 출처 SPA) |
 
 ### 선언
 

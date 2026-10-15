@@ -1,4 +1,5 @@
 using AspNetCoreSkeletonApplication.Common.Errors;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AspNetCoreSkeletonApplication.Common.Web;
@@ -26,7 +27,8 @@ internal static class ProblemDetailsExtensions
             return;
         }
 
-        var errorCode = problemDetails is ValidationProblemDetails
+        // HttpValidationProblemDetails 는 MVC 의 ValidationProblemDetails 와 최소 API 의 ValidationProblem 이 함께 쓰는 기반 타입이다.
+        var errorCode = problemDetails is HttpValidationProblemDetails
             ? ErrorCode.NotValid
             : ErrorCode.FromStatus(problemDetails.Status ?? 500);
         problemDetails.AddErrorCode(errorCode);

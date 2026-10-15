@@ -1,7 +1,12 @@
 using System.Text.Json.Serialization;
+using AspNetCoreSkeletonApplication.Common.Persistence.Caching;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace AspNetCoreSkeletonApplication.Common.Web;
 
@@ -23,6 +28,12 @@ public static class WebServiceCollectionExtensions
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
         services.AddOptions<AuditOptions>().BindConfiguration("Audit");
+
+        // Data Protection 키(쿠키 · antiforgery 토큰을 암호화한다)를 Redis 에 둔다 — 인스턴스가 여러 개여도 서로의 쿠키를 읽는다.
+        services.AddSingleton<DataProtectionRedis>();
+        services.AddDataProtection().SetApplicationName("asp-net-core-skeleton-application");
+        services.AddOptions<KeyManagementOptions>().Configure<DataProtectionRedis, IOptions<CacheOptions>>((keys, redis, cache) =>
+            keys.XmlRepository = new RedisXmlRepository(() => redis.Database, $"{cache.Value.KeyPrefix}data-protection-keys"));
 
         // 열거형은 숫자가 아니라 외부 코드([JsonStringEnumMemberName])로 주고받는다 — JSON 본문도, 쿼리 · 라우트도.
         services.Configure<JsonOptions>(options =>
