@@ -5,7 +5,7 @@ namespace AspNetCoreSkeletonApplication.Common.Web;
 
 /// <summary>
 /// 웹 앱이 공통으로 쓰는 HTTP 파이프라인 구성. 앱의 Program.cs 가 <see cref="AddSkeletonWeb"/> 와
-/// <see cref="UseSkeletonWeb"/> 를 짝으로 부른다.
+/// <see cref="UseSkeletonWeb"/>(맨 앞) · <see cref="UseAuditorContext"/>(인증 뒤)를 부른다.
 /// </summary>
 public static class WebServiceCollectionExtensions
 {
@@ -20,6 +20,8 @@ public static class WebServiceCollectionExtensions
         });
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
+        services.AddOptions<AuditOptions>().BindConfiguration("Audit");
+
         return services;
     }
 
@@ -31,6 +33,16 @@ public static class WebServiceCollectionExtensions
     {
         app.UseMiddleware<TraceIdMiddleware>();
         app.UseExceptionHandler();
+
+        return app;
+    }
+
+    /// <summary>
+    /// 요청의 감사 주체를 정한다. 인증 주체를 읽으므로 <c>UseAuthentication</c> · <c>UseAuthorization</c> 뒤에 둔다.
+    /// </summary>
+    public static IApplicationBuilder UseAuditorContext(this IApplicationBuilder app)
+    {
+        app.UseMiddleware<AuditorContextMiddleware>();
 
         return app;
     }

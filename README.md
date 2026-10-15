@@ -212,6 +212,20 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 
 `Common/Web/TraceIdMiddleware` 가 하고, `UseSkeletonWeb()` 이 파이프라인 맨 앞에 둔다. 콘솔 로그에 scope 를 찍는 설정은 `appsettings.json` 의 `Logging:Console:FormatterOptions:IncludeScopes` 다. AsyncLocal 이라 `await` · `Task.Run` 을 따라 흐르므로 Spring 의 `MdcTaskDecorator` 같은 전달 장치는 필요 없다.
 
+### 감사 — 누가 언제 만들고 고쳤나
+
+`BaseAuditedEntity` 를 상속한 엔티티는 저장 직전에 `CreatedBy` · `CreatedAt` · `UpdatedBy` · `UpdatedAt` 이 채워진다(`AuditSaveChangesInterceptor`, 시각은 `TimeProvider` 의 UTC). 수정 때 생성 필드는 바뀌지 않는다. EntityService 나 매퍼가 직접 넣지 않는다.
+
+감사 주체는 `AuditorContext` 하나만 읽고, HTTP 요청에서는 `AuditorContextMiddleware` 가 다음 순서로 정한다.
+
+| 순위 | 출처 | 조건 |
+|---|---|---|
+| 1 | 인증 주체 — `NameIdentifier` 또는 `sub` claim | 인증이 붙어 있을 때 |
+| 2 | `X-User-Id` 헤더 | `Audit:TrustUserHeader=true` 일 때만 (기본 false) |
+| 3 | `AuditorIds.System` (`0`) | 위가 없을 때 — 시스템 자신이거나 주체를 모른다는 뜻 |
+
+값은 `long.TryParse` 로만 읽는다 — 빈 값 · 숫자 아님 · 범위 초과는 버린다(자르면 남의 ID 가 된다). **`X-User-Id` 는 외부 입력이다.** 그대로 믿으면 호출자가 다른 사용자로 감사 기록을 위조할 수 있으므로, 게이트웨이가 인증 결과로 헤더를 덮어쓰고 밖에서 온 같은 이름의 헤더를 지우는 배포에서만 켠다. 미들웨어는 인증 주체를 읽으므로 `UseAuthorization()` 뒤에 `UseAuditorContext()` 로 붙인다. 배치처럼 HTTP 가 아닌 실행은 진입점에서 `AuditorContext.Begin(userId)` 로 채운다.
+
 ## 아키텍처 선택
 
 **레이어드를 쓴다 — 헥사고날 · 클린 아키텍처가 아니다.** 소규모 팀이 쓰는 CRUD 중심 스켈레톤에서는 포트 인터페이스와 도메인·영속 모델 이중화의 비용이 회수되지 않는다. 그 구조가 주는 이점 중 실제로 필요한 둘은 이미 있다 — 영속성 격리는 `internal` Entity 와 Dto 경계가, 테스트 용이성은 `I~EntityService` 대역이 맡는다. 계층 이름은 Spring 형제 스켈레톤과 같아서 스택이 달라도 같은 어휘로 읽힌다.
@@ -265,7 +279,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | Azure Key Vault · GCP Secret Manager 비밀 이름 | `:` → `--` | `ConnectionStrings--Default` |
 | AWS Secrets Manager JSON 비밀의 키 | 구성 키 그대로 | `{"ConnectionStrings:Default": "…"}` |
 
-비밀이 아닌 환경별 값(외부 API 주소 등)은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — 예: `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`.
+비밀이 아닌 환경별 값은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — 외부 API 주소 `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`, 감사 헤더 신뢰 `Audit:TrustUserHeader` ← `Audit__TrustUserHeader`.
 
 평문 자격증명은 어느 appsettings 에도 적지 않는다. `appsettings.Local.json` 의 docker compose 계정만 예외다(로컬 컨테이너 전용 값). 비밀을 추가하면 이 표의 각 출처에 같은 이름으로 넣고, Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에도 추가한다.
 

@@ -1,4 +1,5 @@
 using AspNetCoreSkeletonApplication.Common.Persistence.Context;
+using AspNetCoreSkeletonApplication.Common.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,14 +11,16 @@ public static class CommonServiceCollectionExtensions
 {
     /// <summary>
     /// Common 을 쓰는 앱이 부르는 등록 진입점. DB 컨텍스트, DB 헬스 체크, Common 의 계층 서비스
-    /// (EntityService · 공유 BizService), TimeProvider 를 등록한다.
+    /// (EntityService · 공유 BizService), 감사 필드 인터셉터, TimeProvider 를 등록한다.
     /// </summary>
     public static IServiceCollection AddCommon(this IServiceCollection services)
     {
         // 연결 문자열은 첫 DbContext 생성 시 읽는다 — 빠져 있으면 GetRequiredConnectionString 이 키 이름을 담아 멈춘다.
+        services.AddSingleton<AuditSaveChangesInterceptor>();
         services.AddDbContextPool<AppDbContext>((serviceProvider, options) => options
             .UseSqlServer(serviceProvider.GetRequiredService<IConfiguration>().GetRequiredConnectionString("Default"))
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .AddInterceptors(serviceProvider.GetRequiredService<AuditSaveChangesInterceptor>()));
 
         // 현재 시각은 TimeProvider 로만 읽는다 — 테스트에서 FakeTimeProvider 로 바꿔 끼운다.
         services.TryAddSingleton(TimeProvider.System);

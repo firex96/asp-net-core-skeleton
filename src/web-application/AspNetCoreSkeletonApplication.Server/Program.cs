@@ -36,6 +36,7 @@ if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+app.UseAuditorContext();
 
 app.MapHealthChecks("/health");
 
