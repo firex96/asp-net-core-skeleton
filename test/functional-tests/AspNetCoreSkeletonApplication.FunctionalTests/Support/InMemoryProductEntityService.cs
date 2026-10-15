@@ -23,6 +23,14 @@ public sealed class InMemoryProductEntityService : IProductEntityService
     public Task<IReadOnlyList<ProductDto>> ListAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ProductDto>>(_products.Values.OrderBy(product => product.Id).ToArray());
 
+    public Task<IReadOnlyList<ProductDto>> ListStaleDraftsAsync(
+        DateTimeOffset updatedBefore, long afterId, int pageSize, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ProductDto>>(_products.Values
+            .Where(product => product.Status == ProductStatus.Draft && product.UpdatedAt < updatedBefore && product.Id > afterId)
+            .OrderBy(product => product.Id)
+            .Take(pageSize)
+            .ToArray());
+
     public Task<ProductDto> CreateAsync(ProductCreateDto product, ProductStatus status, CancellationToken cancellationToken)
     {
         var id = Interlocked.Increment(ref _lastId);

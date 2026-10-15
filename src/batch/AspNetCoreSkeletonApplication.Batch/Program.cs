@@ -1,4 +1,5 @@
 using AspNetCoreSkeletonApplication.Batch.Configuration;
+using AspNetCoreSkeletonApplication.Batch.Jobs;
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;
 using Scalar.AspNetCore;
@@ -23,7 +24,12 @@ public class Program
         builder.Services.AddSkeletonWeb();
 
         // 스케줄할 Job — 스케줄은 Batch:Jobs:{Job 클래스 이름} 구성이 정한다.
-        builder.Services.AddBatchScheduler(builder.Configuration, _ => { });
+        builder.Services.AddBatchScheduler(builder.Configuration, jobs => jobs
+            .Add<DiscontinueStaleDraftJob>());
+        builder.Services.AddOptions<DiscontinueStaleDraftJobOptions>()
+            .BindConfiguration(BatchSchedulerExtensions.SectionOf(nameof(DiscontinueStaleDraftJob)))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();

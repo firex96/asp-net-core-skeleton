@@ -94,6 +94,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 |---|---|
 | Server 의 WeatherForecast 한 벌 — `Controllers/WeatherForecastController`, `Services/Mapping/WeatherForecastMappingService`, `Services/Biz/WeatherForecastBizService`, `Dtos/WeatherForecastDto`, `Models/WeatherForecastModel`, `Mappers/WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
 | Product 한 벌 — Common 의 `Enums/ProductStatus`, `Dtos/Product*Dto`(상태 이력 포함), `Domain/ProductStatusTransition`, `Services/Biz/ProductBizService`, `Persistence/` 의 `Entities/Main/Product*Entity` · `Configurations/Product*EntityConfiguration` · `Mappers/Product*EntityMapper` · `Services/(I)Product*EntityService`, Server 의 `Controllers/ProductController` · `Services/Mapping/ProductMappingService` · `Models/Product*Model` · `Mappers/ProductModelMapper` (엔드포인트: GET · POST · PUT status · DELETE · GET status-history) | `AppDbContext.Products` · `ProductStatusHistories`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
+| Batch 의 `Jobs/DiscontinueStaleDraftJob`, `Configuration/DiscontinueStaleDraftJobOptions` (+ Common 의 `Domain/StaleDraftPolicy`, `ProductBizService.DiscontinueStaleDraftsAsync`, `ListStaleDraftsAsync`) | Program.cs 의 `jobs.Add<DiscontinueStaleDraftJob>()` 와 옵션 바인딩, `appsettings*.json` 의 `Batch:Jobs:DiscontinueStaleDraftJob`, 테스트의 `DiscontinueStaleDraftJobTests` · `StaleDraftPolicyTests` |
 | Server 의 `Clients/ExampleApiClient` · `ExampleApiOptions`, `Dtos/ExampleStatusDto` | Program.cs 의 `AddApiClient<ExampleApiClient, …>` 줄, `appsettings.json` 의 `Clients:ExampleApi`, `UnitTests/Clients/ExampleApiClientTests.cs` |
 | `AwsSecretSourceTests` (Aws 를 안 쓰면) | 통합 테스트 csproj 의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack` |
 
@@ -300,12 +301,23 @@ EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis
 - `[DisallowConcurrentExecution]` 을 단다 — 클러스터 전체에서 같은 Job 은 한 번에 하나만 돈다.
 - 주입받는 것은 BizService · `IOptions<>` · `TimeProvider` · `ILogger<>` 뿐이다. 업무 판단은 BizService 가 Domain 으로, 쓰기는 BizService 의 `IMainTransaction` 안에서 한다.
 
+**샘플 — `DiscontinueStaleDraftJob`** (매일 02:00, 로컬은 5분마다)
+
+`StaleAfterDays`(기본 30)일 넘게 손대지 않은 Draft 상품을 판매 종료한다. Job 은 현재 시각과 구성을 넘길 뿐이고, 공유 `ProductBizService.DiscontinueStaleDraftsAsync` 가 다음을 한다.
+
+1. 기준 시각은 Domain(`StaleDraftPolicy.CutoffOf`)이 정한다.
+2. 대상은 **keyset 페이지**(`Id > 마지막 id`, id 순)로 읽는다 — 처리하면서 대상이 줄어도 건너뛰는 행이 없다.
+3. 페이지마다 `IMainTransaction` 하나로, 웹의 상태 변경과 **같은 경로**(Domain 판단 → 변경 → 상태 이력)로 바꾼다. 감사 주체는 시스템(`0`), 캐시 무효화는 커밋 뒤.
+
+**멱등** — 처리한 상품은 조회 조건(Draft)에서 빠지므로 다시 실행하면 대상이 0건이다. `DiscontinueStaleDraftJobTests` 가 Quartz 로 두 번 실행해 1회차 결과 · 2회차 0건 · 데이터 스냅샷 동일 · 실행 이력 성공 2건을 확인한다. 새 Job 도 같은 모양으로 — 처리 완료 상태를 데이터에 남기고, 조회 조건이 그것을 걸러야 한다.
+
 **새 Job 체크리스트**
 
 1. `Jobs/{이름}Job.cs` — `TracedJob` 상속, `[DisallowConcurrentExecution]`, `ExecuteJobAsync` 에서 BizService 호출
 2. `Program.cs` 의 `AddBatchScheduler(..., jobs => jobs.Add<{이름}Job>())`
 3. `appsettings.json` 의 `Batch:Jobs:{이름}Job` — `Enabled` · `Cron`
-4. 재실행해도 결과가 같은지(멱등) 확인하는 통합 테스트
+4. 재실행해도 결과가 같은지(멱등) 확인하는 통합 테스트 — `DiscontinueStaleDraftJobTests` 를 본뜬다
+5. Job 고유 설정이 있으면 `Configuration/{이름}JobOptions` 를 같은 구성 섹션에 바인딩한다(`DiscontinueStaleDraftJobOptions` 참고)
 
 ## 아키텍처 선택
 

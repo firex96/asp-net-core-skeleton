@@ -28,14 +28,41 @@ public class ProductBizService(
             cancellationToken);
 
     public Task<ProductDto> ChangeStatusAsync(long id, ProductStatus status, CancellationToken cancellationToken) =>
-        transaction.ExecuteAsync(async token =>
+        transaction.ExecuteAsync(
+            async token => await ChangeStatusCoreAsync(await productEntityService.GetAsync(id, token), status, token),
+            cancellationToken);
+
+    /// <summary>
+    /// 오래 손대지 않은 Draft 상품을 판매 종료한다(Batch 의 <c>DiscontinueStaleDraftJob</c>). keyset 페이지로 읽고 페이지마다 커밋한다 —
+    /// 처리한 행은 조회 조건(Draft)에서 빠지므로 다시 실행해도 같은 행을 두 번 처리하지 않는다. 처리한 건수를 돌려준다.
+    /// </summary>
+    public async Task<int> DiscontinueStaleDraftsAsync(
+        DateTimeOffset now, int staleAfterDays, int pageSize, CancellationToken cancellationToken)
+    {
+        var cutoff = StaleDraftPolicy.CutoffOf(now, staleAfterDays);
+        var processed = 0;
+        var afterId = 0L;
+        while (true)
         {
-            var product = await productEntityService.GetAsync(id, token);
-            ProductStatusTransition.EnsureCanChange(product.Status, status);
-            var changed = await productEntityService.UpdateStatusAsync(id, status, token);
-            await statusHistoryEntityService.CreateAsync(new ProductStatusHistoryCreateDto(id, product.Status, status), token);
-            return changed;
-        }, cancellationToken);
+            var page = await productEntityService.ListStaleDraftsAsync(cutoff, afterId, pageSize, cancellationToken);
+            if (page.Count == 0)
+            {
+                return processed;
+            }
+
+            await transaction.ExecuteAsync(async token =>
+            {
+                foreach (var product in page)
+                {
+                    await ChangeStatusCoreAsync(product, ProductStatus.Discontinued, token);
+                }
+
+                return page.Count;
+            }, cancellationToken);
+            processed += page.Count;
+            afterId = page[^1].Id;
+        }
+    }
 
     public Task DeleteAsync(long id, CancellationToken cancellationToken) =>
         transaction.ExecuteAsync(async token =>
@@ -43,6 +70,15 @@ public class ProductBizService(
             await productEntityService.DeleteAsync(id, token);
             return true;
         }, cancellationToken);
+
+    /// <summary>상태 전이 한 건 — Domain 판단, 변경, 이력. 트랜잭션 안에서만 부른다.</summary>
+    private async Task<ProductDto> ChangeStatusCoreAsync(ProductDto product, ProductStatus status, CancellationToken token)
+    {
+        ProductStatusTransition.EnsureCanChange(product.Status, status);
+        var changed = await productEntityService.UpdateStatusAsync(product.Id, status, token);
+        await statusHistoryEntityService.CreateAsync(new ProductStatusHistoryCreateDto(product.Id, product.Status, status), token);
+        return changed;
+    }
 
     /// <summary>상품이 없으면 404 — 빈 목록으로 "없는 상품" 과 "이력 없는 상품" 을 구분할 수 없게 하지 않는다.</summary>
     public async Task<IReadOnlyList<ProductStatusHistoryDto>> ListStatusHistoryAsync(long id, CancellationToken cancellationToken)

@@ -34,6 +34,15 @@ internal sealed class ProductEntityService(AppDbContext dbContext, EntityCache c
             async token => await dbContext.Products.OrderBy(product => product.Id).ProjectToDto().ToListAsync(token),
             cancellationToken) ?? [];
 
+    public async Task<IReadOnlyList<ProductDto>> ListStaleDraftsAsync(
+        DateTimeOffset updatedBefore, long afterId, int pageSize, CancellationToken cancellationToken) =>
+        await dbContext.Products
+            .Where(product => product.Status == ProductStatus.Draft && product.UpdatedAt < updatedBefore && product.Id > afterId)
+            .OrderBy(product => product.Id)
+            .Take(pageSize)
+            .ProjectToDto()
+            .ToListAsync(cancellationToken);
+
     public async Task<ProductDto> CreateAsync(ProductCreateDto product, ProductStatus status, CancellationToken cancellationToken)
     {
         var entity = product.ToEntity(status);

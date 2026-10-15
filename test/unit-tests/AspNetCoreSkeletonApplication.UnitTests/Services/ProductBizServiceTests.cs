@@ -64,6 +64,26 @@ public class ProductBizServiceTests
         Assert.Equal(1, _transaction.Executions);
     }
 
+    [Fact]
+    public async Task DiscontinueStaleDrafts_PagesUntilEmpty_OneTransactionPerPage()
+    {
+        var now = new DateTimeOffset(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        var cutoff = now.AddDays(-30);
+        _entityService.ListStaleDraftsAsync(cutoff, 0, 2, Arg.Any<CancellationToken>())
+            .Returns([Product(1, ProductStatus.Draft), Product(2, ProductStatus.Draft)]);
+        _entityService.ListStaleDraftsAsync(cutoff, 2, 2, Arg.Any<CancellationToken>())
+            .Returns([Product(3, ProductStatus.Draft)]);
+        _entityService.ListStaleDraftsAsync(cutoff, 3, 2, Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        var processed = await CreateBizService().DiscontinueStaleDraftsAsync(now, 30, 2, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, processed);
+        Assert.Equal(2, _transaction.Executions);
+        await _entityService.Received(3).UpdateStatusAsync(Arg.Any<long>(), ProductStatus.Discontinued, Arg.Any<CancellationToken>());
+        await _historyService.Received(3).CreateAsync(Arg.Any<ProductStatusHistoryCreateDto>(), Arg.Any<CancellationToken>());
+    }
+
     private static ProductDto Product(long id, ProductStatus status) =>
         new(id, "Keyboard", 49_000m, status, 0, DateTimeOffset.UnixEpoch, 0, DateTimeOffset.UnixEpoch);
 
