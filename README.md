@@ -90,6 +90,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 | 지울 것 | 함께 지워야 하는 것 |
 |---|---|
 | Server 의 WeatherForecast 한 벌 — `Controllers/WeatherForecastController`, `Services/Mapping/WeatherForecastMappingService`, `Services/Biz/WeatherForecastBizService`, `Dtos/WeatherForecastDto`, `Models/WeatherForecastModel`, `Mappers/WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
+| Server 의 `Clients/ExampleApiClient` · `ExampleApiOptions`, `Dtos/ExampleStatusDto` | Program.cs 의 `AddApiClient<ExampleApiClient, …>` 줄, `appsettings.json` 의 `Clients:ExampleApi`, `UnitTests/Clients/ExampleApiClientTests.cs` |
 | `AwsSecretSourceTests` (Aws 를 안 쓰면) | 통합 테스트 csproj 의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack` |
 
 ### 6. 뜨는지 확인한다
@@ -159,6 +160,16 @@ dotnet ef migrations add Initial \
 
 예: `GET /weatherforecast` — `WeatherForecastController` 가 `WeatherForecastMappingService.List()` 를 부르고, MappingService 는 `WeatherForecastBizService` 가 만든 `WeatherForecastDto` 에 화씨(표시용 파생 값)를 계산해 `WeatherForecastMapper.ToModel(dto, temperatureF)` 로 `WeatherForecastModel` 을 만든다.
 
+### 외부 API 클라이언트
+
+외부 API 는 앱의 `Clients/` 에 typed HttpClient `~Client` 로 두고 BizService 만 주입받는다. 등록은 Program.cs 한 줄이다.
+
+```csharp
+builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:ExampleApi");
+```
+
+이 한 줄이 붙이는 것 — `~Options`(`ApiClientOptions` 상속) 바인딩과 기동 시 검증(`BaseAddress` 가 없으면 기동이 멈춘다), 표준 resilience(재시도 · 타임아웃 · 회로 차단), 시도마다 `X-Trace-Id` 전파, 재시도 뒤에도 응답이 없으면 `ApiCallException`(502). 응답은 `ReadRequiredFromJsonAsync<T>()` 로 읽는다 — 오류 상태나 빈 본문도 `ApiCallException` 이 되어 실패가 null 로 새지 않는다.
+
 ## 에러 응답
 
 모든 에러 응답은 **ProblemDetails**(`application/problem+json`, RFC 9457)다. 어디서 만들어졌든 확장 필드 `code` · `divisionCode` · `traceId` 가 붙는다.
@@ -180,6 +191,7 @@ dotnet ef migrations add Initial \
 | `ItemNotFoundException` | 404 `NOT_FOUND_ERROR` (G009) | 예외 메시지 |
 | `ClientBadRequestException` | 400 `BAD_REQUEST_ERROR` (G001) | 예외 메시지 |
 | `ConflictException` | 409 `CONFLICT_ERROR` (G013) | 예외 메시지 |
+| `ApiCallException` (외부 API 실패) | 502 `EXTERNAL_API_ERROR` (G014) | 없음 — 로그에만 남는다 |
 | DataAnnotations 검증 실패 (`[ApiController]` 자동 400) | 400 `NOT_VALID_ERROR` (G011), `errors` 에 필드별 메시지 | — |
 | 컨트롤러가 돌려준 상태 코드(`NotFound()` 등) | 상태 코드로 고른 코드 | — |
 | 그 밖의 예외 | 500 `INTERNAL_SERVER_ERROR` (G999) | 없음 — 내부 메시지를 내보내지 않는다 |
@@ -252,6 +264,8 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | 환경변수 | `:` → `__` | `ConnectionStrings__Default` |
 | Azure Key Vault · GCP Secret Manager 비밀 이름 | `:` → `--` | `ConnectionStrings--Default` |
 | AWS Secrets Manager JSON 비밀의 키 | 구성 키 그대로 | `{"ConnectionStrings:Default": "…"}` |
+
+비밀이 아닌 환경별 값(외부 API 주소 등)은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — 예: `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`.
 
 평문 자격증명은 어느 appsettings 에도 적지 않는다. `appsettings.Local.json` 의 docker compose 계정만 예외다(로컬 컨테이너 전용 값). 비밀을 추가하면 이 표의 각 출처에 같은 이름으로 넣고, Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에도 추가한다.
 

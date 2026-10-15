@@ -1,5 +1,6 @@
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;
+using AspNetCoreSkeletonApplication.Server.Clients;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,9 @@ builder.AddSecretSource<Program>();
 builder.Services.AddCommon();
 builder.Services.AddLayeredServices(typeof(Program).Assembly);
 builder.Services.AddSkeletonWeb();
+
+// 외부 API 클라이언트 — 구성 바인딩 · 재시도 · 추적 ID 전파 · 실패 → ApiCallException
+builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:ExampleApi");
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

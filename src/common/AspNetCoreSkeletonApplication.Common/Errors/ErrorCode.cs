@@ -12,9 +12,10 @@ public sealed class ErrorCode(string code, int status, string divisionCode, stri
     public static readonly ErrorCode NotFound = new("NOT_FOUND_ERROR", 404, "G009", "Not Found");
     public static readonly ErrorCode NotValid = new("NOT_VALID_ERROR", 400, "G011", "One or more validation errors occurred");
     public static readonly ErrorCode Conflict = new("CONFLICT_ERROR", 409, "G013", "Conflict");
+    public static readonly ErrorCode ExternalApiError = new("EXTERNAL_API_ERROR", 502, "G014", "Bad Gateway");
     public static readonly ErrorCode InternalServerError = new("INTERNAL_SERVER_ERROR", 500, "G999", "Internal Server Error");
 
-    private static readonly ErrorCode[] ByStatus = [BadRequest, Forbidden, NotFound, Conflict, InternalServerError];
+    private static readonly ErrorCode[] ByStatus = [BadRequest, Forbidden, NotFound, Conflict, ExternalApiError, InternalServerError];
 
     public string Code => code;
 
