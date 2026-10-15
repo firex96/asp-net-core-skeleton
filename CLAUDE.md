@@ -22,6 +22,7 @@ ASPNETCORE_ENVIRONMENT=Local dotnet ef database update --project src/common/AspN
 dotnet run --project src/web-application/AspNetCoreSkeletonApplication.Server --launch-profile https
 dotnet run --project src/web-application/AspNetCoreSkeletonApplication.Server --launch-profile https -p:SpaClient=nuxt
 dotnet run --project src/internal-api/AspNetCoreSkeletonApplication.InternalApi --launch-profile https
+dotnet run --project src/batch/AspNetCoreSkeletonApplication.Batch --launch-profile https
 
 # SPA (각 src/spa/<클라이언트> 에서)
 npm ci && npm run build && npm test          # Angular 는 npm test -- --watch=false
@@ -30,12 +31,12 @@ npm run check                                # SvelteKit · Nuxt 타입 검사
 # 템플릿 확인 — 사용자 템플릿 캐시를 건드리지 않게 custom hive 를 쓴다
 dotnet new install . --debug:custom-hive <임시 폴더>
 dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend all -o <출력> --debug:custom-hive <임시 폴더>
-dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend angular --internalApi false -o <출력> --debug:custom-hive <임시 폴더>
+dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend angular --internalApi false --batch false -o <출력> --debug:custom-hive <임시 폴더>
 ```
 
 ## Architecture
 
-- 프로젝트는 공유·배포 단위다: `Common`(공유 라이브러리) ← 앱(`Server` · `InternalApi`). 앱끼리는 참조하지 않는다. 계층은 프로젝트 안의 네임스페이스다 — `Controller → MappingService → BizService → EntityService → DbContext`, 업무 판단은 순수 `Domain`. 계층별 책임·주입 허용 목록은 README 「요청 흐름」, 이름·선언 규칙과 리뷰 체크포인트는 README 「코딩 규약」이 정본이다. 규칙에 예외 케이스를 두지 않는다.
+- 프로젝트는 공유·배포 단위다: `Common`(공유 라이브러리) ← 앱(`Server` · `InternalApi` · `Batch`). 앱끼리는 참조하지 않는다. Batch 는 Quartz.NET(클러스터 · 영속 저장소) — README 「Batch」. 계층은 프로젝트 안의 네임스페이스다 — `Controller → MappingService → BizService → EntityService → DbContext`, 업무 판단은 순수 `Domain`. 계층별 책임·주입 허용 목록은 README 「요청 흐름」, 이름·선언 규칙과 리뷰 체크포인트는 README 「코딩 규약」이 정본이다. 규칙에 예외 케이스를 두지 않는다.
 - Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다. 앱은 EntityService 의 Dto 로만 데이터를 본다.
 - 컴포지션 루트는 각 앱의 `Program.cs` 다. 계층 서비스는 `AddLayeredServices` 가 이름 접미사로 등록하므로 따로 등록하지 않는다.
 - 비밀값 출처 분기는 `Common/Configuration/SecretSourceExtensions.cs` 한 곳이다. 프로파일(`ASPNETCORE_ENVIRONMENT`)은 Local · Aws · Azure · Gcp 와 미지정(환경변수만)뿐이다 — dev·staging·prod 프로파일을 만들지 않는다.
@@ -48,6 +49,6 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend angular --internalApi 
 - **패키지 버전은 `Directory.Packages.props` 에만.** csproj 의 `PackageReference` 에 `Version` 을 적지 않는다. 테스트 공통 설정은 `test/Directory.Build.props`.
 - **규약 테스트를 지킨다.** `UnitTests/Conventions/` 가 실패하면 규약 쪽이 아니라 코드를 고친다. 새 앱을 더하면 `ConventionScan` 의 어셈블리 목록에 넣는다.
 - **새 테스트는 의존으로 위치를 정한다.** 외부 의존 없음 → `UnitTests`, HTTP 파이프라인(DB 없음) → `FunctionalTests`, Docker(DB·클라우드 에뮬레이터) → `IntegrationTests`.
-- **템플릿 조건 주석을 깨지 않는다.** 서버 csproj · 테스트 csproj · slnx 의 `<!--#if (frontend == …) -->` · `<!--#if (internalApi) -->` 는 `dotnet new` 용이다. InternalApi 전용 테스트는 각 테스트 프로젝트의 `InternalApi/` 폴더에 둔다(템플릿이 폴더째 뺀다). 레포 원본에서는 그냥 주석이므로 첫 분기(angular)가 기본값이 되도록 순서를 지킨다.
+- **템플릿 조건 주석을 깨지 않는다.** 서버 csproj · 테스트 csproj · slnx 의 `<!--#if (frontend == …) -->` · `<!--#if (internalApi) -->` · `<!--#if (batch) -->` 는 `dotnet new` 용이다. InternalApi · Batch 전용 테스트는 각 테스트 프로젝트의 `InternalApi/` · `Batch/` 폴더에 둔다(템플릿이 폴더째 뺀다). 레포 원본에서는 그냥 주석이므로 첫 분기(angular)가 기본값이 되도록 순서를 지킨다.
 - 이름은 `AspNetCoreSkeletonApplication`(PascalCase)과 `asp-net-core-skeleton-application`(kebab-case) 두 형태로만 쓴다 — 템플릿이 이 두 문자열을 치환한다.
 - C# 은 file-scoped namespace, 생성자 주입은 primary constructor 를 쓴다. 들여쓰기는 `.editorconfig`.

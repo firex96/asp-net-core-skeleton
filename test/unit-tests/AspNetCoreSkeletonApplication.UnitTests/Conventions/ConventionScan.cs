@@ -26,6 +26,7 @@ internal static partial class ConventionScan
         return ns switch
         {
             _ when ns.EndsWith(".Controllers", StringComparison.Ordinal) => Layer.Controller,
+            _ when ns.EndsWith(".Jobs", StringComparison.Ordinal) => Layer.Job,
             _ when ns.EndsWith(".Services.Mapping", StringComparison.Ordinal) => Layer.MappingService,
             _ when ns.EndsWith(".Services.Biz", StringComparison.Ordinal) => Layer.BizService,
             _ when ns.EndsWith(".Persistence.Services", StringComparison.Ordinal) => Layer.EntityService,
@@ -66,10 +67,13 @@ internal static partial class ConventionScan
     private static List<Assembly> CreateAssemblies()
     {
         List<Assembly> assemblies = [typeof(ErrorCode).Assembly, typeof(Program).Assembly];
-        AddOptionalAppAssemblies(assemblies);
+        AddInternalApiAssembly(assemblies);
+        AddBatchAssembly(assemblies);
         return assemblies;
     }
 
-    /// <summary>템플릿에서 빠질 수 있는 앱은 그 앱 폴더(<c>InternalApi/</c>)에서 더한다 — 앱이 빠지면 구현도 같이 빠진다.</summary>
-    static partial void AddOptionalAppAssemblies(List<Assembly> assemblies);
+    // 템플릿에서 빠질 수 있는 앱은 그 앱 폴더(InternalApi/ · Batch/)에서 구현한다 — 앱이 빠지면 구현도 같이 빠지고 호출은 사라진다.
+    static partial void AddInternalApiAssembly(List<Assembly> assemblies);
+
+    static partial void AddBatchAssembly(List<Assembly> assemblies);
 }

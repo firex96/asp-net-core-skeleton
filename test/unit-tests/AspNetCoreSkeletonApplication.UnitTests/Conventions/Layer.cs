@@ -4,6 +4,7 @@ namespace AspNetCoreSkeletonApplication.UnitTests.Conventions;
 public enum Layer
 {
     Controller,
+    Job,
     MappingService,
     BizService,
     EntityService,

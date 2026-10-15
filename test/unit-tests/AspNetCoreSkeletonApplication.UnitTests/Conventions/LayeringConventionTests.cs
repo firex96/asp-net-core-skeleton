@@ -11,7 +11,7 @@ namespace AspNetCoreSkeletonApplication.UnitTests.Conventions;
 /// </summary>
 public class LayeringConventionTests
 {
-    public static TheoryData<Layer> LayersWithInjectionRules => [Layer.Controller, Layer.MappingService, Layer.BizService, Layer.EntityService];
+    public static TheoryData<Layer> LayersWithInjectionRules => [Layer.Controller, Layer.Job, Layer.MappingService, Layer.BizService, Layer.EntityService];
 
     [Fact]
     public void Scan_FindsTypesInEveryAppAssembly()
@@ -60,11 +60,15 @@ public class LayeringConventionTests
         return layer switch
         {
             Layer.Controller => name.EndsWith("MappingService", StringComparison.Ordinal),
+            Layer.Job => name.EndsWith("BizService", StringComparison.Ordinal)
+                         || IsGenericOf(dependency, typeof(IOptions<>))
+                         || dependency == typeof(TimeProvider),
             Layer.MappingService => name.EndsWith("BizService", StringComparison.Ordinal)
                                     || IsGenericOf(dependency, typeof(IOptions<>))
                                     || dependency == typeof(TimeProvider),
             Layer.BizService => (dependency.IsInterface && name.StartsWith('I') && name.EndsWith("EntityService", StringComparison.Ordinal))
                                 || dependency == typeof(IMainTransaction)
+                                || name == "ISchedulerFactory"
                                 || ConventionScan.LayerOf(dependency) == Layer.Client
                                 || (name.EndsWith("BizService", StringComparison.Ordinal) && ConventionScan.LayerOf(dependency) == Layer.BizService)
                                 || IsGenericOf(dependency, typeof(IOptions<>))

@@ -9,6 +9,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\web-application\AspNetCoreSkeletonApplication.Server\AspNetCoreSkeletonApplication.Server.csproj" />
+    <!--#if (batch) -->
+    <ProjectReference Include="..\..\..\src\batch\AspNetCoreSkeletonApplication.Batch\AspNetCoreSkeletonApplication.Batch.csproj" />
+    <!--#endif -->
     <!--#if (internalApi) -->
     <ProjectReference Include="..\..\..\src\internal-api\AspNetCoreSkeletonApplication.InternalApi\AspNetCoreSkeletonApplication.InternalApi.csproj" />
     <!--#endif -->

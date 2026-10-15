@@ -9,6 +9,7 @@ public class NamingConventionTests
     private static readonly (string Suffix, Layer Layer)[] SuffixLayers =
     [
         ("Controller", Layer.Controller),
+        ("Job", Layer.Job),
         ("MappingService", Layer.MappingService),
         ("BizService", Layer.BizService),
         ("EntityService", Layer.EntityService),
@@ -70,5 +71,5 @@ public class NamingConventionTests
     // Entity 네임스페이스에는 Backbone 기반 클래스가, Mapper 네임스페이스에는 MapperDefaults 같은 비 클래스가 있어
     // 역방향(네임스페이스 → 접미사)은 계층 서비스 · 컨트롤러 · 클라이언트에만 요구한다.
     private static bool ExpectsSuffix(Layer layer) =>
-        layer is Layer.Controller or Layer.MappingService or Layer.BizService or Layer.EntityService;
+        layer is Layer.Controller or Layer.Job or Layer.MappingService or Layer.BizService or Layer.EntityService;
 }

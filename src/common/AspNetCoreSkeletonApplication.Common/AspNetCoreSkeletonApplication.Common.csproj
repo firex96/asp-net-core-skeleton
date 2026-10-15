@@ -35,6 +35,10 @@
     <PackageReference Include="Riok.Mapperly" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
+    <!-- 프레임워크 정본 DDL(Quartz) — 마이그레이션이 리소스로 읽어 실행한다 -->
+    <EmbeddedResource Include="Persistence\Migrations\Scripts\*.sql" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="AspNetCoreSkeletonApplication.UnitTests" />
     <InternalsVisibleTo Include="AspNetCoreSkeletonApplication.FunctionalTests" />
     <InternalsVisibleTo Include="AspNetCoreSkeletonApplication.IntegrationTests" />

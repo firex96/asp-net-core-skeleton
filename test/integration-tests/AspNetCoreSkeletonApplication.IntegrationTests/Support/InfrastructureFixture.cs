@@ -1,5 +1,7 @@
+using AspNetCoreSkeletonApplication.Common.Persistence.Context;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
 using Testcontainers.Redis;
 
@@ -30,6 +32,19 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         builder.UseSetting("ConnectionStrings:Default", ConnectionStringFor(database));
         builder.UseSetting("ConnectionStrings:Redis", RedisConnectionString);
         builder.UseSetting("Cache:KeyPrefix", $"{database}:");
+    }
+
+    /// <summary>
+    /// <paramref name="database"/> 를 지우고 마이그레이션을 처음부터 적용한다. 기동하면서 바로 DB 를 쓰는 앱(Batch 의 Quartz)은
+    /// 앱을 띄우기 전에 이것을 부른다.
+    /// </summary>
+    public async Task RecreateDatabaseAsync(string database)
+    {
+        await using var dbContext = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(ConnectionStringFor(database))
+            .Options);
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.MigrateAsync();
     }
 
     public async ValueTask InitializeAsync() => await Task.WhenAll(_sqlServer.StartAsync(), _redis.StartAsync());

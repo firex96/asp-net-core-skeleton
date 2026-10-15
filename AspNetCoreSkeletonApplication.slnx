@@ -3,6 +3,11 @@
   <Folder Name="/src/Common/">
     <Project Path="src/common/AspNetCoreSkeletonApplication.Common/AspNetCoreSkeletonApplication.Common.csproj" />
   </Folder>
+  <!--#if (batch) -->
+  <Folder Name="/src/Batch/">
+    <Project Path="src/batch/AspNetCoreSkeletonApplication.Batch/AspNetCoreSkeletonApplication.Batch.csproj" />
+  </Folder>
+  <!--#endif -->
   <!--#if (internalApi) -->
   <Folder Name="/src/Internal API/">
     <Project Path="src/internal-api/AspNetCoreSkeletonApplication.InternalApi/AspNetCoreSkeletonApplication.InternalApi.csproj" />

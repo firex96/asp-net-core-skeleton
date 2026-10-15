@@ -10,7 +10,7 @@
 
 | 스켈레톤 | 쓰는 곳 |
 |---|---|
-| **`asp-net-core-skeleton`** (이 레포) | ASP.NET Core API + SPA 한 벌, 같은 Common 을 쓰는 내부 API(선택) |
+| **`asp-net-core-skeleton`** (이 레포) | ASP.NET Core API + SPA 한 벌, 같은 Common 을 쓰는 내부 API · 배치(선택) |
 | `spring-boot-public-api-skeleton` | 외부에 노출되는 API (Spring Security + JWT) |
 | `spring-boot-internal-api-skeleton` | 게이트웨이 뒤의 내부 API |
 | `spring-batch-skeleton` | 배치·스케줄 작업 |
@@ -58,10 +58,11 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend sveltekit
 | `-n` | 솔루션·프로젝트 이름. `AspNetCoreSkeletonApplication` 은 이 값으로, `asp-net-core-skeleton-application` 은 kebab-case(`contoso-shop`)로 바뀐다 | 출력 폴더 이름 |
 | `--frontend` | `angular` · `sveltekit` · `nuxt` · `all`(셋 다 두고 `SpaClient` 로 전환) | `angular` |
 | `--internalApi` | 게이트웨이 뒤 내부 API 앱(`InternalApi`)을 함께 만든다. `false` 면 앱과 테스트의 `InternalApi/` 폴더가 빠진다 | `true` |
+| `--batch` | 배치 앱(`Batch` — Quartz.NET)을 함께 만든다. `false` 면 앱과 테스트의 `Batch/` 폴더가 빠진다(DB 의 `quartz` 스키마는 남는다 — 쓰지 않는다) | `true` |
 
 user-secrets ID 도 새로 만들어진다. 템플릿을 지우려면 `dotnet new uninstall <경로>`.
 
-**복사해서** 쓴다면 `AspNetCoreSkeletonApplication`(PascalCase)과 `asp-net-core-skeleton-application`(kebab-case)을 폴더·파일 이름과 내용에서 모두 바꾸고, 두 앱 csproj(Server · InternalApi)의 `UserSecretsId` 를 같은 새 GUID 로 바꾼다. 쓰지 않는 SPA 는 「프론트엔드 선택」의 표대로 지운다.
+**복사해서** 쓴다면 `AspNetCoreSkeletonApplication`(PascalCase)과 `asp-net-core-skeleton-application`(kebab-case)을 폴더·파일 이름과 내용에서 모두 바꾸고, 세 앱 csproj(Server · InternalApi · Batch)의 `UserSecretsId` 를 같은 새 GUID 로 바꾼다. 쓰지 않는 SPA 는 「프론트엔드 선택」의 표대로 지운다.
 
 ### 3. 프론트엔드를 고른다
 
@@ -120,6 +121,7 @@ src/
   common/             Common   공유 라이브러리 — 영속 계층, 공유 BizService·Domain, Dto, 비밀값 출처 구성
   web-application/    Server   public 앱 — SPA 호스트, 컨트롤러, MappingService, 앱 전용 BizService
   internal-api/       InternalApi  게이트웨이 뒤 내부 API 앱 — SPA 없음 (템플릿 --internalApi)
+  batch/              Batch        배치 앱 — Quartz.NET 스케줄 (템플릿 --batch)
   spa/                client.angular · client.sveltekit · client.nuxt
 test/
   unit-tests/         UnitTests        외부 의존 없음
@@ -127,7 +129,7 @@ test/
   integration-tests/  IntegrationTests Docker 필요 (Testcontainers SQL Server · LocalStack)
 ```
 
-**프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 계층은 프로젝트 안의 폴더(네임스페이스)로 나눈다 — 「요청 흐름」 참고. 의존은 앱(`Server` · `InternalApi`) → `Common` 한 방향이고, 앱끼리는 서로 참조하지 않는다. 배치 앱도 같은 자리(`Common` 을 쓰는 앱)에 들어올 예정이다.
+**프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 계층은 프로젝트 안의 폴더(네임스페이스)로 나눈다 — 「요청 흐름」 참고. 의존은 앱(`Server` · `InternalApi` · `Batch`) → `Common` 한 방향이고, 앱끼리는 서로 참조하지 않는다.
 
 | 프로젝트 | 폴더 | 들어가는 것 |
 |---|---|---|
@@ -137,10 +139,11 @@ test/
 | `Server` | `Controllers/` · `Services/Mapping/` · `Models/` · `Mappers/` | HTTP 입출력과 화면용 변환 |
 | | `Services/Biz/` · `Dtos/` · `Clients/` | 이 앱만 쓰는 BizService · Dto · 외부 API 클라이언트 |
 | `InternalApi` | Server 와 같은 폴더 규칙 | 같은 공유 BizService 를 자기 Model 로 노출한다(예: 감사 주체 ID 까지 내보내는 `ProductModel`) |
+| `Batch` | `Jobs/` · `Configuration/` (+ Server 와 같은 폴더 규칙) | Quartz Job(`TracedJob` 상속)과 스케줄러 구성. Job 은 공유 BizService 를 부른다 — 「Batch」 참고 |
 
 **Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다.** 앱은 DbContext 를 볼 수 없고, EntityService 의 public 메서드에 Entity 를 쓰면 접근성 불일치(CS0050 · CS0051)로 컴파일이 깨진다 — 「Entity 는 EntityService 위로 올라가지 않는다」를 컴파일러가 지킨다.
 
-**컴포지션 루트는 각 앱의 `Program.cs`** 다(`InternalApi` 는 top-level 문 대신 네임스페이스 안의 `Program` 클래스 — 테스트가 두 앱을 함께 참조해도 이름이 겹치지 않는다). 비밀값 출처(`AddSecretSource<Program>()`), Common(`AddCommon()`), 앱의 계층 서비스(`AddLayeredServices(typeof(Program).Assembly)`) 순서로 붙인다. 계층 서비스는 이름 접미사로 찾아 scoped 로 등록하므로 서비스를 추가할 때 등록 코드를 쓰지 않는다 — `~MappingService` · `~BizService` 는 자기 타입으로, `~EntityService` 는 `I~EntityService` 로.
+**컴포지션 루트는 각 앱의 `Program.cs`** 다(`InternalApi` · `Batch` 는 top-level 문 대신 네임스페이스 안의 `Program` 클래스 — 테스트가 여러 앱을 함께 참조해도 이름이 겹치지 않는다). 비밀값 출처(`AddSecretSource<Program>()`), Common(`AddCommon()`), 앱의 계층 서비스(`AddLayeredServices(typeof(Program).Assembly)`) 순서로 붙인다. 계층 서비스는 이름 접미사로 찾아 scoped 로 등록하므로 서비스를 추가할 때 등록 코드를 쓰지 않는다 — `~MappingService` · `~BizService` 는 자기 타입으로, `~EntityService` 는 `I~EntityService` 로.
 
 엔티티를 추가하면 `AppDbContext` 에 `DbSet` 을 두고 마이그레이션을 만든다.
 
@@ -280,6 +283,29 @@ EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis
 | 3 | `AuditorIds.System` (`0`) | 위가 없을 때 — 시스템 자신이거나 주체를 모른다는 뜻 |
 
 값은 `long.TryParse` 로만 읽는다 — 빈 값 · 숫자 아님 · 범위 초과는 버린다(자르면 남의 ID 가 된다). **`X-User-Id` 는 외부 입력이다.** 그대로 믿으면 호출자가 다른 사용자로 감사 기록을 위조할 수 있으므로, 게이트웨이가 인증 결과로 헤더를 덮어쓰고 밖에서 온 같은 이름의 헤더를 지우는 배포에서만 켠다. 내부 API 는 인증이 없어 헤더가 유일한 출처다 — 게이트웨이 뒤에 둘 때 `Audit__TrustUserHeader=true` 로 켠다. 미들웨어는 인증 주체를 읽으므로 `UseAuthorization()` 뒤에 `UseAuditorContext()` 로 붙인다. 배치처럼 HTTP 가 아닌 실행은 진입점에서 `AuditorContext.Begin(userId)` 로 채운다.
+
+## Batch
+
+`Batch` 앱은 **Quartz.NET 4.5** 로 Job 을 스케줄한다. 실행 이력 · 재시도 · 동시 실행 방지는 Quartz 가 맡고, 업무 처리는 Job 이 공유 BizService 를 불러서 한다 — Spring Batch 같은 chunk 프레임워크는 두지 않는다(.NET 에 유지되는 대응이 없다).
+
+**스케줄러** — `Configuration/BatchSchedulerExtensions.AddBatchScheduler`
+
+- SQL Server 영속 저장소(`quartz` 스키마, 테이블 접두사 `quartz.QRTZ_`) · **클러스터** · 실행 이력(`QRTZ_EXECUTION_HISTORY`). 인스턴스가 여러 개 떠도 한 Job 은 클러스터 전체에서 한 번만 돈다. 노드 ID 는 기동할 때 생성하고, 스케줄러 이름(`SCHED_NAME`)은 앱 이름이다.
+- 스키마는 Common 마이그레이션 `AddQuartzScheduler` 가 만든다 — Quartz 4.5.0 의 정본 DDL(`Persistence/Migrations/Scripts/quartz-4.5.0-sqlserver.sql`)을 그대로 실행한다. 프레임워크 정본이라 업무 테이블 규칙(FOREIGN KEY 금지 등)의 대상이 아니다. Quartz 를 올리면 새 버전 스크립트로 새 마이그레이션을 만든다.
+- 스케줄은 `Batch:Jobs:{Job 클래스 이름}` 구성에서만 정한다(cron 을 코드에 적지 않는다). `Enabled=false` 면 트리거를 두지 않고 — 저장소에 남은 옛 트리거도 기동할 때 지운다 — Job 은 남아 수동 실행은 된다. 켜졌는데 `Cron` 이 없거나 섹션이 없으면 기동이 멈춘다.
+
+**Job 규칙** (예외 없음, `JobConventionTests` · `LayeringConventionTests` 가 강제)
+
+- `Jobs/` 의 `~Job` 이고 `TracedJob` 을 상속한다. `TracedJob` 이 실행마다 추적 ID(수동 실행이 넘긴 `traceId` 를 검증해 쓰거나 새로), 감사 주체(언제나 시스템 `0`), 로깅 scope(`X-Trace-Id` · `Job`)와 시작 · 끝 · 실패 로그를 정한다. 실패는 다시 던져 Quartz 실행 이력에 실패로 남긴다.
+- `[DisallowConcurrentExecution]` 을 단다 — 클러스터 전체에서 같은 Job 은 한 번에 하나만 돈다.
+- 주입받는 것은 BizService · `IOptions<>` · `TimeProvider` · `ILogger<>` 뿐이다. 업무 판단은 BizService 가 Domain 으로, 쓰기는 BizService 의 `IMainTransaction` 안에서 한다.
+
+**새 Job 체크리스트**
+
+1. `Jobs/{이름}Job.cs` — `TracedJob` 상속, `[DisallowConcurrentExecution]`, `ExecuteJobAsync` 에서 BizService 호출
+2. `Program.cs` 의 `AddBatchScheduler(..., jobs => jobs.Add<{이름}Job>())`
+3. `appsettings.json` 의 `Batch:Jobs:{이름}Job` — `Enabled` · `Cron`
+4. 재실행해도 결과가 같은지(멱등) 확인하는 통합 테스트
 
 ## 아키텍처 선택
 
@@ -479,12 +505,14 @@ dotnet run --project src/web-application/AspNetCoreSkeletonApplication.Server --
 dotnet publish src/web-application/AspNetCoreSkeletonApplication.Server -c Release -p:SpaClient=angular -o out
 ASPNETCORE_ENVIRONMENT=Local dotnet out/AspNetCoreSkeletonApplication.Server.dll
 dotnet run --project src/internal-api/AspNetCoreSkeletonApplication.InternalApi --launch-profile https
+dotnet run --project src/batch/AspNetCoreSkeletonApplication.Batch --launch-profile https
 ```
 
 | 항목 | 값 |
 |---|---|
 | 서버 | https://localhost:7274 · http://localhost:5255 |
 | 내부 API | https://localhost:7276 · http://localhost:5257 (SPA 없음, `Local` 에서 `/scalar`) |
+| 배치 | https://localhost:7278 · http://localhost:5259 |
 | 헬스 체크 | `/health` — `AppDbContext` 연결 확인 |
 | 패키지 버전 | `Directory.Packages.props` 중앙 관리 (전이 의존도 고정) |
 | macOS 참고 | VS JavaScript SDK 가 SPA 폴더에 `obj\Debug/\package.g.props` 같은 이름의 파일을 만든다. 빌드에 영향 없고 `.gitignore` 에 들어 있다 |
