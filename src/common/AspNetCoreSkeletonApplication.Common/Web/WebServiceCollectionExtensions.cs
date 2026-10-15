@@ -42,6 +42,8 @@ public static class WebServiceCollectionExtensions
         app.UseMiddleware<TraceIdMiddleware>();
         app.UseMiddleware<SlowRequestMiddleware>();
         app.UseExceptionHandler();
+        // 본문 없는 4xx · 5xx(인증 실패 401, 인가 실패 403, 없는 경로 404 등)도 ProblemDetails 로 채운다.
+        app.UseStatusCodePages();
 
         return app;
     }

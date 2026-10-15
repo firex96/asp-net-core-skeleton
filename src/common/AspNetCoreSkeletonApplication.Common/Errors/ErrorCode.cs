@@ -8,6 +8,7 @@ namespace AspNetCoreSkeletonApplication.Common.Errors;
 public sealed class ErrorCode(string code, int status, string divisionCode, string message)
 {
     public static readonly ErrorCode BadRequest = new("BAD_REQUEST_ERROR", 400, "G001", "Bad Request");
+    public static readonly ErrorCode Unauthorized = new("UNAUTHORIZED_ERROR", 401, "G015", "Unauthorized");
     public static readonly ErrorCode Forbidden = new("FORBIDDEN_ERROR", 403, "G008", "Forbidden");
     public static readonly ErrorCode NotFound = new("NOT_FOUND_ERROR", 404, "G009", "Not Found");
     public static readonly ErrorCode NotValid = new("NOT_VALID_ERROR", 400, "G011", "One or more validation errors occurred");
@@ -15,7 +16,7 @@ public sealed class ErrorCode(string code, int status, string divisionCode, stri
     public static readonly ErrorCode ExternalApiError = new("EXTERNAL_API_ERROR", 502, "G014", "Bad Gateway");
     public static readonly ErrorCode InternalServerError = new("INTERNAL_SERVER_ERROR", 500, "G999", "Internal Server Error");
 
-    private static readonly ErrorCode[] ByStatus = [BadRequest, Forbidden, NotFound, Conflict, ExternalApiError, InternalServerError];
+    private static readonly ErrorCode[] ByStatus = [BadRequest, Unauthorized, Forbidden, NotFound, Conflict, ExternalApiError, InternalServerError];
 
     public string Code => code;
 

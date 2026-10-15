@@ -236,6 +236,7 @@ EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis
 | `ApiCallException` (외부 API 실패) | 502 `EXTERNAL_API_ERROR` (G014) | 없음 — 로그에만 남는다 |
 | DataAnnotations 검증 실패 (`[ApiController]` 자동 400) | 400 `NOT_VALID_ERROR` (G011), `errors` 에 필드별 메시지 | — |
 | 컨트롤러가 돌려준 상태 코드(`NotFound()` 등) | 상태 코드로 고른 코드 | — |
+| 본문 없는 응답 — 인증 실패 401 · 인가 실패 403 · 없는 경로 등 (`UseStatusCodePages`) | 401 `UNAUTHORIZED_ERROR` (G015) · 403 `FORBIDDEN_ERROR` (G008) · 상태 코드로 고른 코드 | — |
 | 그 밖의 예외 | 500 `INTERNAL_SERVER_ERROR` (G999) | 없음 — 내부 메시지를 내보내지 않는다 |
 
 - 업무 실패는 `CodedException` 계열을 던진다. 메시지는 4xx 응답의 `detail` 로 그대로 나가므로 사용자에게 보여도 되는 문장으로 쓴다. 예외를 잡아서 삼키지 않는다.
@@ -310,6 +311,33 @@ EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis
 3. 페이지마다 `IMainTransaction` 하나로, 웹의 상태 변경과 **같은 경로**(Domain 판단 → 변경 → 상태 이력)로 바꾼다. 감사 주체는 시스템(`0`), 캐시 무효화는 커밋 뒤.
 
 **멱등** — 처리한 상품은 조회 조건(Draft)에서 빠지므로 다시 실행하면 대상이 0건이다. `DiscontinueStaleDraftJobTests` 가 Quartz 로 두 번 실행해 1회차 결과 · 2회차 0건 · 데이터 스냅샷 동일 · 실행 이력 성공 2건을 확인한다. 새 Job 도 같은 모양으로 — 처리 완료 상태를 데이터에 남기고, 조회 조건이 그것을 걸러야 한다.
+
+**수동 실행 — 웹훅** `POST /api/jobs/{Job 이름}/trigger`
+
+```bash
+curl -X POST https://localhost:7278/api/jobs/DiscontinueStaleDraftJob/trigger \
+  -H 'X-Api-Key: <키>' -H 'Content-Type: application/json' -d '{"parameters": {}}'
+# 202 {"jobName":"DiscontinueStaleDraftJob","traceId":"…"}
+```
+
+| 순서 | 검사 | 실패 |
+|---|---|---|
+| 1 | `X-Api-Key` 가 `Batch:Webhook:ApiKeys` 의 키와 맞는가(상수 시간 비교) | 401 `UNAUTHORIZED_ERROR` |
+| 2 | 그 키의 `AllowedJobs` 에 경로의 Job 이 있는가 — 없는 Job 이름도 같은 403(존재를 드러내지 않는다) | 403 `FORBIDDEN_ERROR` |
+| 3 | 본문 `parameters` 의 이름이 그 Job 의 `Batch:Jobs:{Job}:AllowedParameters` 에 있는가 — 거부 응답에는 이름만, 값은 담지 않는다 | 400 `BAD_REQUEST_ERROR` |
+| 4 | Job 이 스케줄러에 있는가 | 404 `NOT_FOUND_ERROR` |
+
+통과하면 Quartz `TriggerJob` 으로 실행하고 202 와 요청의 추적 ID 를 돌려준다 — Job 로그와 실행 이력(수동 실행으로 표시)을 이 ID 로 찾는다. 스케줄 실행과 같은 Quartz 경로라 `[DisallowConcurrentExecution]` 이 웹훅에도 걸린다 — 형제 스켈레톤처럼 웹훅과 스케줄이 같은 Job 을 동시에 돌리는 일이 없다.
+
+API 키는 이름 · 키 · 허용 Job 으로 적고, **키는 비밀값**이다. 기동할 때 검증한다 — 이름 없음, 32자보다 짧은 키, 같은 이름 중복은 기동 실패. 허용 Job 이 비어 있는 키는 아무것도 실행하지 못한다(fail-closed).
+
+```bash
+# 로컬 — user-secrets (Batch 프로젝트에서)
+dotnet user-secrets set "Batch:Webhook:ApiKeys:0:Name" "local"
+dotnet user-secrets set "Batch:Webhook:ApiKeys:0:Key" "$(openssl rand -hex 32)"
+dotnet user-secrets set "Batch:Webhook:ApiKeys:0:AllowedJobs:0" "DiscontinueStaleDraftJob"
+# 배포 — 환경변수 Batch__Webhook__ApiKeys__0__Key, 비밀 저장소 이름 Batch--Webhook--ApiKeys--0--Key
+```
 
 **새 Job 체크리스트**
 
@@ -457,7 +485,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | `Azure` | Azure Key Vault — 볼트의 모든 비밀 | `Azure:KeyVault:Endpoint`, `DefaultAzureCredential` |
 | `Gcp` | GCP Secret Manager — `Gcp:SecretManager:Secrets` 에 적은 비밀 | `Gcp:SecretManager:ProjectId`, Application Default Credentials |
 
-저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이다.** 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
+저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 가 더 있다**(Gcp 를 쓰면 키마다 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` 를 추가한다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
 
 ### 키 이름 대응
 

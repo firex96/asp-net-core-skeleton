@@ -1,5 +1,6 @@
 using AspNetCoreSkeletonApplication.Batch.Configuration;
 using AspNetCoreSkeletonApplication.Batch.Jobs;
+using AspNetCoreSkeletonApplication.Batch.Security;
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;
 using Scalar.AspNetCore;
@@ -31,6 +32,8 @@ public class Program
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        builder.Services.AddBatchSecurity();
+
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
 
@@ -46,6 +49,7 @@ public class Program
 
         app.UseHttpsRedirection();
 
+        app.UseAuthentication();
         app.UseAuthorization();
         app.UseAuditorContext();
 

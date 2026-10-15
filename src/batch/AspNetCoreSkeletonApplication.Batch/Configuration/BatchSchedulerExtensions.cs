@@ -24,10 +24,7 @@ public static class BatchSchedulerExtensions
         services.AddSingleton(registry);
 
         var schedules = registry.JobTypes.ToDictionary(type => type.Name, type => ReadSchedule(configuration, type.Name));
-        foreach (var (jobName, _) in schedules)
-        {
-            services.AddOptions<JobScheduleOptions>(jobName).BindConfiguration(SectionOf(jobName));
-        }
+        services.AddOptions<BatchOptions>().BindConfiguration("Batch");
 
         services.AddQuartz(quartz =>
         {

@@ -10,12 +10,13 @@ namespace AspNetCoreSkeletonApplication.Batch.Configuration;
 internal sealed class JobScheduleReconciler(
     ISchedulerFactory schedulerFactory,
     BatchJobRegistry registry,
-    IOptionsMonitor<JobScheduleOptions> schedules) : IHostedService
+    IOptions<BatchOptions> options) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
-        foreach (var jobName in registry.JobTypes.Select(type => type.Name).Where(name => !schedules.Get(name).Enabled))
+        var jobs = options.Value.Jobs;
+        foreach (var jobName in registry.JobTypes.Select(type => type.Name).Where(name => !jobs[name].Enabled))
         {
             await scheduler.UnscheduleJob(new TriggerKey($"{jobName}.cron", BatchSchedulerExtensions.JobGroup), cancellationToken);
         }
