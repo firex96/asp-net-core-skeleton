@@ -1,3 +1,4 @@
+using AspNetCoreSkeletonApplication.Common.Persistence;
 using AspNetCoreSkeletonApplication.Common.Persistence.Context;
 using AspNetCoreSkeletonApplication.Common.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,7 @@ public static class CommonServiceCollectionExtensions
             .UseSqlServer(serviceProvider.GetRequiredService<IConfiguration>().GetRequiredConnectionString("Default"))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .AddInterceptors(serviceProvider.GetRequiredService<AuditSaveChangesInterceptor>()));
+        services.AddScoped<IMainTransaction, MainTransaction>();
 
         // 현재 시각은 TimeProvider 로만 읽는다 — 테스트에서 FakeTimeProvider 로 바꿔 끼운다.
         services.TryAddSingleton(TimeProvider.System);

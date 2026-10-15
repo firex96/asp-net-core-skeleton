@@ -90,6 +90,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 | 지울 것 | 함께 지워야 하는 것 |
 |---|---|
 | Server 의 WeatherForecast 한 벌 — `Controllers/WeatherForecastController`, `Services/Mapping/WeatherForecastMappingService`, `Services/Biz/WeatherForecastBizService`, `Dtos/WeatherForecastDto`, `Models/WeatherForecastModel`, `Mappers/WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
+| Product 한 벌 — Common 의 `Enums/ProductStatus`, `Dtos/Product*Dto`, `Domain/ProductStatusTransition`, `Services/Biz/ProductBizService`, `Persistence/` 의 `Entities/Main/ProductEntity` · `Configurations/ProductEntityConfiguration` · `Mappers/ProductEntityMapper` · `Services/(I)ProductEntityService`, Server 의 `Controllers/ProductController` · `Services/Mapping/ProductMappingService` · `Models/Product*Model` · `Mappers/ProductModelMapper` | `AppDbContext.Products`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
 | Server 의 `Clients/ExampleApiClient` · `ExampleApiOptions`, `Dtos/ExampleStatusDto` | Program.cs 의 `AddApiClient<ExampleApiClient, …>` 줄, `appsettings.json` 의 `Clients:ExampleApi`, `UnitTests/Clients/ExampleApiClientTests.cs` |
 | `AwsSecretSourceTests` (Aws 를 안 쓰면) | 통합 테스트 csproj 의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack` |
 
@@ -97,10 +98,15 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 
 ```bash
 docker compose up -d                                    # SQL Server — mssql-init 이 skeleton DB 를 만든다
+dotnet tool restore                                     # dotnet-ef (dotnet-tools.json 에 버전 고정)
+ASPNETCORE_ENVIRONMENT=Local dotnet ef database update \
+  --project src/common/AspNetCoreSkeletonApplication.Common \
+  --startup-project src/web-application/AspNetCoreSkeletonApplication.Server
 dotnet build AspNetCoreSkeletonApplication.slnx
 cd src/web-application/AspNetCoreSkeletonApplication.Server
 dotnet run --launch-profile https                       # Local 프로파일 + SpaProxy
 curl -k https://localhost:7274/health                   # Healthy
+curl -k https://localhost:7274/api/products             # []
 ```
 
 브라우저에는 Scalar(`/scalar`)가 열리고, SPA 는 dev 서버 주소(Angular 기본 https://localhost:61194)에서 뜬다.
@@ -135,13 +141,16 @@ test/
 엔티티를 추가하면 `AppDbContext` 에 `DbSet` 을 두고 마이그레이션을 만든다.
 
 ```bash
-dotnet tool update -g dotnet-ef
-dotnet ef migrations add Initial \
+dotnet tool restore
+ASPNETCORE_ENVIRONMENT=Local dotnet ef migrations add <이름> \
   --project src/common/AspNetCoreSkeletonApplication.Common \
-  --startup-project src/web-application/AspNetCoreSkeletonApplication.Server
+  --startup-project src/web-application/AspNetCoreSkeletonApplication.Server \
+  --output-dir Persistence/Migrations
 ```
 
-`dotnet ef` 는 시작 프로젝트를 띄워 구성을 읽으므로 `ASPNETCORE_ENVIRONMENT=Local` 처럼 연결 문자열이 있는 프로파일로 실행한다.
+- `dotnet ef` 는 레포 로컬 도구다(`dotnet-tools.json`, EF Core 와 같은 버전). 시작 프로젝트를 띄워 구성을 읽으므로 연결 문자열이 있는 프로파일(`Local`)로 실행한다.
+- `--namespace` 는 주지 않는다 — 주면 모델 스냅샷이 엉뚱한 폴더에 생긴다. `--output-dir` 만으로 네임스페이스가 `…Common.Persistence.Migrations` 가 된다.
+- 마이그레이션은 앱 기동 시 자동 적용하지 않는다. 로컬은 `dotnet ef database update`, 배포는 마이그레이션 번들이나 스크립트(`dotnet ef migrations script --idempotent`)로 적용한다.
 
 ## 요청 흐름
 
@@ -151,14 +160,20 @@ dotnet ef migrations add Initial \
 |---|---|---|
 | Controller (`.Controllers`) | HTTP 처리와 검증. 요청과 응답 모두 Model | MappingService |
 | MappingService (`.Services.Mapping`) | 화면용 변환 전부 — 파생 값, 포맷, 여러 BizService 결과 조합. 트랜잭션 없음 | BizService, `IOptions<>`, `TimeProvider` |
-| BizService (`.Services.Biz`) | 조회·저장·트랜잭션·호출 순서. 업무 판단은 Domain 을 불러 얻는다 | `I~EntityService`, `~Client`, 다른 BizService, `IOptions<>`, `TimeProvider` |
+| BizService (`.Services.Biz`) | 조회·저장·트랜잭션·호출 순서. 업무 판단은 Domain 을 불러 얻는다. 변경 메서드는 **항상** `IMainTransaction.ExecuteAsync` 안에서 돈다 | `I~EntityService`, `IMainTransaction`, `~Client`, 다른 BizService, `IOptions<>`, `TimeProvider` |
 | Domain (`.Domain`) | 업무 값 계산과 상태 전이 판단 전부. EF 를 모르는 순수 클래스, DI 대상이 아니다 | — (Dto · 열거형 · 에러 · System 만 참조) |
-| EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현한다 | `AppDbContext` |
+| EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현하고, 구현은 `internal` 이다. 조회는 기본 NoTracking, 바꿀 때만 `AsTracking()` | `AppDbContext` |
 | 매퍼 (`.Mappers`, `.Persistence.Mappers`) | 필드를 기계적으로 옮긴다. 계산하지 않는다. `static partial` (Mapperly) | — |
 
 모든 계층은 `ILogger<>` 를 더 받을 수 있다. 타입은 셋으로 나눈다 — **Model**(HTTP 입출력, `.Models`), **Dto**(계층 사이 전달, `.Dtos`), **Entity**(DB 매핑, `internal`). Model 과 Dto 는 데이터만 담는 `sealed record` 다.
 
+메서드 이름은 한 벌이다 — `Get`(없으면 `ItemNotFoundException`), `Find`(없으면 null), `List`, `Create`, `Update`, `Delete`(비동기는 `~Async`).
+
+요청 Model 의 검증 특성(`[Required]` · `[Range]` 등)은 record **생성자 매개변수**에 붙인다(`property:` 로 붙이면 MVC 가 요청을 500 으로 막는다). 값 타입 필수 필드는 빠지면 0 이 되므로 `[property: JsonRequired]` 를 함께 붙인다 — `ProductCreateModel` 참고.
+
 예: `GET /weatherforecast` — `WeatherForecastController` 가 `WeatherForecastMappingService.List()` 를 부르고, MappingService 는 `WeatherForecastBizService` 가 만든 `WeatherForecastDto` 에 화씨(표시용 파생 값)를 계산해 `WeatherForecastMapper.ToModel(dto, temperatureF)` 로 `WeatherForecastModel` 을 만든다.
+
+예: `PUT /api/products/{id}/status` — `ProductController` → `ProductMappingService` → 공유 `ProductBizService`(Common) 가 `IMainTransaction` 안에서 `IProductEntityService.GetAsync` 로 현재 상태를 읽고, `ProductStatusTransition.EnsureCanChange`(Domain) 로 판단을 얻은 뒤 `UpdateStatusAsync` 로 바꾼다. 허용되지 않은 전이는 Domain 이 `ConflictException`(409)을 던진다.
 
 ### 외부 API 클라이언트
 
@@ -251,6 +266,18 @@ dotnet test --solution AspNetCoreSkeletonApplication.slnx                       
 dotnet test --project test/unit-tests/AspNetCoreSkeletonApplication.UnitTests  # 하나만
 dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.IntegrationTests -- --filter-class "*HealthCheckTests"  # 클래스만
 ```
+
+**대역 원칙** — 계층마다 하나로 정해져 있다.
+
+| 대상 | 대역 | 어디서 |
+|---|---|---|
+| BizService | `I~EntityService` 를 NSubstitute 로, `IMainTransaction` 은 바로 실행하는 가짜로 | `UnitTests` |
+| Domain | 대역 없음 — 순수 함수라 표(`[Theory]`)로 모든 경우를 확인 | `UnitTests` |
+| `~Client` | 맨 안쪽 `HttpMessageHandler` 만 가짜로 — `AddApiClient` 의 핸들러 체인은 실제 그대로 | `UnitTests` |
+| HTTP 계약(상태 코드 · JSON · 에러 응답) | `I~EntityService` 를 메모리 구현으로 바꿔 DB 없이 | `FunctionalTests` |
+| EntityService · 트랜잭션 · 감사 필드 | 대역 없음 — SQL Server 컨테이너에 마이그레이션을 적용해 HTTP 로 끝까지 | `IntegrationTests` |
+
+DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server 컨테이너는 `[Collection(SqlServerCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름을 달리한다(`SqlServerFixture.ConnectionStringFor`).
 
 SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 `npm test -- --watch=false` 로 단발 실행)다. 타입 검사는 SvelteKit · Nuxt 에서 `npm run check`.
 

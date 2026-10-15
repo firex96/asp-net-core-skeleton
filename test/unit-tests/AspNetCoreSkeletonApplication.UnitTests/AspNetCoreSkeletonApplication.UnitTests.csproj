@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- 단위 테스트 — 외부 의존 없음. 공통 설정은 test/Directory.Build.props -->
   <ItemGroup>
+    <!-- BizService 단위 테스트에서 I~EntityService 를 대체한다. 분석기는 대체할 수 없는 멤버 설정을 컴파일 오류로 잡는다 -->
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\..\src\web-application\AspNetCoreSkeletonApplication.Server\AspNetCoreSkeletonApplication.Server.csproj" />
   </ItemGroup>
 </Project>

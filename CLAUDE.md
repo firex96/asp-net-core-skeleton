@@ -17,6 +17,8 @@ dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.Integ
 
 # 로컬 실행 — Local 프로파일 + SpaProxy (SPA 는 SpaClient 로 고른다, 기본 angular)
 docker compose up -d
+dotnet tool restore
+ASPNETCORE_ENVIRONMENT=Local dotnet ef database update --project src/common/AspNetCoreSkeletonApplication.Common --startup-project src/web-application/AspNetCoreSkeletonApplication.Server
 dotnet run --project src/web-application/AspNetCoreSkeletonApplication.Server --launch-profile https
 dotnet run --project src/web-application/AspNetCoreSkeletonApplication.Server --launch-profile https -p:SpaClient=nuxt
 
