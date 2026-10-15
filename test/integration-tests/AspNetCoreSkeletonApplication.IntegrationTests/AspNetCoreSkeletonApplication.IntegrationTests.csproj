@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 통합 테스트 — Docker 필요. Testcontainers 로 SQL Server·LocalStack 을 띄운다 -->
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.SecretsManager" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.LocalStack" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\web-application\AspNetCoreSkeletonApplication.Server\AspNetCoreSkeletonApplication.Server.csproj" />
+  </ItemGroup>
+</Project>

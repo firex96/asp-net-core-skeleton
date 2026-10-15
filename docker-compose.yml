@@ -1,0 +1,38 @@
+# 로컬 개발용 인프라. Local 프로파일(appsettings.Local.json)의 연결 문자열과 짝이다.
+#   docker compose up -d      # 기동 — mssql-init 이 skeleton DB 를 만들고 끝난다
+#   docker compose down -v    # 데이터까지 삭제
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64   # 공식 이미지는 amd64 만 있다 — Apple Silicon 은 에뮬레이션으로 돈다
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Skeleton!Passw0rd}
+      TZ: Asia/Seoul
+    ports:
+      - "${DB_PORT:-1433}:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  mssql-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Skeleton!Passw0rd}
+    entrypoint:
+      - /bin/bash
+      - -c
+      - /opt/mssql-tools18/bin/sqlcmd -C -S mssql -U sa -P "$$MSSQL_SA_PASSWORD" -b -Q "IF DB_ID('skeleton') IS NULL CREATE DATABASE skeleton"
+    restart: "no"
+
+volumes:
+  mssql-data:

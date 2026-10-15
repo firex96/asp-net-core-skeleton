@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 기능 테스트 — WebApplicationFactory 로 앱을 메모리에 띄워 HTTP 로 호출한다. DB 불필요 -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\web-application\AspNetCoreSkeletonApplication.Server\AspNetCoreSkeletonApplication.Server.csproj" />
+  </ItemGroup>
+</Project>

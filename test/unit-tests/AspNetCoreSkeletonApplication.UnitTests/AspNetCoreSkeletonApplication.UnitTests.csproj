@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 단위 테스트 — 외부 의존 없음. 공통 설정은 test/Directory.Build.props -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\web-application\AspNetCoreSkeletonApplication.Server\AspNetCoreSkeletonApplication.Server.csproj" />
+  </ItemGroup>
+</Project>

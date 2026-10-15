@@ -1,0 +1,57 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Application Core/">
+    <Project Path="src/application-core/AspNetCoreSkeletonApplication.ApplicationCore/AspNetCoreSkeletonApplication.ApplicationCore.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/infrastructure/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework.csproj" />
+    <Project Path="src/infrastructure/AspNetCoreSkeletonApplication.Infrastructure.ExternalService/AspNetCoreSkeletonApplication.Infrastructure.ExternalService.csproj" />
+  </Folder>
+  <Folder Name="/src/SPA/">
+    <!--#if (frontend == "angular" || frontend == "all") -->
+    <Project Path="src/spa/asp-net-core-skeleton-application.client.angular/asp-net-core-skeleton-application.client.angular.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <!--#endif -->
+    <!--#if (frontend == "nuxt" || frontend == "all") -->
+    <Project Path="src/spa/asp-net-core-skeleton-application.client.nuxt/asp-net-core-skeleton-application.client.nuxt.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <!--#endif -->
+    <!--#if (frontend == "sveltekit" || frontend == "all") -->
+    <Project Path="src/spa/asp-net-core-skeleton-application.client.sveltekit/asp-net-core-skeleton-application.client.sveltekit.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <!--#endif -->
+  </Folder>
+  <Folder Name="/src/Web Application/">
+    <Project Path="src/web-application/AspNetCoreSkeletonApplication.Server/AspNetCoreSkeletonApplication.Server.csproj">
+      <BuildDependency Project="src/application-core/AspNetCoreSkeletonApplication.ApplicationCore/AspNetCoreSkeletonApplication.ApplicationCore.csproj" />
+      <BuildDependency Project="src/infrastructure/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework.csproj" />
+    </Project>
+  </Folder>
+  <Folder Name="/test/" />
+  <Folder Name="/test/Functional Tests/">
+    <Project Path="test/functional-tests/AspNetCoreSkeletonApplication.FunctionalTests/AspNetCoreSkeletonApplication.FunctionalTests.csproj" />
+  </Folder>
+  <Folder Name="/test/Integration Tests/">
+    <Project Path="test/integration-tests/AspNetCoreSkeletonApplication.IntegrationTests/AspNetCoreSkeletonApplication.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/test/Unit Tests/">
+    <Project Path="test/unit-tests/AspNetCoreSkeletonApplication.UnitTests/AspNetCoreSkeletonApplication.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="AGENTS.md" />
+    <File Path="CHANGELOG.md" />
+    <File Path="CLAUDE.md" />
+    <File Path="Directory.Packages.props" />
+    <File Path="docker-compose.yml" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+    <File Path="test/Directory.Build.props" />
+  </Folder>
+</Solution>

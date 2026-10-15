@@ -1,0 +1,6 @@
+@AspNetCoreSkeletonApplication.Server_HostAddress = http://localhost:5255
+
+GET {{AspNetCoreSkeletonApplication.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

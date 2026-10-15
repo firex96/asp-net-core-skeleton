@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "rex",
+  "classifications": [
+    "Web",
+    "SPA",
+    "ASP.NET Core",
+    "Angular",
+    "SvelteKit",
+    "Nuxt"
+  ],
+  "identity": "AspNetCoreSpaSkeleton",
+  "name": "ASP.NET Core + SPA Skeleton",
+  "description": "ASP.NET Core Web API + SPA(Angular · SvelteKit · Nuxt) 스켈레톤. 클라우드별 비밀값 출처 프로파일(Local · Aws · Azure · Gcp)과 테스트 3분류가 배선돼 있다.",
+  "shortName": "aspnet-spa-skeleton",
+  "sourceName": "AspNetCoreSkeletonApplication",
+  "preferNameDirectory": true,
+  "guids": [
+    "352c4267-d2dd-461e-8203-8604ccb52ac8"
+  ],
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "forms": {
+    "kebab": {
+      "identifier": "kebabCase"
+    }
+  },
+  "symbols": {
+    "frontend": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "포함할 SPA 클라이언트",
+      "defaultValue": "angular",
+      "choices": [
+        {
+          "choice": "angular",
+          "description": "Angular"
+        },
+        {
+          "choice": "sveltekit",
+          "description": "SvelteKit (SPA 정적 빌드)"
+        },
+        {
+          "choice": "nuxt",
+          "description": "Nuxt (SPA 정적 빌드)"
+        },
+        {
+          "choice": "all",
+          "description": "셋 다 — SpaClient 속성으로 전환"
+        }
+      ]
+    },
+    "kebabName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "kebab",
+      "replaces": "asp-net-core-skeleton-application",
+      "fileRename": "asp-net-core-skeleton-application"
+    }
+  },
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**",
+        "**/[Oo]bj/**",
+        "**/obj\\*/**",
+        "**/*.user",
+        "**/*.lock.json",
+        "**/*.filelist",
+        ".template.config/**",
+        ".git/**",
+        ".vs/**",
+        ".idea/**",
+        ".claude/**",
+        "**/.DS_Store",
+        "**/TestResults/**",
+        "**/node_modules/**",
+        "**/.angular/**",
+        "**/dist/**",
+        "**/.svelte-kit/**",
+        "src/spa/*/build/**",
+        "**/.nuxt/**",
+        "**/.output/**",
+        "**/.data/**"
+      ],
+      "copyOnly": [
+        "**/*.ico",
+        "**/*.png",
+        "**/*.svg"
+      ],
+      "modifiers": [
+        {
+          "condition": "(frontend != \"angular\" && frontend != \"all\")",
+          "exclude": [
+            "src/spa/asp-net-core-skeleton-application.client.angular/**"
+          ]
+        },
+        {
+          "condition": "(frontend != \"sveltekit\" && frontend != \"all\")",
+          "exclude": [
+            "src/spa/asp-net-core-skeleton-application.client.sveltekit/**"
+          ]
+        },
+        {
+          "condition": "(frontend != \"nuxt\" && frontend != \"all\")",
+          "exclude": [
+            "src/spa/asp-net-core-skeleton-application.client.nuxt/**"
+          ]
+        }
+      ]
+    }
+  ],
+  "SpecialCustomOperations": {
+    "**/*.slnx": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "actionableIf": [
+              "<!--#if"
+            ],
+            "actionableElse": [
+              "<!--#else"
+            ],
+            "actionableElseif": [
+              "<!--#elif"
+            ],
+            "endif": [
+              "<!--#endif"
+            ],
+            "trim": true,
+            "wholeLine": true
+          }
+        }
+      ]
+    }
+  }
+}
