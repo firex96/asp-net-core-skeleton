@@ -7,6 +7,7 @@ internal static class ProblemDetailsExtensions
 {
     public const string CodeKey = "code";
     public const string DivisionCodeKey = "divisionCode";
+    public const string TraceIdKey = "traceId";
 
     public static void AddErrorCode(this ProblemDetails problemDetails, ErrorCode errorCode)
     {

@@ -171,7 +171,7 @@ dotnet ef migrations add Initial \
   "detail": "상품 42 가 없다",
   "code": "NOT_FOUND_ERROR",
   "divisionCode": "G009",
-  "traceId": "00-…"
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
 }
 ```
 
@@ -188,6 +188,17 @@ dotnet ef migrations add Initial \
 - 코드는 `Common/Errors/ErrorCode` 의 정적 필드다. 업무 코드가 필요하면 정적 필드를 더 두고 `CodedException` 을 상속한다.
 - 처리는 `Common/Web` 의 `GlobalExceptionHandler`(예외 → ProblemDetails)와 `AddProblemDetails` 의 `CustomizeProblemDetails`(예외가 아닌 응답에 코드를 붙임) 두 곳이다. 앱은 `AddSkeletonWeb()` · `UseSkeletonWeb()` 로 붙인다.
 - 코드 문자열과 구분 코드는 Spring 형제 스켈레톤과 같지만 **응답 형식은 다르다** — 형제는 자체 `ErrorResponseModel` 을, 이 스켈레톤은 .NET 표준 ProblemDetails 를 쓴다.
+
+## 추적 ID 와 감사
+
+### 추적 ID — `X-Trace-Id`
+
+요청마다 추적 ID 하나를 정해 로그와 응답, 나가는 호출을 한 줄로 잇는다. 헤더 이름과 검증 규칙은 Spring 형제 스켈레톤과 같다.
+
+1. 받은 `X-Trace-Id` 가 `^[A-Za-z0-9._-]{1,64}$` 이면 그 값을 쓴다. 없거나 어긋나면(개행 주입 등) 버리고 새로 만든다 — 현재 W3C trace-id, 없으면 GUID.
+2. 그 값을 `TraceIdContext.Current`(AsyncLocal), 로깅 scope `TraceId`, `HttpContext.TraceIdentifier`, 응답 헤더 `X-Trace-Id`, 에러 응답의 `traceId` 에 싣는다.
+
+`Common/Web/TraceIdMiddleware` 가 하고, `UseSkeletonWeb()` 이 파이프라인 맨 앞에 둔다. 콘솔 로그에 scope 를 찍는 설정은 `appsettings.json` 의 `Logging:Console:FormatterOptions:IncludeScopes` 다. AsyncLocal 이라 `await` · `Task.Run` 을 따라 흐르므로 Spring 의 `MdcTaskDecorator` 같은 전달 장치는 필요 없다.
 
 ## 아키텍처 선택
 

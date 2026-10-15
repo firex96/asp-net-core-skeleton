@@ -11,17 +11,25 @@ public static class WebServiceCollectionExtensions
 {
     public static IServiceCollection AddSkeletonWeb(this IServiceCollection services)
     {
-        // 모든 에러 응답은 ProblemDetails 다. 어디서 만들어졌든 code · divisionCode 확장 필드를 붙인다.
-        services.AddProblemDetails(options =>
-            options.CustomizeProblemDetails = context => context.ProblemDetails.AddErrorCodeIfMissing());
+        // 모든 에러 응답은 ProblemDetails 다. 어디서 만들어졌든 code · divisionCode 를 붙이고,
+        // traceId 는 기본값(Activity.Id) 대신 응답 헤더 X-Trace-Id 와 같은 값으로 맞춘다.
+        services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+        {
+            context.ProblemDetails.AddErrorCodeIfMissing();
+            context.ProblemDetails.Extensions[ProblemDetailsExtensions.TraceIdKey] = context.HttpContext.TraceIdentifier;
+        });
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
         return services;
     }
 
-    /// <summary>파이프라인 맨 앞에 둔다 — 뒤에서 나는 예외를 모두 ProblemDetails 로 바꾼다.</summary>
+    /// <summary>
+    /// 파이프라인 맨 앞에 둔다. 추적 ID 를 먼저 정하고(에러 응답에도 실리도록), 그 뒤에서 나는 예외를 모두
+    /// ProblemDetails 로 바꾼다.
+    /// </summary>
     public static IApplicationBuilder UseSkeletonWeb(this IApplicationBuilder app)
     {
+        app.UseMiddleware<TraceIdMiddleware>();
         app.UseExceptionHandler();
 
         return app;
