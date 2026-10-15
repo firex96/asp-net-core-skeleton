@@ -6,8 +6,11 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace AspNetCoreSkeletonApplication.Common.Persistence.Interceptors;
 
 /// <summary>
-/// 저장 직전에 <see cref="BaseAuditedEntity"/> 의 감사 필드를 채운다. 주체는 <see cref="AuditorContext.CurrentOrSystem"/>,
-/// 시각은 <see cref="TimeProvider"/>(UTC). 수정 때는 생성 필드가 바뀌지 않게 막는다.
+/// 저장 직전에 감사 필드를 채운다. 주체는 <see cref="AuditorContext.CurrentOrSystem"/>, 시각은 <see cref="TimeProvider"/>(UTC).
+/// <list type="bullet">
+/// <item><see cref="BaseAuditedEntity"/> — 생성 · 수정 필드. 수정 때 생성 필드는 바뀌지 않게 막는다.</item>
+/// <item><see cref="BaseCreateAuditedEntity"/> — 생성 필드만. 추가 전용이라 수정 · 삭제하면 예외다.</item>
+/// </list>
 /// 상태가 없고 AsyncLocal 만 읽으므로 싱글턴이다 — DbContext 풀링과 함께 쓸 수 있다.
 /// </summary>
 internal sealed class AuditSaveChangesInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
@@ -51,6 +54,20 @@ internal sealed class AuditSaveChangesInterceptor(TimeProvider timeProvider) : S
                     entry.Property(entity => entity.CreatedBy).IsModified = false;
                     entry.Property(entity => entity.CreatedAt).IsModified = false;
                     break;
+            }
+        }
+
+        foreach (var entry in context.ChangeTracker.Entries<BaseCreateAuditedEntity>())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    entry.Entity.CreatedBy = auditor;
+                    entry.Entity.CreatedAt = now;
+                    break;
+                case EntityState.Modified or EntityState.Deleted:
+                    throw new InvalidOperationException(
+                        $"{entry.Metadata.ClrType.Name} 는 추가 전용이다 — 고치거나 지우지 않고 새 행을 추가한다");
             }
         }
     }

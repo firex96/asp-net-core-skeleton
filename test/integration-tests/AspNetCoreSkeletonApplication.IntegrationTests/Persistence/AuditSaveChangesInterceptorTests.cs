@@ -59,6 +59,35 @@ public class AuditSaveChangesInterceptorTests(SqlServerFixture database) : IAsyn
         Assert.Equal(UpdatedTime, saved.UpdatedAt);
     }
 
+    [Fact]
+    public async Task AppendOnly_RecordsCreatorAndRefusesChanges()
+    {
+        long id;
+        await using (var context = CreateContext())
+        using (AuditorContext.Begin(5))
+        {
+            var entry = new AppendOnlyProbeEntity { Note = "first" };
+            context.AppendOnlyProbes.Add(entry);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+            id = entry.Id;
+            Assert.Equal(5, entry.CreatedBy);
+            Assert.Equal(CreatedTime, entry.CreatedAt);
+        }
+
+        await using (var context = CreateContext())
+        {
+            var entry = await context.AppendOnlyProbes.SingleAsync(probe => probe.Id == id, TestContext.Current.CancellationToken);
+            entry.Note = "changed";
+            await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync(TestContext.Current.CancellationToken));
+        }
+
+        await using (var context = CreateContext())
+        {
+            context.AppendOnlyProbes.Remove(await context.AppendOnlyProbes.SingleAsync(probe => probe.Id == id, TestContext.Current.CancellationToken));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync(TestContext.Current.CancellationToken));
+        }
+    }
+
     private async Task<long> AddAsync(long? auditor)
     {
         await using var context = CreateContext();
@@ -85,9 +114,16 @@ public class AuditSaveChangesInterceptorTests(SqlServerFixture database) : IAsyn
         public required string Name { get; set; }
     }
 
+    internal sealed class AppendOnlyProbeEntity : BaseCreateAuditedEntity
+    {
+        public required string Note { get; set; }
+    }
+
     internal sealed class ProbeDbContext(DbContextOptions<ProbeDbContext> options) : DbContext(options)
     {
         public DbSet<AuditedProbeEntity> Probes => Set<AuditedProbeEntity>();
+
+        public DbSet<AppendOnlyProbeEntity> AppendOnlyProbes => Set<AppendOnlyProbeEntity>();
     }
 
     private sealed class SettableTimeProvider(DateTimeOffset now) : TimeProvider

@@ -94,6 +94,24 @@ public class ProductApiTests(SqlServerFixture database) : IAsyncLifetime
         Assert.Equal(42, saved.UpdatedBy);
     }
 
+    [Fact]
+    public async Task ChangeStatus_WritesHistoryInSameTransaction()
+    {
+        var client = _factory.CreateClient();
+        var id = (await ReadJsonAsync(await client.PostAsJsonAsync(
+            "/api/products", new { name = "Lamp", price = 15000 }, TestContext.Current.CancellationToken))).GetProperty("id").GetInt64();
+        var request = new HttpRequestMessage(HttpMethod.Put, $"/api/products/{id}/status") { Content = JsonContent.Create(new { status = "Discontinued" }) };
+        request.Headers.Add("X-User-Id", "7");
+        await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var history = await dbContext.ProductStatusHistories.SingleAsync(row => row.ProductId == id, TestContext.Current.CancellationToken);
+        Assert.Equal(ProductStatus.Draft, history.FromStatus);
+        Assert.Equal(ProductStatus.Discontinued, history.ToStatus);
+        Assert.Equal(7, history.CreatedBy);
+    }
+
     private async Task<(long CreatedBy, DateTimeOffset CreatedAt, long UpdatedBy, ProductStatus Status)> FindEntityAsync(long id)
     {
         using var scope = _factory.Services.CreateScope();

@@ -13,6 +13,8 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbC
 {
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
+    public DbSet<ProductStatusHistoryEntity> ProductStatusHistories => Set<ProductStatusHistoryEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly)
             .UseStringEnumCodes();

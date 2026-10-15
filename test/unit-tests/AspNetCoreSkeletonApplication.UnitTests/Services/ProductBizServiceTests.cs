@@ -12,9 +12,10 @@ namespace AspNetCoreSkeletonApplication.UnitTests.Services;
 public class ProductBizServiceTests
 {
     private readonly IProductEntityService _entityService = Substitute.For<IProductEntityService>();
+    private readonly IProductStatusHistoryEntityService _historyService = Substitute.For<IProductStatusHistoryEntityService>();
     private readonly InlineTransaction _transaction = new();
 
-    private ProductBizService CreateBizService() => new(_entityService, _transaction);
+    private ProductBizService CreateBizService() => new(_entityService, _historyService, _transaction);
 
     [Fact]
     public async Task Create_StartsAsInitialStatusInsideTransaction()
@@ -38,6 +39,8 @@ public class ProductBizServiceTests
 
         Assert.Equal(ProductStatus.OnSale, changed.Status);
         Assert.Equal(1, _transaction.Executions);
+        await _historyService.Received(1).CreateAsync(
+            new ProductStatusHistoryCreateDto(1, ProductStatus.Draft, ProductStatus.OnSale), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -49,6 +52,7 @@ public class ProductBizServiceTests
             () => CreateBizService().ChangeStatusAsync(1, ProductStatus.OnSale, TestContext.Current.CancellationToken));
 
         await _entityService.DidNotReceiveWithAnyArgs().UpdateStatusAsync(default, default, TestContext.Current.CancellationToken);
+        await _historyService.DidNotReceiveWithAnyArgs().CreateAsync(default!, TestContext.Current.CancellationToken);
     }
 
     private static ProductDto Product(long id, ProductStatus status) =>

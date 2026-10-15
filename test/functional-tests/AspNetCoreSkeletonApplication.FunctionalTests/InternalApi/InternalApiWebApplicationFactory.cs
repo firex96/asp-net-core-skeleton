@@ -21,6 +21,8 @@ public class InternalApiWebApplicationFactory : WebApplicationFactory<InternalAp
         {
             services.RemoveAll<IProductEntityService>();
             services.AddSingleton<IProductEntityService, InMemoryProductEntityService>();
+            services.RemoveAll<IProductStatusHistoryEntityService>();
+            services.AddSingleton<IProductStatusHistoryEntityService, InMemoryProductStatusHistoryEntityService>();
             services.RemoveAll<IMainTransaction>();
             services.AddSingleton<IMainTransaction, InlineMainTransaction>();
         });

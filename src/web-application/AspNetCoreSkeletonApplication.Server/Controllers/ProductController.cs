@@ -27,4 +27,8 @@ public class ProductController(ProductMappingService mappingService) : Controlle
     [HttpPut("{id:long}/status")]
     public Task<ProductModel> ChangeStatus(long id, ProductStatusChangeModel model, CancellationToken cancellationToken) =>
         mappingService.ChangeStatusAsync(id, model, cancellationToken);
+
+    [HttpGet("{id:long}/status-history")]
+    public Task<IReadOnlyList<ProductStatusHistoryModel>> ListStatusHistory(long id, CancellationToken cancellationToken) =>
+        mappingService.ListStatusHistoryAsync(id, cancellationToken);
 }

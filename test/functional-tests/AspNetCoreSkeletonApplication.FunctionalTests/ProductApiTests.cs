@@ -62,6 +62,30 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task StatusHistory_RecordsOnlyAppliedChanges()
+    {
+        var client = factory.CreateClient();
+        var id = (await ReadJsonAsync(await client.PostAsJsonAsync(
+            "/api/products", new { name = "Stand", price = 29000 }, TestContext.Current.CancellationToken))).GetProperty("id").GetInt64();
+
+        await client.PutAsJsonAsync($"/api/products/{id}/status", new { status = "OnSale" }, TestContext.Current.CancellationToken);
+        await client.PutAsJsonAsync($"/api/products/{id}/status", new { status = "Draft" }, TestContext.Current.CancellationToken); // 409 — 기록되지 않는다
+
+        var history = await ReadJsonAsync(await client.GetAsync($"/api/products/{id}/status-history", TestContext.Current.CancellationToken));
+        var entry = Assert.Single(history.EnumerateArray());
+        Assert.Equal("Draft", entry.GetProperty("fromStatus").GetString());
+        Assert.Equal("OnSale", entry.GetProperty("toStatus").GetString());
+    }
+
+    [Fact]
+    public async Task StatusHistory_MissingProduct_Is404()
+    {
+        var response = await factory.CreateClient().GetAsync("/api/products/777777/status-history", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Response_DoesNotExposeAuditorIds()
     {
         var response = await factory.CreateClient().PostAsJsonAsync(

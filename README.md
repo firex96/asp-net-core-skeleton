@@ -91,7 +91,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 | 지울 것 | 함께 지워야 하는 것 |
 |---|---|
 | Server 의 WeatherForecast 한 벌 — `Controllers/WeatherForecastController`, `Services/Mapping/WeatherForecastMappingService`, `Services/Biz/WeatherForecastBizService`, `Dtos/WeatherForecastDto`, `Models/WeatherForecastModel`, `Mappers/WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
-| Product 한 벌 — Common 의 `Enums/ProductStatus`, `Dtos/Product*Dto`, `Domain/ProductStatusTransition`, `Services/Biz/ProductBizService`, `Persistence/` 의 `Entities/Main/ProductEntity` · `Configurations/ProductEntityConfiguration` · `Mappers/ProductEntityMapper` · `Services/(I)ProductEntityService`, Server 의 `Controllers/ProductController` · `Services/Mapping/ProductMappingService` · `Models/Product*Model` · `Mappers/ProductModelMapper` | `AppDbContext.Products`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
+| Product 한 벌 — Common 의 `Enums/ProductStatus`, `Dtos/Product*Dto`(상태 이력 포함), `Domain/ProductStatusTransition`, `Services/Biz/ProductBizService`, `Persistence/` 의 `Entities/Main/Product*Entity` · `Configurations/Product*EntityConfiguration` · `Mappers/Product*EntityMapper` · `Services/(I)Product*EntityService`, Server 의 `Controllers/ProductController` · `Services/Mapping/ProductMappingService` · `Models/Product*Model` · `Mappers/ProductModelMapper` | `AppDbContext.Products` · `ProductStatusHistories`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
 | Server 의 `Clients/ExampleApiClient` · `ExampleApiOptions`, `Dtos/ExampleStatusDto` | Program.cs 의 `AddApiClient<ExampleApiClient, …>` 줄, `appsettings.json` 의 `Clients:ExampleApi`, `UnitTests/Clients/ExampleApiClientTests.cs` |
 | `AwsSecretSourceTests` (Aws 를 안 쓰면) | 통합 테스트 csproj 의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack` |
 
@@ -176,7 +176,7 @@ ASPNETCORE_ENVIRONMENT=Local dotnet ef migrations add <이름> \
 
 예: `GET /weatherforecast` — `WeatherForecastController` 가 `WeatherForecastMappingService.List()` 를 부르고, MappingService 는 `WeatherForecastBizService` 가 만든 `WeatherForecastDto` 에 화씨(표시용 파생 값)를 계산해 `WeatherForecastMapper.ToModel(dto, temperatureF)` 로 `WeatherForecastModel` 을 만든다.
 
-예: `PUT /api/products/{id}/status` — `ProductController` → `ProductMappingService` → 공유 `ProductBizService`(Common) 가 `IMainTransaction` 안에서 `IProductEntityService.GetAsync` 로 현재 상태를 읽고, `ProductStatusTransition.EnsureCanChange`(Domain) 로 판단을 얻은 뒤 `UpdateStatusAsync` 로 바꾼다. 허용되지 않은 전이는 Domain 이 `ConflictException`(409)을 던진다.
+예: `PUT /api/products/{id}/status` — `ProductController` → `ProductMappingService` → 공유 `ProductBizService`(Common) 가 `IMainTransaction` 안에서 `IProductEntityService.GetAsync` 로 현재 상태를 읽고, `ProductStatusTransition.EnsureCanChange`(Domain) 로 판단을 얻은 뒤 `UpdateStatusAsync` 로 바꾼다. 허용되지 않은 전이는 Domain 이 `ConflictException`(409)을 던진다. 바뀌면 같은 트랜잭션에서 상태 이력(`GET /api/products/{id}/status-history`)을 남긴다.
 
 ### 외부 API 클라이언트
 
@@ -232,7 +232,12 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 
 ### 감사 — 누가 언제 만들고 고쳤나
 
-`BaseAuditedEntity` 를 상속한 엔티티는 저장 직전에 `CreatedBy` · `CreatedAt` · `UpdatedBy` · `UpdatedAt` 이 채워진다(`AuditSaveChangesInterceptor`, 시각은 `TimeProvider` 의 UTC). 수정 때 생성 필드는 바뀌지 않는다. EntityService 나 매퍼가 직접 넣지 않는다.
+감사 필드는 `AuditSaveChangesInterceptor` 가 저장 직전에 채운다(시각은 `TimeProvider` 의 UTC). EntityService 나 매퍼가 직접 넣지 않는다. 엔티티의 기반은 행의 성격으로 고른다.
+
+| 기반 | 필드 | 쓰는 곳 |
+|---|---|---|
+| `BaseAuditedEntity` | `CreatedBy` · `CreatedAt` · `UpdatedBy` · `UpdatedAt` | 고칠 수 있는 업무 행(`ProductEntity`). 수정 때 생성 필드는 바뀌지 않는다 |
+| `BaseCreateAuditedEntity` | `CreatedBy` · `CreatedAt` | 한 번 쓰고 바꾸지 않는 이력 · 로그(`ProductStatusHistoryEntity`). **추가 전용** — 수정 · 삭제하면 저장할 때 예외 |
 
 감사 주체는 `AuditorContext` 하나만 읽고, HTTP 요청에서는 `AuditorContextMiddleware` 가 다음 순서로 정한다.
 
