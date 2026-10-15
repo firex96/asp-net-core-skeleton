@@ -91,7 +91,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 | 지울 것 | 함께 지워야 하는 것 |
 |---|---|
 | Server 의 WeatherForecast 한 벌 — `Controllers/WeatherForecastController`, `Services/Mapping/WeatherForecastMappingService`, `Services/Biz/WeatherForecastBizService`, `Dtos/WeatherForecastDto`, `Models/WeatherForecastModel`, `Mappers/WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
-| Product 한 벌 — Common 의 `Enums/ProductStatus`, `Dtos/Product*Dto`(상태 이력 포함), `Domain/ProductStatusTransition`, `Services/Biz/ProductBizService`, `Persistence/` 의 `Entities/Main/Product*Entity` · `Configurations/Product*EntityConfiguration` · `Mappers/Product*EntityMapper` · `Services/(I)Product*EntityService`, Server 의 `Controllers/ProductController` · `Services/Mapping/ProductMappingService` · `Models/Product*Model` · `Mappers/ProductModelMapper` | `AppDbContext.Products` · `ProductStatusHistories`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
+| Product 한 벌 — Common 의 `Enums/ProductStatus`, `Dtos/Product*Dto`(상태 이력 포함), `Domain/ProductStatusTransition`, `Services/Biz/ProductBizService`, `Persistence/` 의 `Entities/Main/Product*Entity` · `Configurations/Product*EntityConfiguration` · `Mappers/Product*EntityMapper` · `Services/(I)Product*EntityService`, Server 의 `Controllers/ProductController` · `Services/Mapping/ProductMappingService` · `Models/Product*Model` · `Mappers/ProductModelMapper` (엔드포인트: GET · POST · PUT status · DELETE · GET status-history) | `AppDbContext.Products` · `ProductStatusHistories`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
 | Server 의 `Clients/ExampleApiClient` · `ExampleApiOptions`, `Dtos/ExampleStatusDto` | Program.cs 의 `AddApiClient<ExampleApiClient, …>` 줄, `appsettings.json` 의 `Clients:ExampleApi`, `UnitTests/Clients/ExampleApiClientTests.cs` |
 | `AwsSecretSourceTests` (Aws 를 안 쓰면) | 통합 테스트 csproj 의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack` |
 
@@ -238,6 +238,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 |---|---|---|
 | `BaseAuditedEntity` | `CreatedBy` · `CreatedAt` · `UpdatedBy` · `UpdatedAt` | 고칠 수 있는 업무 행(`ProductEntity`). 수정 때 생성 필드는 바뀌지 않는다 |
 | `BaseCreateAuditedEntity` | `CreatedBy` · `CreatedAt` | 한 번 쓰고 바꾸지 않는 이력 · 로그(`ProductStatusHistoryEntity`). **추가 전용** — 수정 · 삭제하면 저장할 때 예외 |
+| `ISoftDeletable` (함께 구현) | `DeletedAt` · `DeletedBy` | 지워도 남겨야 하는 업무 행(`ProductEntity`). EntityService 는 `Remove` 를 부르고 인터셉터가 논리 삭제로 바꾼다. 지워진 행은 전역 쿼리 필터가 모든 조회에서 뺀다(꼭 봐야 하면 그 쿼리에서만 `IgnoreQueryFilters()`) |
 
 감사 주체는 `AuditorContext` 하나만 읽고, HTTP 요청에서는 `AuditorContextMiddleware` 가 다음 순서로 정한다.
 
@@ -296,6 +297,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 | `ErrorResponseModel` | ProblemDetails + `code` · `divisionCode` |
 | MDC · `TaskDecorator` | 로깅 scope · AsyncLocal (전달 장치가 필요 없다) |
 | `StringEnum` · `@JsonValue` · `AbstractStringEnumConverter` | `[JsonStringEnumMemberName]` 하나 — JSON · DB · 쿼리 공통 |
+| `SoftDeletable` + `@SQLRestriction` (엔티티마다) | `ISoftDeletable` — 인터셉터 + 전역 쿼리 필터가 자동으로 |
 
 ### 선언
 
@@ -304,7 +306,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 - **Domain** — EF · DI · ASP.NET 을 모르는 순수 클래스. `static` 함수나 불변 record.
 - **매퍼** — `[Mapper] static partial class`. 계산하지 않는다 — 계산된 값은 MappingService 가 추가 매개변수로 넘긴다.
 - **열거형** — 멤버마다 `[JsonStringEnumMemberName("코드")]` 로 외부 코드를 단다. JSON 본문 · 응답, 쿼리 · 라우트 바인딩, DB 컬럼이 모두 이 코드를 쓴다(`Common/Enums/EnumCodes`). C# 멤버 이름을 바꿔도 저장된 데이터와 API 계약이 바뀌지 않는다. EF 변환기는 `AppDbContext` 가 모든 열거형 속성에 자동으로 붙이므로 엔티티 구성에 적지 않는다(길이만 `HasMaxLength`).
-- **DB** — 식별자 `BIGINT`, FOREIGN KEY 제약 없음, 열거형은 외부 코드 문자열로 저장, 조회 기본 NoTracking.
+- **DB** — 식별자 `BIGINT`, FOREIGN KEY 제약 없음, 열거형은 외부 코드 문자열로 저장, 조회 기본 NoTracking. 업무 테이블에는 물리 삭제 경로를 두지 않는다 — 지울 수 있는 엔티티는 `ISoftDeletable`, 이력은 `BaseCreateAuditedEntity`(지우지 않는다). 논리 삭제된 행과 유일 인덱스가 부딪히면 필터 인덱스(`HasFilter("[DeletedAt] IS NULL")`)로 둔다.
 
 ### Mapperly 엄격 모드와 남은 함정
 
@@ -334,6 +336,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 
 - [ ] BizService · MappingService · 매퍼에 업무 값 계산이나 상태 판단 식이 없다 — Domain 에 있다
 - [ ] BizService 의 변경 메서드가 모두 `IMainTransaction.ExecuteAsync` 안에 있다
+- [ ] 업무 테이블을 물리 삭제하는 경로(`ExecuteDelete`, 원시 SQL `DELETE`)가 없다
 - [ ] 업무 실패는 `CodedException` 계열로 던지고, 메시지는 사용자에게 보여도 되는 문장이다. 예외를 삼키지 않는다
 - [ ] 현재 시각은 `TimeProvider` 로만 읽는다
 - [ ] API 앱에 주기 실행(`BackgroundService` 타이머 등)이 없다 — 배치 앱의 일이다

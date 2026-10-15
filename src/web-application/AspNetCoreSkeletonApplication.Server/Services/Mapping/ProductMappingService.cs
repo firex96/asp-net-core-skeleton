@@ -19,6 +19,9 @@ public class ProductMappingService(ProductBizService bizService)
     public async Task<ProductModel> ChangeStatusAsync(long id, ProductStatusChangeModel model, CancellationToken cancellationToken) =>
         (await bizService.ChangeStatusAsync(id, model.Status, cancellationToken)).ToModel();
 
+    public Task DeleteAsync(long id, CancellationToken cancellationToken) =>
+        bizService.DeleteAsync(id, cancellationToken);
+
     public async Task<IReadOnlyList<ProductStatusHistoryModel>> ListStatusHistoryAsync(long id, CancellationToken cancellationToken) =>
         (await bizService.ListStatusHistoryAsync(id, cancellationToken)).ToModels();
 }

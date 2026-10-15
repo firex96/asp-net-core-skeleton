@@ -28,6 +28,13 @@ public class ProductController(ProductMappingService mappingService) : Controlle
     public Task<ProductModel> ChangeStatus(long id, ProductStatusChangeModel model, CancellationToken cancellationToken) =>
         mappingService.ChangeStatusAsync(id, model, cancellationToken);
 
+    [HttpDelete("{id:long}")]
+    public async Task<NoContentResult> Delete(long id, CancellationToken cancellationToken)
+    {
+        await mappingService.DeleteAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("{id:long}/status-history")]
     public Task<IReadOnlyList<ProductStatusHistoryModel>> ListStatusHistory(long id, CancellationToken cancellationToken) =>
         mappingService.ListStatusHistoryAsync(id, cancellationToken);

@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using AspNetCoreSkeletonApplication.Common.Persistence.Entities.Backbone;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -19,6 +21,24 @@ internal static class ModelBuilderConventionExtensions
                 var converterType = typeof(StringEnumValueConverter<>).MakeGenericType(enumType);
                 property.SetValueConverter((ValueConverter)Activator.CreateInstance(converterType)!);
             }
+        }
+
+        return modelBuilder;
+    }
+
+    /// <summary>
+    /// <see cref="ISoftDeletable"/> 엔티티마다 <c>DeletedAt == null</c> 전역 쿼리 필터를 건다 — 지워진 행은 모든 조회에서 빠진다.
+    /// 지워진 행까지 봐야 하면 그 쿼리에서만 <c>IgnoreQueryFilters()</c> 를 쓴다.
+    /// </summary>
+    public static ModelBuilder UseSoftDeleteFilter(this ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(type => typeof(ISoftDeletable).IsAssignableFrom(type.ClrType)))
+        {
+            var entity = Expression.Parameter(entityType.ClrType, "entity");
+            var notDeleted = Expression.Equal(
+                Expression.Property(entity, nameof(ISoftDeletable.DeletedAt)),
+                Expression.Constant(null, typeof(DateTimeOffset?)));
+            modelBuilder.Entity(entityType.ClrType).HasQueryFilter(Expression.Lambda(notDeleted, entity));
         }
 
         return modelBuilder;

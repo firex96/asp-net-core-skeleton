@@ -10,6 +10,7 @@ namespace AspNetCoreSkeletonApplication.Common.Persistence.Interceptors;
 /// <list type="bullet">
 /// <item><see cref="BaseAuditedEntity"/> — 생성 · 수정 필드. 수정 때 생성 필드는 바뀌지 않게 막는다.</item>
 /// <item><see cref="BaseCreateAuditedEntity"/> — 생성 필드만. 추가 전용이라 수정 · 삭제하면 예외다.</item>
+/// <item><see cref="ISoftDeletable"/> — 삭제를 삭제 주체 · 시각을 채운 수정으로 바꾼다.</item>
 /// </list>
 /// 상태가 없고 AsyncLocal 만 읽으므로 싱글턴이다 — DbContext 풀링과 함께 쓸 수 있다.
 /// </summary>
@@ -37,6 +38,14 @@ internal sealed class AuditSaveChangesInterceptor(TimeProvider timeProvider) : S
 
         var now = timeProvider.GetUtcNow();
         var auditor = AuditorContext.CurrentOrSystem;
+
+        // 논리 삭제를 먼저 바꾼다 — Modified 가 되면 아래에서 수정 필드도 함께 채워진다.
+        foreach (var entry in context.ChangeTracker.Entries<ISoftDeletable>().Where(entry => entry.State == EntityState.Deleted))
+        {
+            entry.State = EntityState.Modified;
+            entry.Entity.DeletedAt = now;
+            entry.Entity.DeletedBy = auditor;
+        }
 
         foreach (var entry in context.ChangeTracker.Entries<BaseAuditedEntity>())
         {

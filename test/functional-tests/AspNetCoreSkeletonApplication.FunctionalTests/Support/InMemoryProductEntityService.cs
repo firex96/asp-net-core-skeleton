@@ -31,6 +31,9 @@ public sealed class InMemoryProductEntityService : IProductEntityService
         return Task.FromResult(created);
     }
 
+    public Task DeleteAsync(long id, CancellationToken cancellationToken) =>
+        _products.TryRemove(id, out _) ? Task.CompletedTask : throw new ItemNotFoundException($"상품 {id} 가 없다");
+
     public async Task<ProductDto> UpdateStatusAsync(long id, ProductStatus status, CancellationToken cancellationToken)
     {
         var updated = await GetAsync(id, cancellationToken) with { Status = status };

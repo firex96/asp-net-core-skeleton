@@ -36,6 +36,12 @@ namespace AspNetCoreSkeletonApplication.Common.Persistence.Migrations
                     b.Property<long>("CreatedBy")
                         .HasColumnType("bigint");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)

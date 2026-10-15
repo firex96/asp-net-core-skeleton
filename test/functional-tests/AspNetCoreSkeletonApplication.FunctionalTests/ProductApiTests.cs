@@ -78,6 +78,22 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task Delete_Is204ThenGetIs404()
+    {
+        var client = factory.CreateClient();
+        var id = (await ReadJsonAsync(await client.PostAsJsonAsync(
+            "/api/products", new { name = "Tray", price = 5000 }, TestContext.Current.CancellationToken))).GetProperty("id").GetInt64();
+
+        var deleted = await client.DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
+        var again = await client.DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
+        var fetched = await client.GetAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, fetched.StatusCode);
+    }
+
+    [Fact]
     public async Task StatusHistory_MissingProduct_Is404()
     {
         var response = await factory.CreateClient().GetAsync("/api/products/777777/status-history", TestContext.Current.CancellationToken);

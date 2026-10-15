@@ -37,6 +37,13 @@ public class ProductBizService(
             return changed;
         }, cancellationToken);
 
+    public Task DeleteAsync(long id, CancellationToken cancellationToken) =>
+        transaction.ExecuteAsync(async token =>
+        {
+            await productEntityService.DeleteAsync(id, token);
+            return true;
+        }, cancellationToken);
+
     /// <summary>상품이 없으면 404 — 빈 목록으로 "없는 상품" 과 "이력 없는 상품" 을 구분할 수 없게 하지 않는다.</summary>
     public async Task<IReadOnlyList<ProductStatusHistoryDto>> ListStatusHistoryAsync(long id, CancellationToken cancellationToken)
     {

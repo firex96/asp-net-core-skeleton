@@ -55,6 +55,15 @@ public class ProductBizServiceTests
         await _historyService.DidNotReceiveWithAnyArgs().CreateAsync(default!, TestContext.Current.CancellationToken);
     }
 
+    [Fact]
+    public async Task Delete_RunsInsideTransaction()
+    {
+        await CreateBizService().DeleteAsync(1, TestContext.Current.CancellationToken);
+
+        await _entityService.Received(1).DeleteAsync(1, Arg.Any<CancellationToken>());
+        Assert.Equal(1, _transaction.Executions);
+    }
+
     private static ProductDto Product(long id, ProductStatus status) =>
         new(id, "Keyboard", 49_000m, status, 0, DateTimeOffset.UnixEpoch, 0, DateTimeOffset.UnixEpoch);
 

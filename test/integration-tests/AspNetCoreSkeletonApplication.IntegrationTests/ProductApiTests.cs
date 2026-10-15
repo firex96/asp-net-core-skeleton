@@ -95,6 +95,31 @@ public class ProductApiTests(SqlServerFixture database) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Delete_IsLogical_RowStaysWithDeleter()
+    {
+        var client = _factory.CreateClient();
+        var id = (await ReadJsonAsync(await client.PostAsJsonAsync(
+            "/api/products", new { name = "Shelf", price = 80000 }, TestContext.Current.CancellationToken))).GetProperty("id").GetInt64();
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/products/{id}");
+        request.Headers.Add("X-User-Id", "11");
+
+        var deleted = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var fetched = await client.GetAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
+        var listed = await ReadJsonAsync(await client.GetAsync("/api/products", TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, fetched.StatusCode);
+        Assert.DoesNotContain(listed.EnumerateArray(), product => product.GetProperty("id").GetInt64() == id);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await dbContext.Products.IgnoreQueryFilters().SingleAsync(product => product.Id == id, TestContext.Current.CancellationToken);
+        Assert.NotNull(row.DeletedAt);
+        Assert.Equal(11, row.DeletedBy);
+        Assert.Equal(11, row.UpdatedBy);
+    }
+
+    [Fact]
     public async Task ChangeStatus_WritesHistoryInSameTransaction()
     {
         var client = _factory.CreateClient();

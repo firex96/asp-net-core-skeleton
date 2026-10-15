@@ -17,5 +17,6 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbC
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly)
-            .UseStringEnumCodes();
+            .UseStringEnumCodes()
+            .UseSoftDeleteFilter();
 }

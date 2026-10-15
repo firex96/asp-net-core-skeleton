@@ -39,6 +39,12 @@ internal sealed class ProductEntityService(AppDbContext dbContext) : IProductEnt
         return entity.ToDto();
     }
 
+    public async Task DeleteAsync(long id, CancellationToken cancellationToken)
+    {
+        dbContext.Products.Remove(await TrackAsync(id, cancellationToken));
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task<ProductEntity> TrackAsync(long id, CancellationToken cancellationToken) =>
         await dbContext.Products.AsTracking().SingleOrDefaultAsync(product => product.Id == id, cancellationToken)
         ?? throw NotFound(id);
