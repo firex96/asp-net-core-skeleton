@@ -69,7 +69,7 @@ public class LayeringConventionTests
                                 || (name.EndsWith("BizService", StringComparison.Ordinal) && ConventionScan.LayerOf(dependency) == Layer.BizService)
                                 || IsGenericOf(dependency, typeof(IOptions<>))
                                 || dependency == typeof(TimeProvider),
-            Layer.EntityService => name == "AppDbContext",
+            Layer.EntityService => name is "AppDbContext" or "EntityCache",
             _ => false,
         };
     }

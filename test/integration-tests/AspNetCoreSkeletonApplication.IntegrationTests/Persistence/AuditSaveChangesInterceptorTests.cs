@@ -8,8 +8,8 @@ using Microsoft.EntityFrameworkCore;
 namespace AspNetCoreSkeletonApplication.IntegrationTests.Persistence;
 
 /// <summary>저장 직전에 감사 필드가 채워지고, 수정 때 생성 필드는 바뀌지 않는다 — 실제 SQL Server 에 저장해 확인한다.</summary>
-[Collection(SqlServerCollection.Name)]
-public class AuditSaveChangesInterceptorTests(SqlServerFixture database) : IAsyncLifetime
+[Collection(InfrastructureCollection.Name)]
+public class AuditSaveChangesInterceptorTests(InfrastructureFixture database) : IAsyncLifetime
 {
     private static readonly DateTimeOffset CreatedTime = new(2026, 10, 15, 9, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset UpdatedTime = CreatedTime.AddHours(1);

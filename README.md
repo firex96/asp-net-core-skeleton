@@ -27,7 +27,8 @@
 | Angular | 22.2 (Vitest) |
 | SvelteKit / Svelte | 3.0 / 5 (adapter-static) |
 | Nuxt / Vue | 4.6 / 3.5 (`ssr: false`) |
-| 로컬 DB | SQL Server 2022 컨테이너 (`docker-compose.yml`) |
+| 로컬 DB · 캐시 | SQL Server 2022 · Redis 7.4 컨테이너 (`docker-compose.yml`) |
+| 캐시 | HybridCache (`Microsoft.Extensions.Caching.Hybrid`) + Redis L2 |
 
 **여기 적힌 숫자는 빌드 파일이 정본이다.** 어긋나면 `global.json` · `Directory.Packages.props` · 각 SPA `package.json` 을 따른다.
 
@@ -98,7 +99,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 ### 6. 뜨는지 확인한다
 
 ```bash
-docker compose up -d                                    # SQL Server — mssql-init 이 skeleton DB 를 만든다
+docker compose up -d                                    # SQL Server · Redis — mssql-init 이 skeleton DB 를 만든다
 dotnet tool restore                                     # dotnet-ef (dotnet-tools.json 에 버전 고정)
 ASPNETCORE_ENVIRONMENT=Local dotnet ef database update \
   --project src/common/AspNetCoreSkeletonApplication.Common \
@@ -165,7 +166,7 @@ ASPNETCORE_ENVIRONMENT=Local dotnet ef migrations add <이름> \
 | MappingService (`.Services.Mapping`) | 화면용 변환 전부 — 파생 값, 포맷, 여러 BizService 결과 조합. 트랜잭션 없음 | BizService, `IOptions<>`, `TimeProvider` |
 | BizService (`.Services.Biz`) | 조회·저장·트랜잭션·호출 순서. 업무 판단은 Domain 을 불러 얻는다. 변경 메서드는 **항상** `IMainTransaction.ExecuteAsync` 안에서 돈다 | `I~EntityService`, `IMainTransaction`, `~Client`, 다른 BizService, `IOptions<>`, `TimeProvider` |
 | Domain (`.Domain`) | 업무 값 계산과 상태 전이 판단 전부. EF 를 모르는 순수 클래스, DI 대상이 아니다 | — (Dto · 열거형 · 에러 · System 만 참조) |
-| EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현하고, 구현은 `internal` 이다. 조회는 기본 NoTracking, 바꿀 때만 `AsTracking()` | `AppDbContext` |
+| EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현하고, 구현은 `internal` 이다. 조회는 기본 NoTracking, 바꿀 때만 `AsTracking()`. 캐시는 여기서만 | `AppDbContext`, `EntityCache` |
 | 매퍼 (`.Mappers`, `.Persistence.Mappers`) | 필드를 기계적으로 옮긴다. 계산하지 않는다. `static partial` (Mapperly) | — |
 
 모든 계층은 `ILogger<>` 를 더 받을 수 있다. 이 표의 주입 허용 목록은 규약 테스트가 강제한다 — 「코딩 규약」 참고. 타입은 셋으로 나눈다 — **Model**(HTTP 입출력, `.Models`), **Dto**(계층 사이 전달, `.Dtos`), **Entity**(DB 매핑, `internal`). Model 과 Dto 는 데이터만 담는 `sealed record` 다.
@@ -187,6 +188,25 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 ```
 
 이 한 줄이 붙이는 것 — `~Options`(`ApiClientOptions` 상속) 바인딩과 기동 시 검증(`BaseAddress` 가 없으면 기동이 멈춘다), 표준 resilience(재시도 · 타임아웃 · 회로 차단), 시도마다 `X-Trace-Id` 전파, 재시도 뒤에도 응답이 없으면 `ApiCallException`(502). 응답은 `ReadRequiredFromJsonAsync<T>()` 로 읽는다 — 오류 상태나 빈 본문도 `ApiCallException` 이 되어 실패가 null 로 새지 않는다.
+
+## 캐시
+
+EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis(L2)** 로 캐시한다. 연결 문자열은 비밀값 `ConnectionStrings:Redis`, 로컬은 docker compose 의 Redis 다.
+
+규칙 (예외 없음):
+
+- **캐시는 EntityService 에서만**, `HybridCache` 를 직접 쓰지 않고 `EntityCache` 를 거친다(주입 허용 목록이 강제한다).
+- 키는 `{엔티티}:{id}` · `{엔티티}:list`, 태그는 `{엔티티}`. **캐시하는 엔티티의 모든 변경 메서드는 그 태그 전체를 무효화한다** — 키를 골라 지우다 빠뜨리는 일이 없다(형제 스켈레톤의 `ProductIdList` 처럼 무효화가 없는 캐시가 생기지 않는다).
+- **없는 값은 캐시하지 않는다.** `EntityCache.FindOrLoadAsync` 가 null 결과를 캐시에 넣지 않는다.
+- **무효화는 커밋 뒤에.** 트랜잭션 안에서 부른 무효화는 모아 두었다가 `IMainTransaction` 이 커밋한 직후에 실행하고, 롤백되면 버린다. 커밋 전에 지우면 그 사이 다른 요청이 옛 값을 다시 캐시해 만료까지 남는다.
+
+| 설정 (`Cache:*`) | 기본 | 뜻 |
+|---|---|---|
+| `Expiration` | 10분 | Redis 까지 포함한 만료 |
+| `LocalExpiration` | 30초 | L1 만료. **다른 인스턴스의 L1 은 무효화가 닿지 않는다** — 여러 인스턴스로 돌 때 낡은 값이 남는 시간의 상한이다 |
+| `KeyPrefix` | `asp-net-core-skeleton-application:` | Redis 키 접두사. 같은 Redis 를 여러 서비스가 쓸 때 섞이지 않게 한다 |
+
+여러 인스턴스에서 즉시 무효화가 필요해지면 `HybridCache` 구현을 FusionCache + Redis 백플레인으로 바꾼다 — EntityService 코드는 그대로다.
 
 ## 에러 응답
 
@@ -310,6 +330,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 | `StringEnum` · `@JsonValue` · `AbstractStringEnumConverter` | `[JsonStringEnumMemberName]` 하나 — JSON · DB · 쿼리 공통 |
 | `SoftDeletable` + `@SQLRestriction` (엔티티마다) | `ISoftDeletable` — 인터셉터 + 전역 쿼리 필터가 자동으로 |
 | `@SlowMethod` + `SlowMethodAspect` | `SlowQueryInterceptor` · `SlowRequestMiddleware` — 경계에서 모두 잰다 |
+| `@Cacheable` · `@CachePut` · `@CacheEvict` (EntityService) | `EntityCache` — 조회 캐시 + 변경 시 태그 무효화(커밋 뒤) |
 
 ### 선언
 
@@ -362,7 +383,7 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 |---|---|---|
 | `UnitTests` | 없음 | xUnit v3 |
 | `FunctionalTests` | 없음 — 앱을 메모리에 띄우고 DB 에는 붙지 않는다 | `WebApplicationFactory` |
-| `IntegrationTests` | **Docker** | Testcontainers (SQL Server · LocalStack) |
+| `IntegrationTests` | **Docker** | Testcontainers (SQL Server · Redis · LocalStack) |
 
 ```bash
 dotnet test --solution AspNetCoreSkeletonApplication.slnx                       # 전부 — Docker 필요
@@ -380,7 +401,7 @@ dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.Integ
 | HTTP 계약(상태 코드 · JSON · 에러 응답) | `I~EntityService` 를 메모리 구현으로 바꿔 DB 없이 | `FunctionalTests` |
 | EntityService · 트랜잭션 · 감사 필드 | 대역 없음 — SQL Server 컨테이너에 마이그레이션을 적용해 HTTP 로 끝까지 | `IntegrationTests` |
 
-DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server 컨테이너는 `[Collection(SqlServerCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름을 달리한다(`SqlServerFixture.ConnectionStringFor`).
+DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server · Redis 컨테이너는 `[Collection(InfrastructureCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름과 캐시 키 접두사를 달리한다 — 앱은 `InfrastructureFixture.ConfigureApp(builder, "<데이터베이스>")` 한 줄로 붙인다.
 
 SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 `npm test -- --watch=false` 로 단발 실행)다. 타입 검사는 SvelteKit · Nuxt 에서 `npm run check`.
 
@@ -392,13 +413,13 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 
 | 프로파일 | 비밀값 출처 | 필요한 것 |
 |---|---|---|
-| (없음 = `Production`) | 환경변수 (컨테이너, k8s Secret) | `ConnectionStrings__Default` |
+| (없음 = `Production`) | 환경변수 (컨테이너, k8s Secret) | `ConnectionStrings__Default` · `ConnectionStrings__Redis` |
 | `Local` | `appsettings.Local.json` 의 docker compose 값 + user-secrets | `docker compose up -d` |
 | `Aws` | AWS Secrets Manager — JSON 비밀 하나의 키 | `Aws:SecretsManager:SecretId`, AWS SDK 기본 자격증명 체인 |
 | `Azure` | Azure Key Vault — 볼트의 모든 비밀 | `Azure:KeyVault:Endpoint`, `DefaultAzureCredential` |
 | `Gcp` | GCP Secret Manager — `Gcp:SecretManager:Secrets` 에 적은 비밀 | `Gcp:SecretManager:ProjectId`, Application Default Credentials |
 
-저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **`ConnectionStrings:Default` 가 없으면 기동이 멈추고** 빠진 키와 출처별 이름을 알려 준다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
+저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이다.** 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
 
 ### 키 이름 대응
 
@@ -417,17 +438,20 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 
 ```bash
 CS='Server=tcp:<host>,1433;Database=<db>;User ID=<user>;Password=<password>;Encrypt=True'
+REDIS='<host>:6380,password=<password>,ssl=True,abortConnect=False'
 
 # AWS — JSON 비밀 하나에 키를 모은다
-aws secretsmanager create-secret --name contoso-shop/prod --secret-string "{\"ConnectionStrings:Default\":\"$CS\"}"
+aws secretsmanager create-secret --name contoso-shop/prod --secret-string "{\"ConnectionStrings:Default\":\"$CS\",\"ConnectionStrings:Redis\":\"$REDIS\"}"
 ASPNETCORE_ENVIRONMENT=Aws Aws__SecretsManager__SecretId=contoso-shop/prod dotnet Contoso.Shop.Server.dll
 
 # Azure — 비밀 이름의 -- 가 : 로 읽힌다
 az keyvault secret set --vault-name <vault> --name ConnectionStrings--Default --value "$CS"
+az keyvault secret set --vault-name <vault> --name ConnectionStrings--Redis --value "$REDIS"
 ASPNETCORE_ENVIRONMENT=Azure Azure__KeyVault__Endpoint=https://<vault>.vault.azure.net/ dotnet Contoso.Shop.Server.dll
 
 # GCP — 비밀 이름은 Azure 와 같고, appsettings.Gcp.json 의 Secrets 에 적은 것만 읽는다
 printf '%s' "$CS" | gcloud secrets create ConnectionStrings--Default --data-file=-
+printf '%s' "$REDIS" | gcloud secrets create ConnectionStrings--Redis --data-file=-
 ASPNETCORE_ENVIRONMENT=Gcp Gcp__SecretManager__ProjectId=<project> dotnet Contoso.Shop.Server.dll
 ```
 

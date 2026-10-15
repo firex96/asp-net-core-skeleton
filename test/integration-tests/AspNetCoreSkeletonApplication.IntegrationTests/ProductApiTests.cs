@@ -16,8 +16,8 @@ namespace AspNetCoreSkeletonApplication.IntegrationTests;
 /// 실제 SQL Server 에 마이그레이션을 적용하고 Product API 를 끝까지 통과시킨다 — EntityService 의 쿼리 · 매핑,
 /// 트랜잭션, 감사 필드 기록을 대역 없이 확인한다.
 /// </summary>
-[Collection(SqlServerCollection.Name)]
-public class ProductApiTests(SqlServerFixture database) : IAsyncLifetime
+[Collection(InfrastructureCollection.Name)]
+public class ProductApiTests(InfrastructureFixture database) : IAsyncLifetime
 {
     private WebApplicationFactory<Program> _factory = null!;
 
@@ -25,8 +25,7 @@ public class ProductApiTests(SqlServerFixture database) : IAsyncLifetime
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Default", database.ConnectionStringFor("product_api"));
+            database.ConfigureApp(builder, "product_api");
             builder.UseSetting("Audit:TrustUserHeader", "true");
         });
 

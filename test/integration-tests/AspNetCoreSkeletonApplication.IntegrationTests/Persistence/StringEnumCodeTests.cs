@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 namespace AspNetCoreSkeletonApplication.IntegrationTests.Persistence;
 
 /// <summary>열거형 컬럼에는 C# 이름이 아니라 외부 코드가 저장되고, 그 코드로 다시 읽힌다 — 실제 SQL Server 로 확인한다.</summary>
-[Collection(SqlServerCollection.Name)]
-public class StringEnumCodeTests(SqlServerFixture database) : IAsyncLifetime
+[Collection(InfrastructureCollection.Name)]
+public class StringEnumCodeTests(InfrastructureFixture database) : IAsyncLifetime
 {
     public async ValueTask InitializeAsync()
     {

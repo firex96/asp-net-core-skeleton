@@ -1,5 +1,5 @@
 # 로컬 개발용 인프라. Local 프로파일(appsettings.Local.json)의 연결 문자열과 짝이다.
-#   docker compose up -d      # 기동 — mssql-init 이 skeleton DB 를 만들고 끝난다
+#   docker compose up -d      # 기동 — SQL Server · Redis. mssql-init 이 skeleton DB 를 만들고 끝난다
 #   docker compose down -v    # 데이터까지 삭제
 services:
   mssql:
@@ -33,6 +33,16 @@ services:
       - -c
       - /opt/mssql-tools18/bin/sqlcmd -C -S mssql -U sa -P "$$MSSQL_SA_PASSWORD" -b -Q "IF DB_ID('skeleton') IS NULL CREATE DATABASE skeleton"
     restart: "no"
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   mssql-data:

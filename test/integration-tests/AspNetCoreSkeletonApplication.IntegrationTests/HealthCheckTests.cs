@@ -7,8 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AspNetCoreSkeletonApplication.IntegrationTests;
 
 /// <summary>SQL Server 컨테이너에 붙은 앱이 DB 연결과 /health 를 통과하는지 확인한다.</summary>
-[Collection(SqlServerCollection.Name)]
-public class HealthCheckTests(SqlServerFixture database) : IAsyncLifetime
+[Collection(InfrastructureCollection.Name)]
+public class HealthCheckTests(InfrastructureFixture database) : IAsyncLifetime
 {
     private WebApplicationFactory<Program> _factory = null!;
 
@@ -16,8 +16,7 @@ public class HealthCheckTests(SqlServerFixture database) : IAsyncLifetime
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Default", database.ConnectionString);
+            database.ConfigureApp(builder, "master");
         });
         return ValueTask.CompletedTask;
     }

@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 캐시 — HybridCache(메모리 L1 + Redis L2), EntityService 전용 `EntityCache`(없는 값은 캐시하지 않음, 변경 시 태그 무효화를 커밋 뒤에 실행). 비밀값 `ConnectionStrings:Redis`, 설정 `Cache:*`, docker compose 에 Redis, 통합 테스트 fixture 를 `InfrastructureFixture`(SQL Server · Redis)로
 - 느린 쿼리 · 요청 경고 — `SlowQueryInterceptor`(EF 명령), `SlowRequestMiddleware`(HTTP), 임계값 `Diagnostics:SlowQueryThreshold` · `SlowRequestThreshold`. 테스트에 `FakeLogger`(`Microsoft.Extensions.Diagnostics.Testing`)
 - 논리 삭제 `ISoftDeletable` — `Remove` 를 인터셉터가 삭제 주체 · 시각을 채운 수정으로 바꾸고, 전역 쿼리 필터가 지워진 행을 뺀다. `DELETE /api/products/{id}`(204)
 - 추가 전용 엔티티 기반 `BaseCreateAuditedEntity`(수정 · 삭제 시 예외)와 그 사용처인 상품 상태 이력(`product_status_history`, `GET /api/products/{id}/status-history`) — 상태가 바뀔 때 같은 트랜잭션에서 기록

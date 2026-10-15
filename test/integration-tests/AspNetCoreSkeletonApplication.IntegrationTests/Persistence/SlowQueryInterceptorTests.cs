@@ -9,8 +9,8 @@ using Microsoft.Extensions.Options;
 namespace AspNetCoreSkeletonApplication.IntegrationTests.Persistence;
 
 /// <summary>임계값을 넘긴 DB 명령만 경고로 남는다 — 실제 SQL Server 명령으로 확인한다.</summary>
-[Collection(SqlServerCollection.Name)]
-public class SlowQueryInterceptorTests(SqlServerFixture database)
+[Collection(InfrastructureCollection.Name)]
+public class SlowQueryInterceptorTests(InfrastructureFixture database)
 {
     [Fact]
     public async Task OverThreshold_LogsCommandText()

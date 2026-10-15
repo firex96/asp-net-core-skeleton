@@ -11,24 +11,21 @@ using InternalApiProgram = AspNetCoreSkeletonApplication.InternalApi.Program;
 namespace AspNetCoreSkeletonApplication.IntegrationTests.InternalApi;
 
 /// <summary>두 앱이 Common 을 함께 쓴다 — Server 가 만든 상품을 InternalApi 가 같은 DB 에서 읽는다.</summary>
-[Collection(SqlServerCollection.Name)]
-public class SharedProductTests(SqlServerFixture database) : IAsyncLifetime
+[Collection(InfrastructureCollection.Name)]
+public class SharedProductTests(InfrastructureFixture database) : IAsyncLifetime
 {
     private WebApplicationFactory<Program> _server = null!;
     private WebApplicationFactory<InternalApiProgram> _internalApi = null!;
 
     public async ValueTask InitializeAsync()
     {
-        var connectionString = database.ConnectionStringFor("shared_product");
         _server = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Default", connectionString);
+            database.ConfigureApp(builder, "shared_product");
         });
         _internalApi = new WebApplicationFactory<InternalApiProgram>().WithWebHostBuilder(builder =>
         {
-            builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Default", connectionString);
+            database.ConfigureApp(builder, "shared_product");
         });
 
         using var scope = _server.Services.CreateScope();
