@@ -1,11 +1,7 @@
 <Solution>
   <Folder Name="/src/" />
-  <Folder Name="/src/Application Core/">
-    <Project Path="src/application-core/AspNetCoreSkeletonApplication.ApplicationCore/AspNetCoreSkeletonApplication.ApplicationCore.csproj" />
-  </Folder>
-  <Folder Name="/src/Infrastructure/">
-    <Project Path="src/infrastructure/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework.csproj" />
-    <Project Path="src/infrastructure/AspNetCoreSkeletonApplication.Infrastructure.ExternalService/AspNetCoreSkeletonApplication.Infrastructure.ExternalService.csproj" />
+  <Folder Name="/src/Common/">
+    <Project Path="src/common/AspNetCoreSkeletonApplication.Common/AspNetCoreSkeletonApplication.Common.csproj" />
   </Folder>
   <Folder Name="/src/SPA/">
     <!--#if (frontend == "angular" || frontend == "all") -->
@@ -28,10 +24,7 @@
     <!--#endif -->
   </Folder>
   <Folder Name="/src/Web Application/">
-    <Project Path="src/web-application/AspNetCoreSkeletonApplication.Server/AspNetCoreSkeletonApplication.Server.csproj">
-      <BuildDependency Project="src/application-core/AspNetCoreSkeletonApplication.ApplicationCore/AspNetCoreSkeletonApplication.ApplicationCore.csproj" />
-      <BuildDependency Project="src/infrastructure/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework.csproj" />
-    </Project>
+    <Project Path="src/web-application/AspNetCoreSkeletonApplication.Server/AspNetCoreSkeletonApplication.Server.csproj" />
   </Folder>
   <Folder Name="/test/" />
   <Folder Name="/test/Functional Tests/">

@@ -1,4 +1,4 @@
-using AspNetCoreSkeletonApplication.Server.Configuration;
+using AspNetCoreSkeletonApplication.Common.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 
@@ -14,7 +14,7 @@ public class SecretSourceExtensionsTests
         var configuration = new ConfigurationManager();
         var sourceCount = SourceCount(configuration);
 
-        SecretSourceExtensions.AddSecretSource(configuration, environmentName);
+        SecretSourceExtensions.AddSecretSource(configuration, environmentName, typeof(Program).Assembly);
 
         Assert.Equal(sourceCount, SourceCount(configuration));
     }
@@ -25,7 +25,7 @@ public class SecretSourceExtensionsTests
         var configuration = new ConfigurationManager();
         var sourceCount = SourceCount(configuration);
 
-        SecretSourceExtensions.AddSecretSource(configuration, SecretSourceExtensions.Local);
+        SecretSourceExtensions.AddSecretSource(configuration, SecretSourceExtensions.Local, typeof(Program).Assembly);
 
         var added = Assert.Single(((IConfigurationBuilder)configuration).Sources.Skip(sourceCount));
         Assert.Equal("secrets.json", Assert.IsType<JsonConfigurationSource>(added).Path);
@@ -40,7 +40,7 @@ public class SecretSourceExtensionsTests
         var configuration = new ConfigurationManager();
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => SecretSourceExtensions.AddSecretSource(configuration, environmentName));
+            () => SecretSourceExtensions.AddSecretSource(configuration, environmentName, typeof(Program).Assembly));
 
         Assert.Contains(missingKey, exception.Message);
     }

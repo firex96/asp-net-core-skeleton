@@ -1,9 +1,12 @@
 using Azure.Core;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Identity;
+using System.Reflection;
 using Azure.Security.KeyVault.Secrets;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
-namespace AspNetCoreSkeletonApplication.Server.Configuration;
+namespace AspNetCoreSkeletonApplication.Common.Configuration;
 
 /// <summary>
 /// 실행 프로파일별 비밀값 출처를 구성에 붙인다. 프로파일은 비밀값을 어디서 읽을지만 고른다.
@@ -23,18 +26,24 @@ public static class SecretSourceExtensions
     public const string Azure = "Azure";
     public const string Gcp = "Gcp";
 
-    public static WebApplicationBuilder AddSecretSource(this WebApplicationBuilder builder)
+    /// <summary>
+    /// 앱의 Program.cs 가 부른다. <typeparamref name="TUserSecrets"/> 는 <c>UserSecretsId</c> 를 가진 앱 어셈블리의 타입이다
+    /// (보통 <c>Program</c>). 웹 앱과 워커가 함께 쓰도록 <see cref="IHostApplicationBuilder"/> 를 받는다.
+    /// </summary>
+    public static IHostApplicationBuilder AddSecretSource<TUserSecrets>(this IHostApplicationBuilder builder)
+        where TUserSecrets : class
     {
-        AddSecretSource(builder.Configuration, builder.Environment.EnvironmentName);
+        AddSecretSource(builder.Configuration, builder.Environment.EnvironmentName, typeof(TUserSecrets).Assembly);
         return builder;
     }
 
-    public static IConfigurationManager AddSecretSource(IConfigurationManager configuration, string environmentName)
+    public static IConfigurationManager AddSecretSource(
+        IConfigurationManager configuration, string environmentName, Assembly userSecretsAssembly)
     {
         if (Is(environmentName, Local))
         {
             // user-secrets 는 Development 환경에서만 자동으로 읽히므로 Local 에서 명시적으로 추가한다.
-            configuration.AddUserSecrets<Program>(optional: true);
+            configuration.AddUserSecrets(userSecretsAssembly, optional: true);
         }
         else if (Is(environmentName, Aws))
         {

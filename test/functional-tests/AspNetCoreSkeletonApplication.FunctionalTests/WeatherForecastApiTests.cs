@@ -1,19 +1,33 @@
 using System.Net.Http.Json;
-using AspNetCoreSkeletonApplication.Server;
+using System.Text.Json;
+using AspNetCoreSkeletonApplication.Server.Models;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests;
 
 public class WeatherForecastApiTests(SkeletonWebApplicationFactory factory) : IClassFixture<SkeletonWebApplicationFactory>
 {
     [Fact]
-    public async Task Get_ReturnsFiveForecasts()
+    public async Task Get_ReturnsFiveForecastsWithFahrenheit()
     {
         var client = factory.CreateClient();
 
-        var forecasts = await client.GetFromJsonAsync<WeatherForecast[]>("/weatherforecast", TestContext.Current.CancellationToken);
+        var forecasts = await client.GetFromJsonAsync<WeatherForecastModel[]>("/weatherforecast", TestContext.Current.CancellationToken);
 
         Assert.NotNull(forecasts);
         Assert.Equal(5, forecasts.Length);
+        Assert.All(forecasts, forecast => Assert.Equal(32 + (int)(forecast.TemperatureC / 0.5556), forecast.TemperatureF));
+    }
+
+    [Fact]
+    public async Task Get_KeepsJsonShapeTheSpaClientsRead()
+    {
+        var client = factory.CreateClient();
+
+        using var document = JsonDocument.Parse(
+            await client.GetStringAsync("/weatherforecast", TestContext.Current.CancellationToken));
+
+        var names = document.RootElement[0].EnumerateObject().Select(property => property.Name).ToArray();
+        Assert.Equal(["date", "temperatureC", "temperatureF", "summary"], names);
     }
 
     [Fact]

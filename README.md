@@ -89,7 +89,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 
 | 지울 것 | 함께 지워야 하는 것 |
 |---|---|
-| `WeatherForecastController`, `WeatherForecast` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
+| Server 의 WeatherForecast 한 벌 — `Controllers/WeatherForecastController`, `Services/Mapping/WeatherForecastMappingService`, `Services/Biz/WeatherForecastBizService`, `Dtos/WeatherForecastDto`, `Models/WeatherForecastModel`, `Mappers/WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
 | `AwsSecretSourceTests` (Aws 를 안 쓰면) | 통합 테스트 csproj 의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack` |
 
 ### 6. 뜨는지 확인한다
@@ -108,10 +108,8 @@ curl -k https://localhost:7274/health                   # Healthy
 
 ```
 src/
-  application-core/   ApplicationCore              도메인·유스케이스 (아직 비어 있다)
-  infrastructure/     Infrastructure.EntityFramework  AppDbContext, EF Core 매핑
-                      Infrastructure.ExternalService  외부 API 클라이언트 (아직 비어 있다)
-  web-application/    Server                       ASP.NET Core 호스트: 컨트롤러, 구성, DI, SPA 서빙
+  common/             Common   공유 라이브러리 — 영속 계층, 공유 BizService·Domain, Dto, 비밀값 출처 구성
+  web-application/    Server   public 앱 — SPA 호스트, 컨트롤러, MappingService, 앱 전용 BizService
   spa/                client.angular · client.sveltekit · client.nuxt
 test/
   unit-tests/         UnitTests        외부 의존 없음
@@ -119,18 +117,57 @@ test/
   integration-tests/  IntegrationTests Docker 필요 (Testcontainers SQL Server · LocalStack)
 ```
 
-의존 방향은 `Server → Infrastructure → ApplicationCore` 다. 연결 문자열·비밀값 출처·DI 구성은 컴포지션 루트인 `Server` 에 둔다.
+**프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 계층은 프로젝트 안의 폴더(네임스페이스)로 나눈다 — 「요청 흐름」 참고. 의존은 `Server → Common` 한 방향이다.
+
+| 프로젝트 | 폴더 | 들어가는 것 |
+|---|---|---|
+| `Common` | `Configuration/` | `AddCommon` · `AddLayeredServices` (DI 등록), `SecretSourceExtensions` (비밀값 출처) |
+| | `Persistence/` | `Context/AppDbContext`, `Entities/`, `Services/` (`I~EntityService` · `~EntityService`), `Mappers/` (Entity↔Dto) |
+| | `Services/Biz/` · `Domain/` · `Dtos/` · `Enums/` | 여러 앱이 쓰는 BizService · 업무 규칙 · Dto · 열거형 |
+| `Server` | `Controllers/` · `Services/Mapping/` · `Models/` · `Mappers/` | HTTP 입출력과 화면용 변환 |
+| | `Services/Biz/` · `Dtos/` | 이 앱만 쓰는 BizService 와 Dto |
+
+**Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다.** 앱은 DbContext 를 볼 수 없고, EntityService 의 public 메서드에 Entity 를 쓰면 접근성 불일치(CS0050 · CS0051)로 컴파일이 깨진다 — 「Entity 는 EntityService 위로 올라가지 않는다」를 컴파일러가 지킨다.
+
+**컴포지션 루트는 각 앱의 `Program.cs`** 다. 비밀값 출처(`AddSecretSource<Program>()`), Common(`AddCommon()`), 앱의 계층 서비스(`AddLayeredServices(typeof(Program).Assembly)`) 순서로 붙인다. 계층 서비스는 이름 접미사로 찾아 scoped 로 등록하므로 서비스를 추가할 때 등록 코드를 쓰지 않는다 — `~MappingService` · `~BizService` 는 자기 타입으로, `~EntityService` 는 `I~EntityService` 로.
 
 엔티티를 추가하면 `AppDbContext` 에 `DbSet` 을 두고 마이그레이션을 만든다.
 
 ```bash
 dotnet tool update -g dotnet-ef
 dotnet ef migrations add Initial \
-  --project src/infrastructure/AspNetCoreSkeletonApplication.Infrastructure.EntityFramework \
+  --project src/common/AspNetCoreSkeletonApplication.Common \
   --startup-project src/web-application/AspNetCoreSkeletonApplication.Server
 ```
 
 `dotnet ef` 는 시작 프로젝트를 띄워 구성을 읽으므로 `ASPNETCORE_ENVIRONMENT=Local` 처럼 연결 문자열이 있는 프로파일로 실행한다.
+
+## 요청 흐름
+
+`Controller → MappingService → BizService → EntityService → DbContext` 다. BizService 는 업무 판단을 순수 `Domain` 에 맡긴다. 계층을 건너뛰지 않고, **규칙에는 예외 케이스를 두지 않는다** — "이 경우엔 건너뛰어도 된다" 가 생기면 그 경우가 기본이 된다.
+
+| 계층 (네임스페이스) | 하는 일 | 주입받는 것 |
+|---|---|---|
+| Controller (`.Controllers`) | HTTP 처리와 검증. 요청과 응답 모두 Model | MappingService |
+| MappingService (`.Services.Mapping`) | 화면용 변환 전부 — 파생 값, 포맷, 여러 BizService 결과 조합. 트랜잭션 없음 | BizService, `IOptions<>`, `TimeProvider` |
+| BizService (`.Services.Biz`) | 조회·저장·트랜잭션·호출 순서. 업무 판단은 Domain 을 불러 얻는다 | `I~EntityService`, `~Client`, 다른 BizService, `IOptions<>`, `TimeProvider` |
+| Domain (`.Domain`) | 업무 값 계산과 상태 전이 판단 전부. EF 를 모르는 순수 클래스, DI 대상이 아니다 | — (Dto · 열거형 · 에러 · System 만 참조) |
+| EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현한다 | `AppDbContext` |
+| 매퍼 (`.Mappers`, `.Persistence.Mappers`) | 필드를 기계적으로 옮긴다. 계산하지 않는다. `static partial` (Mapperly) | — |
+
+모든 계층은 `ILogger<>` 를 더 받을 수 있다. 타입은 셋으로 나눈다 — **Model**(HTTP 입출력, `.Models`), **Dto**(계층 사이 전달, `.Dtos`), **Entity**(DB 매핑, `internal`). Model 과 Dto 는 데이터만 담는 `sealed record` 다.
+
+예: `GET /weatherforecast` — `WeatherForecastController` 가 `WeatherForecastMappingService.List()` 를 부르고, MappingService 는 `WeatherForecastBizService` 가 만든 `WeatherForecastDto` 에 화씨(표시용 파생 값)를 계산해 `WeatherForecastMapper.ToModel(dto, temperatureF)` 로 `WeatherForecastModel` 을 만든다.
+
+## 아키텍처 선택
+
+**레이어드를 쓴다 — 헥사고날 · 클린 아키텍처가 아니다.** 소규모 팀이 쓰는 CRUD 중심 스켈레톤에서는 포트 인터페이스와 도메인·영속 모델 이중화의 비용이 회수되지 않는다. 그 구조가 주는 이점 중 실제로 필요한 둘은 이미 있다 — 영속성 격리는 `internal` Entity 와 Dto 경계가, 테스트 용이성은 `I~EntityService` 대역이 맡는다. 계층 이름은 Spring 형제 스켈레톤과 같아서 스택이 달라도 같은 어휘로 읽힌다.
+
+**프로젝트는 공유·배포 단위로 나눈다.** 계층마다 프로젝트를 두면 겉모양은 클린 아키텍처인데 의존 역전이 없어서 "포트는 어디 있나" 를 찾게 된다. 공유 라이브러리 + 앱으로 나누면 레이어드가 레이어드로 읽히고, 앱이 늘어도(내부 API · 배치) `Common` 을 같이 쓴다.
+
+**약점과 보완.** 레이어드의 약점은 업무 규칙이 BizService 곳곳에 흩어지는 것이다. 그래서 업무 값 계산과 상태 전이 판단은 **항상** `Domain` 의 순수 클래스에 두고, BizService 는 조회·저장·호출 순서만 맡는다.
+
+**이행 경로.** 저장소나 외부 시스템을 실제로 갈아 끼워야 할 때가 오면, `I~EntityService` 를 쓰는 쪽(BizService 가 있는 곳)으로 옮기는 것만으로 포트가 된다. 그때까지는 옮기지 않는다.
 
 ## 테스트
 
@@ -154,7 +191,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 
 ### 프로파일 — 비밀값을 어디서 읽을지 고른다
 
-환경(dev·staging·prod)별 프로파일은 없다. 환경 간 차이(호스트, 로그 레벨 등)는 배포할 때 환경변수로 준다. 프로파일(`ASPNETCORE_ENVIRONMENT`)은 **비밀값 출처**만 고른다. 분기는 `Server/Configuration/SecretSourceExtensions.cs` 한 곳에 있다.
+환경(dev·staging·prod)별 프로파일은 없다. 환경 간 차이(호스트, 로그 레벨 등)는 배포할 때 환경변수로 준다. 프로파일(`ASPNETCORE_ENVIRONMENT`)은 **비밀값 출처**만 고른다. 분기는 `Common/Configuration/SecretSourceExtensions.cs` 한 곳에 있고, 앱마다 `Program.cs` 에서 `AddSecretSource<Program>()` 으로 붙인다(user-secrets 는 그 앱 csproj 의 `UserSecretsId`).
 
 | 프로파일 | 비밀값 출처 | 필요한 것 |
 |---|---|---|
@@ -197,9 +234,9 @@ ASPNETCORE_ENVIRONMENT=Gcp Gcp__SecretManager__ProjectId=<project> dotnet Contos
 
 ### 쓰지 않는 클라우드 지우기
 
-세 클라우드 패키지는 모두 서버 프로젝트에 들어 있고, 해당 프로파일일 때만 쓰인다. 하나만 쓴다면 나머지를 지운다.
+세 클라우드 패키지는 모두 `Common` 프로젝트에 들어 있고, 해당 프로파일일 때만 쓰인다. 하나만 쓴다면 나머지를 지운다.
 
-| 클라우드 | 패키지 (`Directory.Packages.props` · 서버 csproj) | 코드·설정 |
+| 클라우드 | 패키지 (`Directory.Packages.props` · Common csproj) | 코드·설정 |
 |---|---|---|
 | AWS | `Amazon.Extensions.Configuration.SystemsManager` (+ 테스트의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack`) | `SecretSourceExtensions` 의 `Aws` 분기, `appsettings.Aws.json`, launchSettings `Aws`, `AwsSecretSourceTests` |
 | Azure | `Azure.Extensions.AspNetCore.Configuration.Secrets`, `Azure.Identity` | `Azure` 분기, `appsettings.Azure.json`, launchSettings `Azure` |
@@ -226,8 +263,6 @@ ASPNETCORE_ENVIRONMENT=Local dotnet out/AspNetCoreSkeletonApplication.Server.dll
 | 헬스 체크 | `/health` — `AppDbContext` 연결 확인 |
 | 패키지 버전 | `Directory.Packages.props` 중앙 관리 (전이 의존도 고정) |
 | macOS 참고 | VS JavaScript SDK 가 SPA 폴더에 `obj\Debug/\package.g.props` 같은 이름의 파일을 만든다. 빌드에 영향 없고 `.gitignore` 에 들어 있다 |
-
-참고: [Next-level Clean Architecture boilerplate](https://devblogs.microsoft.com/ise/next-level-clean-architecture-boilerplate/)
 
 ## 관련 문서
 

@@ -1,6 +1,7 @@
 using Google.Cloud.SecretManager.V1;
+using Microsoft.Extensions.Configuration;
 
-namespace AspNetCoreSkeletonApplication.Server.Configuration;
+namespace AspNetCoreSkeletonApplication.Common.Configuration;
 
 /// <summary>
 /// GCP Secret Manager 에서 <see cref="SecretNames"/> 에 적은 비밀의 최신 버전을 읽는다.

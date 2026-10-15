@@ -31,8 +31,10 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend all -o <출력> --debu
 
 ## Architecture
 
-- 레이어: `Server`(컴포지션 루트) → `Infrastructure.EntityFramework` · `Infrastructure.ExternalService` → `ApplicationCore`. 구성·DI·비밀값 출처는 `Server` 에만 둔다.
-- 비밀값 출처 분기는 `Server/Configuration/SecretSourceExtensions.cs` 한 곳이다. 프로파일(`ASPNETCORE_ENVIRONMENT`)은 Local · Aws · Azure · Gcp 와 미지정(환경변수만)뿐이다 — dev·staging·prod 프로파일을 만들지 않는다.
+- 프로젝트는 공유·배포 단위다: `Common`(공유 라이브러리) ← 앱(`Server`). 계층은 프로젝트 안의 네임스페이스다 — `Controller → MappingService → BizService → EntityService → DbContext`, 업무 판단은 순수 `Domain`. 계층별 책임·주입 허용 목록은 README 「요청 흐름」이 정본이다.
+- Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다. 앱은 EntityService 의 Dto 로만 데이터를 본다.
+- 컴포지션 루트는 각 앱의 `Program.cs` 다. 계층 서비스는 `AddLayeredServices` 가 이름 접미사로 등록하므로 따로 등록하지 않는다.
+- 비밀값 출처 분기는 `Common/Configuration/SecretSourceExtensions.cs` 한 곳이다. 프로파일(`ASPNETCORE_ENVIRONMENT`)은 Local · Aws · Azure · Gcp 와 미지정(환경변수만)뿐이다 — dev·staging·prod 프로파일을 만들지 않는다.
 - SPA 선택은 서버 csproj 의 `SpaClient` 속성과 `Choose` 블록이다. SPA 를 추가·삭제하면 csproj `Choose`, `AspNetCoreSkeletonApplication.slnx`, `.template.config/template.json` 의 `frontend` 선택지·`modifiers` 를 함께 고친다.
 
 ## 규칙

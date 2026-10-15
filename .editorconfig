@@ -387,3 +387,10 @@ dotnet_style_allow_multiple_blank_lines_experimental = true:silent
 dotnet_style_allow_statement_immediately_after_block_experimental = true:silent
 tab_width = 4
 
+
+# Mapperly 엄격 모드 — 대상 멤버에 대응하는 소스가 없으면(RMG012), 매핑된 멤버가 하나도 없으면(RMG066) 빌드 실패.
+# 소스 쪽 남는 멤버(RMG020)와 null 불일치(RMG089·RMG090)는 오탐이 많아 기본 심각도로 두고, null 은 런타임 예외로 막는다
+# (각 어셈블리 Mappers/MapperDefaults.cs 의 ThrowOnPropertyMappingNullMismatch).
+[*.cs]
+dotnet_diagnostic.RMG012.severity = error
+dotnet_diagnostic.RMG066.severity = error

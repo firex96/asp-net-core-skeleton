@@ -56,21 +56,13 @@
     <Error Text="알 수 없는 SpaClient '$(SpaClient)'. angular, sveltekit, nuxt 중 하나를 지정하세요." />
   </Target>
   <ItemGroup>
-    <PackageReference Include="Amazon.Extensions.Configuration.SystemsManager" />
-    <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" />
-    <PackageReference Include="Azure.Identity" />
-    <PackageReference Include="Google.Cloud.SecretManager.V1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
-    <PackageReference Include="Riok.Mapperly" />
+    <PackageReference Include="Riok.Mapperly" ExcludeAssets="runtime" PrivateAssets="all" />
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\application-core\AspNetCoreSkeletonApplication.ApplicationCore\AspNetCoreSkeletonApplication.ApplicationCore.csproj" />
-    <ProjectReference Include="..\..\infrastructure\AspNetCoreSkeletonApplication.Infrastructure.EntityFramework\AspNetCoreSkeletonApplication.Infrastructure.EntityFramework.csproj" />
+    <ProjectReference Include="..\..\common\AspNetCoreSkeletonApplication.Common\AspNetCoreSkeletonApplication.Common.csproj" />
     <ProjectReference Include="$(SpaRoot)\$(SpaClientName).esproj" Condition="'$(SpaClientName)' != ''">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>

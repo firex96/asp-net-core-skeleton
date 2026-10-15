@@ -1,4 +1,4 @@
-using AspNetCoreSkeletonApplication.Server.Configuration;
+using AspNetCoreSkeletonApplication.Common.Configuration;
 using Microsoft.Extensions.Configuration;
 
 namespace AspNetCoreSkeletonApplication.UnitTests.Configuration;

@@ -1,6 +1,6 @@
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
-using AspNetCoreSkeletonApplication.Server.Configuration;
+using AspNetCoreSkeletonApplication.Common.Configuration;
 using Microsoft.Extensions.Configuration;
 using Testcontainers.LocalStack;
 
@@ -50,7 +50,7 @@ public class AwsSecretSourceTests : IAsyncLifetime
         var configuration = new ConfigurationManager();
         configuration["Aws:SecretsManager:SecretId"] = SecretId;
 
-        SecretSourceExtensions.AddSecretSource(configuration, SecretSourceExtensions.Aws);
+        SecretSourceExtensions.AddSecretSource(configuration, SecretSourceExtensions.Aws, typeof(Program).Assembly);
 
         Assert.Equal("Server=from-secrets-manager", configuration.GetRequiredConnectionString("Default"));
     }

@@ -1,4 +1,4 @@
-using AspNetCoreSkeletonApplication.Infrastructure.EntityFramework.Context;
+using AspNetCoreSkeletonApplication.Common.Persistence.Context;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
