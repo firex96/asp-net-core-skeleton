@@ -168,7 +168,7 @@ ASPNETCORE_ENVIRONMENT=Local dotnet ef migrations add <이름> \
 | EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현하고, 구현은 `internal` 이다. 조회는 기본 NoTracking, 바꿀 때만 `AsTracking()` | `AppDbContext` |
 | 매퍼 (`.Mappers`, `.Persistence.Mappers`) | 필드를 기계적으로 옮긴다. 계산하지 않는다. `static partial` (Mapperly) | — |
 
-모든 계층은 `ILogger<>` 를 더 받을 수 있다. 타입은 셋으로 나눈다 — **Model**(HTTP 입출력, `.Models`), **Dto**(계층 사이 전달, `.Dtos`), **Entity**(DB 매핑, `internal`). Model 과 Dto 는 데이터만 담는 `sealed record` 다.
+모든 계층은 `ILogger<>` 를 더 받을 수 있다. 이 표의 주입 허용 목록은 규약 테스트가 강제한다 — 「코딩 규약」 참고. 타입은 셋으로 나눈다 — **Model**(HTTP 입출력, `.Models`), **Dto**(계층 사이 전달, `.Dtos`), **Entity**(DB 매핑, `internal`). Model 과 Dto 는 데이터만 담는 `sealed record` 다.
 
 메서드 이름은 한 벌이다 — `Get`(없으면 `ItemNotFoundException`), `Find`(없으면 null), `List`, `Create`, `Update`, `Delete`(비동기는 `~Async`).
 
@@ -253,6 +253,83 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 **약점과 보완.** 레이어드의 약점은 업무 규칙이 BizService 곳곳에 흩어지는 것이다. 그래서 업무 값 계산과 상태 전이 판단은 **항상** `Domain` 의 순수 클래스에 두고, BizService 는 조회·저장·호출 순서만 맡는다.
 
 **이행 경로.** 저장소나 외부 시스템을 실제로 갈아 끼워야 할 때가 오면, `I~EntityService` 를 쓰는 쪽(BizService 가 있는 곳)으로 옮기는 것만으로 포트가 된다. 그때까지는 옮기지 않는다.
+
+## 코딩 규약
+
+### 규칙을 만드는 원칙
+
+- **예외 케이스를 두지 않는다.** "이 경우엔 건너뛰어도 된다" 가 생기면 그 경우가 기본이 된다. 위임 코드가 한 줄 늘더라도 규칙은 하나로 둔다 — 그래서 MappingService 는 변환이 없어도 항상 둔다.
+- **강제와 리뷰를 나눈다.** 기계로 싸게 검사할 수 있는 규칙은 컴파일러 · 분석기 진단 · 규약 테스트로 강제하고, 나머지는 아래 「리뷰 체크포인트」로 둔다.
+
+### 이름
+
+| 접미사 | 계층 · 쓰임 | 네임스페이스 |
+|---|---|---|
+| `~Controller` | HTTP 입출력 | `.Controllers` |
+| `~MappingService` | 화면용 변환 | `.Services.Mapping` |
+| `~BizService` | 업무 흐름 · 트랜잭션 경계 | `.Services.Biz` |
+| `~EntityService` · `I~EntityService` | 엔티티 하나의 CRUD | `.Persistence.Services` |
+| `~Client` | 외부 API (typed HttpClient) | `.Clients` |
+| `~Mapper` | Mapperly 매퍼 (`static partial`) | `.Mappers` · `.Persistence.Mappers` |
+| `~Model` | HTTP 요청 · 응답 | `.Models` |
+| `~Dto` | 계층 사이 전달 | `.Dtos` |
+| `~Entity` | DB 매핑 (`internal`) | `.Persistence.Entities.*` |
+| `~Options` | 구성 바인딩 (Options 패턴) | 쓰는 곳 |
+| `~Extensions` | DI 등록 · 확장 메서드 | `.Configuration` · `.Web` |
+
+- 맨 `~Service` 는 쓰지 않는다 — 계층을 숨긴다. 업무 규칙(`.Domain`)은 접미사 없이 무엇을 판단하는지로 짓는다(`ProductStatusTransition`).
+- 메서드 동사는 한 벌이다 — `Get`(없으면 예외) · `Find`(없으면 null) · `List` · `Create` · `Update` · `Delete`.
+- 이름은 Spring 형제 스켈레톤과 같은 어휘를 쓰고, 스택 고유 개념만 .NET 이름으로 바꾼다.
+
+| Spring 형제 | 이 스켈레톤 |
+|---|---|
+| `~Properties` (`@ConfigurationProperties`) | `~Options` (Options 패턴) |
+| `~Configuration` (`@Configuration`) | `~Extensions` (DI 확장 메서드) |
+| MapStruct (`unmappedTargetPolicy = ERROR`) | Mapperly 엄격 모드 |
+| `~JpaRepository` | 없음 — `AppDbContext` 의 `DbSet` 이 그 자리다 |
+| `@Transactional` | `IMainTransaction.ExecuteAsync` |
+| `ErrorResponseModel` | ProblemDetails + `code` · `divisionCode` |
+| MDC · `TaskDecorator` | 로깅 scope · AsyncLocal (전달 장치가 필요 없다) |
+
+### 선언
+
+- **Model · Dto** — 데이터만 담는 `sealed record`, 생성자 매개변수에 기본값 없음, 계산 속성 없음.
+- **Entity** — `internal` `class` + `{ get; set; }`, `BaseEntity`(`long Id`) 상속, navigation property 없음(참조는 `long` 컬럼). 감사가 필요하면 `BaseAuditedEntity`.
+- **Domain** — EF · DI · ASP.NET 을 모르는 순수 클래스. `static` 함수나 불변 record.
+- **매퍼** — `[Mapper] static partial class`. 계산하지 않는다 — 계산된 값은 MappingService 가 추가 매개변수로 넘긴다.
+- **DB** — 식별자 `BIGINT`, FOREIGN KEY 제약 없음, 열거형은 이름 문자열로 저장, 조회 기본 NoTracking.
+
+### Mapperly 엄격 모드와 남은 함정
+
+각 어셈블리의 `Mappers/MapperDefaults.cs` 와 `.editorconfig` 가 정한다 — 대상 누락(RMG012) · 매핑된 멤버 없음(RMG066)은 **빌드 오류**, 속성 단위 null 불일치는 **런타임 예외**, `ToString` 암시 변환은 꺼져 있다. Kotlin 의 MapStruct 에서 겪던 kapt 비용 · `copy()` 오인 · `is` 접두어 Boolean 문제는 C# 에 없다. 남는 함정은 둘이다.
+
+1. **기본값 있는 생성자 매개변수는 소스가 없으면 조용히 기본값이 들어간다** → Model · Dto 생성자에 기본값을 두지 않는다(규약 테스트).
+2. **소스 쪽 남는 멤버(RMG020)는 경고다** → 일부러 내보내지 않는 값은 `[MapperIgnoreSource]` 로 이유와 함께 적는다(`ProductModelMapper` 참고).
+
+### 무엇이 규칙을 지키는가
+
+| 규칙 | 검출 |
+|---|---|
+| Entity 가 EntityService 밖으로 나가지 않는다 · 앱이 DbContext 를 쓰지 않는다 | 컴파일러 — `internal` (CS0050 · CS0051) |
+| 매핑 누락 | 컴파일러 — Mapperly RMG012 · RMG066 |
+| 계층별 주입 허용 목록 (「요청 흐름」 표) | `LayeringConventionTests` |
+| Controller 의 요청 · 응답은 Model 만 | `LayeringConventionTests` |
+| 접미사 ↔ 네임스페이스, 맨 `Service` 금지, `I~EntityService` 구현 | `NamingConventionTests` |
+| Model · Dto 는 기본값 없는 `sealed record`, 매퍼는 static, 엔티티에 navigation 없음 | `DeclarationConventionTests` |
+| Domain 은 Dto · 열거형 · 에러 · System 만 참조 (시그니처 수준) | `DeclarationConventionTests` |
+
+규약 테스트(`UnitTests/Conventions/`)는 앱 어셈블리를 리플렉션으로 훑고, 계층은 네임스페이스로 판정한다. 접미사 ↔ 네임스페이스 검사가 판정의 어긋남도 잡으므로, 검사 대상을 못 찾아 그냥 통과하는 일이 없다. 샘플을 모두 지워도 규약 테스트는 깨지지 않는다(대상 개수 하한을 두지 않는다). 새 앱을 더하면 `ConventionScan` 의 어셈블리 목록에 넣는다.
+
+### 리뷰 체크포인트
+
+기계로 검사하지 않는 규칙이다. 리뷰에서 먼저 본다.
+
+- [ ] BizService · MappingService · 매퍼에 업무 값 계산이나 상태 판단 식이 없다 — Domain 에 있다
+- [ ] BizService 의 변경 메서드가 모두 `IMainTransaction.ExecuteAsync` 안에 있다
+- [ ] 업무 실패는 `CodedException` 계열로 던지고, 메시지는 사용자에게 보여도 되는 문장이다. 예외를 삼키지 않는다
+- [ ] 현재 시각은 `TimeProvider` 로만 읽는다
+- [ ] API 앱에 주기 실행(`BackgroundService` 타이머 등)이 없다 — 배치 앱의 일이다
+- [ ] 새 비밀은 구성 키로만 읽고 README 「설정과 비밀값」 · `appsettings.Gcp.json` 에 반영했다
 
 ## 테스트
 

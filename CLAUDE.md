@@ -35,7 +35,7 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend angular --internalApi 
 
 ## Architecture
 
-- 프로젝트는 공유·배포 단위다: `Common`(공유 라이브러리) ← 앱(`Server` · `InternalApi`). 앱끼리는 참조하지 않는다. 계층은 프로젝트 안의 네임스페이스다 — `Controller → MappingService → BizService → EntityService → DbContext`, 업무 판단은 순수 `Domain`. 계층별 책임·주입 허용 목록은 README 「요청 흐름」이 정본이다.
+- 프로젝트는 공유·배포 단위다: `Common`(공유 라이브러리) ← 앱(`Server` · `InternalApi`). 앱끼리는 참조하지 않는다. 계층은 프로젝트 안의 네임스페이스다 — `Controller → MappingService → BizService → EntityService → DbContext`, 업무 판단은 순수 `Domain`. 계층별 책임·주입 허용 목록은 README 「요청 흐름」, 이름·선언 규칙과 리뷰 체크포인트는 README 「코딩 규약」이 정본이다. 규칙에 예외 케이스를 두지 않는다.
 - Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다. 앱은 EntityService 의 Dto 로만 데이터를 본다.
 - 컴포지션 루트는 각 앱의 `Program.cs` 다. 계층 서비스는 `AddLayeredServices` 가 이름 접미사로 등록하므로 따로 등록하지 않는다.
 - 비밀값 출처 분기는 `Common/Configuration/SecretSourceExtensions.cs` 한 곳이다. 프로파일(`ASPNETCORE_ENVIRONMENT`)은 Local · Aws · Azure · Gcp 와 미지정(환경변수만)뿐이다 — dev·staging·prod 프로파일을 만들지 않는다.
@@ -46,6 +46,7 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend angular --internalApi 
 - **비밀값은 구성 키로만 읽는다.** 코드는 `ConnectionStrings:Default` 처럼 .NET 구성 키만 쓰고, 값은 환경변수(`__`) 또는 비밀 저장소(`--`, AWS 는 JSON 키)가 채운다. 평문 자격증명은 어느 appsettings 에도 적지 않는다 — `appsettings.Local.json` 의 docker compose 계정만 예외. 비밀을 추가하면 README 「설정과 비밀값」과 `appsettings.Gcp.json` 의 `Secrets` 를 함께 고친다.
 - **필수 값은 폴백 없이 엄격하게.** 빠진 비밀은 기동 실패로 드러나야 한다(`GetRequiredConnectionString` 참고). 빈 문자열 기본값을 두지 않는다.
 - **패키지 버전은 `Directory.Packages.props` 에만.** csproj 의 `PackageReference` 에 `Version` 을 적지 않는다. 테스트 공통 설정은 `test/Directory.Build.props`.
+- **규약 테스트를 지킨다.** `UnitTests/Conventions/` 가 실패하면 규약 쪽이 아니라 코드를 고친다. 새 앱을 더하면 `ConventionScan` 의 어셈블리 목록에 넣는다.
 - **새 테스트는 의존으로 위치를 정한다.** 외부 의존 없음 → `UnitTests`, HTTP 파이프라인(DB 없음) → `FunctionalTests`, Docker(DB·클라우드 에뮬레이터) → `IntegrationTests`.
 - **템플릿 조건 주석을 깨지 않는다.** 서버 csproj · 테스트 csproj · slnx 의 `<!--#if (frontend == …) -->` · `<!--#if (internalApi) -->` 는 `dotnet new` 용이다. InternalApi 전용 테스트는 각 테스트 프로젝트의 `InternalApi/` 폴더에 둔다(템플릿이 폴더째 뺀다). 레포 원본에서는 그냥 주석이므로 첫 분기(angular)가 기본값이 되도록 순서를 지킨다.
 - 이름은 `AspNetCoreSkeletonApplication`(PascalCase)과 `asp-net-core-skeleton-application`(kebab-case) 두 형태로만 쓴다 — 템플릿이 이 두 문자열을 치환한다.
