@@ -159,6 +159,36 @@ dotnet ef migrations add Initial \
 
 예: `GET /weatherforecast` — `WeatherForecastController` 가 `WeatherForecastMappingService.List()` 를 부르고, MappingService 는 `WeatherForecastBizService` 가 만든 `WeatherForecastDto` 에 화씨(표시용 파생 값)를 계산해 `WeatherForecastMapper.ToModel(dto, temperatureF)` 로 `WeatherForecastModel` 을 만든다.
 
+## 에러 응답
+
+모든 에러 응답은 **ProblemDetails**(`application/problem+json`, RFC 9457)다. 어디서 만들어졌든 확장 필드 `code` · `divisionCode` · `traceId` 가 붙는다.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "상품 42 가 없다",
+  "code": "NOT_FOUND_ERROR",
+  "divisionCode": "G009",
+  "traceId": "00-…"
+}
+```
+
+| 응답을 만든 곳 | 상태 · 코드 | `detail` |
+|---|---|---|
+| `ItemNotFoundException` | 404 `NOT_FOUND_ERROR` (G009) | 예외 메시지 |
+| `ClientBadRequestException` | 400 `BAD_REQUEST_ERROR` (G001) | 예외 메시지 |
+| `ConflictException` | 409 `CONFLICT_ERROR` (G013) | 예외 메시지 |
+| DataAnnotations 검증 실패 (`[ApiController]` 자동 400) | 400 `NOT_VALID_ERROR` (G011), `errors` 에 필드별 메시지 | — |
+| 컨트롤러가 돌려준 상태 코드(`NotFound()` 등) | 상태 코드로 고른 코드 | — |
+| 그 밖의 예외 | 500 `INTERNAL_SERVER_ERROR` (G999) | 없음 — 내부 메시지를 내보내지 않는다 |
+
+- 업무 실패는 `CodedException` 계열을 던진다. 메시지는 4xx 응답의 `detail` 로 그대로 나가므로 사용자에게 보여도 되는 문장으로 쓴다. 예외를 잡아서 삼키지 않는다.
+- 코드는 `Common/Errors/ErrorCode` 의 정적 필드다. 업무 코드가 필요하면 정적 필드를 더 두고 `CodedException` 을 상속한다.
+- 처리는 `Common/Web` 의 `GlobalExceptionHandler`(예외 → ProblemDetails)와 `AddProblemDetails` 의 `CustomizeProblemDetails`(예외가 아닌 응답에 코드를 붙임) 두 곳이다. 앱은 `AddSkeletonWeb()` · `UseSkeletonWeb()` 로 붙인다.
+- 코드 문자열과 구분 코드는 Spring 형제 스켈레톤과 같지만 **응답 형식은 다르다** — 형제는 자체 `ErrorResponseModel` 을, 이 스켈레톤은 .NET 표준 ProblemDetails 를 쓴다.
+
 ## 아키텍처 선택
 
 **레이어드를 쓴다 — 헥사고날 · 클린 아키텍처가 아니다.** 소규모 팀이 쓰는 CRUD 중심 스켈레톤에서는 포트 인터페이스와 도메인·영속 모델 이중화의 비용이 회수되지 않는다. 그 구조가 주는 이점 중 실제로 필요한 둘은 이미 있다 — 영속성 격리는 `internal` Entity 와 Dto 경계가, 테스트 용이성은 `I~EntityService` 대역이 맡는다. 계층 이름은 Spring 형제 스켈레톤과 같아서 스택이 달라도 같은 어휘로 읽힌다.

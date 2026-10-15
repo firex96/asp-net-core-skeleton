@@ -1,4 +1,5 @@
 using AspNetCoreSkeletonApplication.Common.Configuration;
+using AspNetCoreSkeletonApplication.Common.Web;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,12 +10,15 @@ builder.AddSecretSource<Program>();
 // Common(DB 컨텍스트 · EntityService · 공유 BizService) 다음에 이 앱의 MappingService · BizService 를 등록한다.
 builder.Services.AddCommon();
 builder.Services.AddLayeredServices(typeof(Program).Assembly);
+builder.Services.AddSkeletonWeb();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+app.UseSkeletonWeb();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
