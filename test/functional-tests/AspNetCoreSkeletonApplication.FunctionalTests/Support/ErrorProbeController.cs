@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using AspNetCoreSkeletonApplication.Common.Errors;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests.Support;
@@ -7,6 +8,7 @@ namespace AspNetCoreSkeletonApplication.FunctionalTests.Support;
 /// <summary>에러 응답 형식을 확인하려고 테스트에서만 붙이는 컨트롤러. 요청한 종류의 실패를 그대로 일으킨다.</summary>
 [ApiController]
 [Route("error-probe")]
+[AllowAnonymous]
 public class ErrorProbeController : ControllerBase
 {
     [HttpGet("not-found")]

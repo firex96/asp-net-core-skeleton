@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- 인가 — 기본 정책은 로그인 필요(익명은 `[AllowAnonymous]` 로 명시), 관리자 정책 `Policies.Administrator`(Product 상태 변경 · 삭제), 규약 테스트로 역할 문자열 인가 금지
+- CSRF 방어 — Fetch Metadata(`Sec-Fetch-Site: cross-site` 인 변경 요청 403), SameSite=Strict 쿠키와 겹쳐 둔다
 - 로그인 — ASP.NET Core Identity + 쿠키(`__Host-session`, HttpOnly · Secure · SameSite=Strict), `/api/auth` register · login · logout · me, 5회 실패 시 30분 잠금(423 `ACCOUNT_LOCKED_ERROR`), 역할 `Administrator` 시드, 계정 테이블 `identity_*`(마이그레이션 `AddIdentity`)
 - Data Protection 키를 Redis 에 저장 — 여러 인스턴스가 쿠키 · antiforgery 토큰을 함께 읽는다
 - Batch 운영 대시보드 `/quartz`(Quartz.Dashboard) — Basic 인증 운영자 정책 뒤(정적 자산 포함), 계정 미설정 시 fail-closed, 다룰 Job 타입을 앱의 `Jobs` 로 제한

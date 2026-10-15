@@ -377,6 +377,13 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 - **계정 테이블** — Identity 정본 스키마를 `identity_` 접두사로 둔다(`identity_user`, `identity_role`, `identity_user_role` …). 프레임워크 소유라 업무 테이블 규칙(FOREIGN KEY 금지 · `BaseEntity`)의 대상이 아니다. 업무 데이터는 이 테이블에 칼럼을 더하지 않고, 사용자 ID 로 가리키는 별도 엔티티에 둔다.
 - **역할** — `Administrator` 가 시드돼 있다. 관리자 지정은 가입한 뒤 SQL 로 한다(관리 API 는 두지 않는다).
 
+**인가** (예외 없음)
+
+- **기본은 로그인 필요다**(fallback 정책). 익명으로 열 엔드포인트는 하나씩 연다 — 컨트롤러 · 액션의 `[AllowAnonymous]`, 엔드포인트의 `.AllowAnonymous()`. Server 에서 열린 것: WeatherForecast, Product 조회(목록 · 단건 · 상태 이력), `/health`, OpenAPI · Scalar, SPA 정적 파일 · fallback, `/api/auth/register` · `login`.
+- **역할이 아니라 정책으로** 인가한다 — `[Authorize(Policy = Policies.Administrator)]`. 역할 문자열(`Roles = "…"`)은 컨트롤러에 쓰지 않는다(`AuthorizationConventionTests`). Product 의 상태 변경 · 삭제가 관리자 정책이다.
+
+**CSRF** — 쿠키가 SameSite=Strict 이고, 그 위에 **Fetch Metadata** 를 한 번 더 본다: 브라우저가 붙이는 `Sec-Fetch-Site` 가 `cross-site` 인 변경 요청(POST · PUT · PATCH · DELETE)은 403(`FetchMetadataMiddleware`, `UseSkeletonWeb` 에 들어 있다). antiforgery 토큰을 주고받지 않으므로 SPA 코드는 바꿀 것이 없다. 헤더가 없는 요청(서버 간 호출)은 막지 않는다.
+
 ```sql
 INSERT INTO identity_user_role (UserId, RoleId)
 SELECT u.Id, r.Id FROM identity_user AS u CROSS JOIN identity_role AS r
@@ -466,6 +473,7 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADM
 | Model · Dto 는 기본값 없는 `sealed record`, 매퍼는 static, 엔티티에 navigation 없음 | `DeclarationConventionTests` |
 | Domain 은 Dto · 열거형 · 에러 · System 만 참조 (시그니처 수준) | `DeclarationConventionTests` |
 | 열거형 멤버마다 중복 없는 외부 코드 | `DeclarationConventionTests` |
+| 컨트롤러는 역할 문자열이 아니라 정책으로 인가 | `AuthorizationConventionTests` |
 
 규약 테스트(`UnitTests/Conventions/`)는 앱 어셈블리를 리플렉션으로 훑고, 계층은 네임스페이스로 판정한다. 접미사 ↔ 네임스페이스 검사가 판정의 어긋남도 잡으므로, 검사 대상을 못 찾아 그냥 통과하는 일이 없다. 샘플을 모두 지워도 규약 테스트는 깨지지 않는다(대상 개수 하한을 두지 않는다). 새 앱을 더하면 `ConventionScan` 의 어셈블리 목록에 넣는다.
 
@@ -478,6 +486,7 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADM
 - [ ] 업무 테이블을 물리 삭제하는 경로(`ExecuteDelete`, 원시 SQL `DELETE`)가 없다
 - [ ] 업무 실패는 `CodedException` 계열로 던지고, 메시지는 사용자에게 보여도 되는 문장이다. 예외를 삼키지 않는다
 - [ ] 현재 시각은 `TimeProvider` 로만 읽는다
+- [ ] 익명으로 연 엔드포인트(`[AllowAnonymous]`)가 정말 익명이어도 되는 것뿐이다
 - [ ] API 앱에 주기 실행(`BackgroundService` 타이머 등)이 없다 — 배치 앱의 일이다
 - [ ] 새 비밀은 구성 키로만 읽고 README 「설정과 비밀값」 · `appsettings.Gcp.json` 에 반영했다
 

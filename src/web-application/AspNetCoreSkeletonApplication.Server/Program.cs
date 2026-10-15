@@ -31,8 +31,8 @@ app.UseStaticFiles();
 
 if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 app.UseHttpsRedirection();
@@ -41,11 +41,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAuditorContext();
 
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapSkeletonAuthEndpoints();
 app.MapControllers();
 
-app.MapFallbackToFile("/index.html");
+app.MapFallbackToFile("/index.html").AllowAnonymous();
 
 app.Run();

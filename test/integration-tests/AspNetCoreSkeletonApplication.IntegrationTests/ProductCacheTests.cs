@@ -22,13 +22,9 @@ public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLif
 
     public async ValueTask InitializeAsync()
     {
+        await infrastructure.RecreateDatabaseAsync(Database);
         _first = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => infrastructure.ConfigureApp(builder, Database));
         _second = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => infrastructure.ConfigureApp(builder, Database));
-
-        using var scope = _first.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.MigrateAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -40,7 +36,7 @@ public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLif
     [Fact]
     public async Task Get_IsServedFromCache_UntilAChangeInvalidatesIt()
     {
-        var client = _first.CreateClient();
+        var (client, _) = await TestUsers.SignInAsync(_first, "cache-admin@example.com", administrator: true);
         var id = await CreateAsync(client, "Original");
         Assert.Equal("Original", await GetNameAsync(client, id)); // 캐시에 들어간다
 
@@ -54,7 +50,7 @@ public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLif
     [Fact]
     public async Task List_IsInvalidatedByCreate()
     {
-        var client = _first.CreateClient();
+        var (client, _) = await TestUsers.SignInAsync(_first, "cache-user@example.com", administrator: false);
         var before = await CountAsync(client);
 
         await CreateAsync(client, "Added");
@@ -65,7 +61,8 @@ public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLif
     [Fact]
     public async Task AnotherInstance_ReadsTheSameEntryFromRedis()
     {
-        var id = await CreateAsync(_first.CreateClient(), "Shared");
+        var (client, _) = await TestUsers.SignInAsync(_first, "cache-shared@example.com", administrator: false);
+        var id = await CreateAsync(client, "Shared");
         Assert.Equal("Shared", await GetNameAsync(_first.CreateClient(), id)); // 첫 인스턴스가 L1 · L2 에 넣는다
 
         await RenameBehindTheCacheAsync(id, "ChangedInDb");

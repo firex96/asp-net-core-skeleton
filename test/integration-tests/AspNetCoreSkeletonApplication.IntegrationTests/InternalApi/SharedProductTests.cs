@@ -43,7 +43,8 @@ public class SharedProductTests(InfrastructureFixture database) : IAsyncLifetime
     [Fact]
     public async Task ProductCreatedByServer_IsReadByInternalApi()
     {
-        var created = await ReadJsonAsync(await _server.CreateClient().PostAsJsonAsync(
+        var (client, userId) = await TestUsers.SignInAsync(_server, "shared@example.com", administrator: false);
+        var created = await ReadJsonAsync(await client.PostAsJsonAsync(
             "/api/products", new { name = "Monitor", price = 320000 }, TestContext.Current.CancellationToken));
         var id = created.GetProperty("id").GetInt64();
 
@@ -51,7 +52,7 @@ public class SharedProductTests(InfrastructureFixture database) : IAsyncLifetime
             $"/api/products/{id}", TestContext.Current.CancellationToken));
 
         Assert.Equal("Monitor", fetched.GetProperty("name").GetString());
-        Assert.Equal(0, fetched.GetProperty("createdBy").GetInt64());
+        Assert.Equal(userId, fetched.GetProperty("createdBy").GetInt64());
     }
 
     private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response)
