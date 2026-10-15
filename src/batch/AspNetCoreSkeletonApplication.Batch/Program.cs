@@ -42,6 +42,15 @@ public class Program
             options.IsJobTypeAllowed = typeName => typeName.StartsWith(typeof(Program).Namespace + ".Jobs.", StringComparison.Ordinal);
         });
 
+        // 대시보드에 외부 DB 를 붙이지(attach) 않으므로 그 탐색 서비스는 할 일이 없다. Quartz 4.5.0 에서는 기동 직후 종료하면 이 서비스의
+        // StopAsync 가 "Collection was modified" 로 실패한다(내부 경합) — 등록을 걷어 낸다. 외부 저장소를 붙일 때나 Quartz 를 올릴 때 다시 본다.
+        // 팩토리 람다로 등록되고 타입이 internal 이라, 팩토리의 반환 타입 이름으로 찾는다. 못 찾으면(Quartz 가 바뀌었으면) 기동을 멈춰
+        // 이 우회를 다시 보게 한다.
+        var discovery = builder.Services.SingleOrDefault(descriptor => descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationFactory?.Method.ReturnType.FullName == "Quartz.Configuration.AttachedStoreDiscovery")
+            ?? throw new InvalidOperationException("Quartz 대시보드의 AttachedStoreDiscovery 등록을 찾지 못했다 — Program.cs 의 우회를 다시 본다");
+        builder.Services.Remove(discovery);
+
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
 
