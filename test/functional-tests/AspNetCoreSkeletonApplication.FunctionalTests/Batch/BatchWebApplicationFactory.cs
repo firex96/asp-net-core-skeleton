@@ -11,12 +11,14 @@ namespace AspNetCoreSkeletonApplication.FunctionalTests.Batch;
 
 /// <summary>
 /// Batch 앱을 DB 없이 띄운다 — 스케줄러는 대역(<see cref="Scheduler"/>)이라 아무 Job 도 실제로 돌지 않는다.
-/// 웹훅 API 키: <c>ops</c>(DiscontinueStaleDraftJob · NoSuchJob 허용), <c>viewer</c>(허용 Job 없음).
+/// 웹훅 API 키: <c>ops</c>(DiscontinueStaleDraftJob · NoSuchJob 허용), <c>viewer</c>(허용 Job 없음). 대시보드 계정: <c>operator</c>.
 /// </summary>
 public class BatchWebApplicationFactory : WebApplicationFactory<BatchProgram>
 {
     public const string OpsKey = "ops-key-0123456789abcdef0123456789abcdef";
     public const string ViewerKey = "viewer-key-0123456789abcdef0123456789abcd";
+    public const string DashboardUsername = "operator";
+    public const string DashboardPassword = "dashboard-pass-0123456789";
 
     public IScheduler Scheduler { get; } = Substitute.For<IScheduler>();
 
@@ -32,6 +34,8 @@ public class BatchWebApplicationFactory : WebApplicationFactory<BatchProgram>
         builder.UseSetting("Batch:Webhook:ApiKeys:1:Name", "viewer");
         builder.UseSetting("Batch:Webhook:ApiKeys:1:Key", ViewerKey);
         builder.UseSetting("Batch:Jobs:DiscontinueStaleDraftJob:AllowedParameters:0", "dryRun");
+        builder.UseSetting("Batch:Dashboard:Username", DashboardUsername);
+        builder.UseSetting("Batch:Dashboard:Password", DashboardPassword);
 
         Scheduler.Exists(Arg.Is<JobKey>(key => key.Name == "DiscontinueStaleDraftJob"), Arg.Any<CancellationToken>()).Returns(true);
         builder.ConfigureTestServices(services =>

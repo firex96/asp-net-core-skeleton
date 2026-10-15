@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- Batch 운영 대시보드 `/quartz`(Quartz.Dashboard) — Basic 인증 운영자 정책 뒤(정적 자산 포함), 계정 미설정 시 fail-closed, 다룰 Job 타입을 앱의 `Jobs` 로 제한
 - Batch 수동 실행 웹훅 `POST /api/jobs/{Job}/trigger` — API 키 인증(상수 시간 비교, 기동 시 검증), 키별 허용 Job(403), 파라미터 화이트리스트(400), Quartz `TriggerJob` 으로 실행해 동시 실행 방지 · 실행 이력 적용, 202 + 추적 ID
 - 본문 없는 4xx 응답도 ProblemDetails(`UseStatusCodePages`), 에러 코드 `UNAUTHORIZED_ERROR`(401, G015)
 - 샘플 Job `DiscontinueStaleDraftJob` — 오래된 Draft 상품을 판매 종료(Domain `StaleDraftPolicy`, keyset 페이지, 페이지마다 트랜잭션, 웹과 같은 상태 전이 경로). 재실행 멱등을 Quartz 실행으로 확인

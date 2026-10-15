@@ -3,6 +3,7 @@ using AspNetCoreSkeletonApplication.Batch.Jobs;
 using AspNetCoreSkeletonApplication.Batch.Security;
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;
+using Quartz;
 using Scalar.AspNetCore;
 
 namespace AspNetCoreSkeletonApplication.Batch;
@@ -34,6 +35,13 @@ public class Program
 
         builder.Services.AddBatchSecurity();
 
+        // 운영 대시보드(/quartz) — 운영자 정책 뒤에, 이 앱의 Job 타입만 다룬다(임의 타입 — 예: 실행 파일을 띄우는 NativeJob — 은 막는다).
+        builder.Services.AddQuartzDashboard(options =>
+        {
+            options.AuthorizationPolicy = BatchPolicies.Operator;
+            options.IsJobTypeAllowed = typeName => typeName.StartsWith(typeof(Program).Namespace + ".Jobs.", StringComparison.Ordinal);
+        });
+
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
 
@@ -52,10 +60,15 @@ public class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseAuditorContext();
+        // 대시보드(Blazor)의 폼 · 회로가 쓴다 — 인증 · 인가 뒤에 둔다.
+        app.UseAntiforgery();
 
         app.MapHealthChecks("/health");
 
         app.MapControllers();
+        // 대시보드의 Blazor 스크립트 · 패키지 CSS 같은 정적 자산 — 대시보드와 같은 운영자 정책 뒤에 둔다.
+        app.MapStaticAssets().RequireAuthorization(BatchPolicies.Operator);
+        app.MapQuartzDashboard().RequireAuthorization(BatchPolicies.Operator);
 
         app.Run();
     }

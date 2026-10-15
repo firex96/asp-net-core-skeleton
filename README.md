@@ -339,6 +339,18 @@ dotnet user-secrets set "Batch:Webhook:ApiKeys:0:AllowedJobs:0" "DiscontinueStal
 # 배포 — 환경변수 Batch__Webhook__ApiKeys__0__Key, 비밀 저장소 이름 Batch--Webhook--ApiKeys--0--Key
 ```
 
+**운영 대시보드** `/quartz` — Quartz.NET 내장 대시보드(Blazor). Job · 트리거 · 실행 중 · 실행 이력(클러스터 전체, DB 의 `QRTZ_EXECUTION_HISTORY`)을 보고, 멈춤 · 재개 · 지금 실행을 할 수 있다.
+
+- **운영자 정책 뒤에 있다** — 브라우저용 Basic 인증, 계정은 `Batch:Dashboard:Username` · `Password`(비밀값, 16자 이상). 계정을 적지 않으면 아무도 들어오지 못한다. 대시보드의 Blazor 스크립트 · CSS 같은 정적 자산도 같은 정책 뒤다. 웹훅 API 키로는 열리지 않는다.
+- **다룰 수 있는 Job 타입은 이 앱의 `Jobs` 네임스페이스뿐이다**(`IsJobTypeAllowed`) — 대시보드로 임의 타입(예: 실행 파일을 띄우는 `NativeJob`)의 Job 을 추가하는 길을 막는다.
+- Basic 인증은 평문 계정을 매 요청에 싣는다 — HTTPS 로만 연다(Batch 는 HTTPS 로 리다이렉트한다). 사내망 · VPN 뒤에 두는 것을 권한다.
+
+```bash
+dotnet user-secrets set "Batch:Dashboard:Username" "operator"   # Batch 프로젝트에서
+dotnet user-secrets set "Batch:Dashboard:Password" "$(openssl rand -hex 16)"
+# 배포 — Batch__Dashboard__Password, 비밀 저장소 이름 Batch--Dashboard--Password
+```
+
 **새 Job 체크리스트**
 
 1. `Jobs/{이름}Job.cs` — `TracedJob` 상속, `[DisallowConcurrentExecution]`, `ExecuteJobAsync` 에서 BizService 호출
@@ -485,7 +497,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | `Azure` | Azure Key Vault — 볼트의 모든 비밀 | `Azure:KeyVault:Endpoint`, `DefaultAzureCredential` |
 | `Gcp` | GCP Secret Manager — `Gcp:SecretManager:Secrets` 에 적은 비밀 | `Gcp:SecretManager:ProjectId`, Application Default Credentials |
 
-저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 가 더 있다**(Gcp 를 쓰면 키마다 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` 를 추가한다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
+저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 와 대시보드 비밀번호 `Batch:Dashboard:Password` 가 더 있다**(Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` · `Batch--Dashboard--Password` 를 추가한다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
 
 ### 키 이름 대응
 

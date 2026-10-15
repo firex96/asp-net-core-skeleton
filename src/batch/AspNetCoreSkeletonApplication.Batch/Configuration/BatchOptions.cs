@@ -7,4 +7,6 @@ public sealed class BatchOptions
     public Dictionary<string, JobScheduleOptions> Jobs { get; set; } = [];
 
     public WebhookOptions Webhook { get; set; } = new();
+
+    public DashboardOptions Dashboard { get; set; } = new();
 }
