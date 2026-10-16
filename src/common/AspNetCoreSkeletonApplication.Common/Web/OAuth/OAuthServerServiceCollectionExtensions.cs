@@ -55,8 +55,22 @@ public static class OAuthServerServiceCollectionExtensions
 
             if (server.KeySource == OAuthKeySource.Certificates)
             {
-                options.AddSigningCertificate(Load(server.SigningCertificate))
-                    .AddEncryptionCertificate(Load(server.EncryptionCertificate));
+                if (server.SigningCertificates.Count == 0 || server.EncryptionCertificates.Count == 0)
+                {
+                    throw new OptionsValidationException(SectionName, typeof(OAuthServerOptions),
+                        ["KeySource 가 Certificates 면 SigningCertificates · EncryptionCertificates 가 하나 이상 필요하다"]);
+                }
+
+                // OpenIddict 가 지금 유효한 것 중 만료가 가장 늦은 인증서를 고른다 — 넣는 순서는 상관없다.
+                foreach (var certificate in server.SigningCertificates)
+                {
+                    options.AddSigningCertificate(Load(certificate));
+                }
+
+                foreach (var certificate in server.EncryptionCertificates)
+                {
+                    options.AddEncryptionCertificate(Load(certificate));
+                }
             }
             else
             {
@@ -93,7 +107,8 @@ public static class OAuthServerServiceCollectionExtensions
 
     private static bool Validate(OAuthServerOptions options) =>
         (options.KeySource != OAuthKeySource.Certificates
-         || (!string.IsNullOrWhiteSpace(options.SigningCertificate) && !string.IsNullOrWhiteSpace(options.EncryptionCertificate)))
+         || (options.SigningCertificates.Count > 0 && options.EncryptionCertificates.Count > 0
+             && options.SigningCertificates.Concat(options.EncryptionCertificates).All(certificate => !string.IsNullOrWhiteSpace(certificate))))
         && options.Clients.All(client =>
             !client.GrantTypes.Contains(GrantTypes.ClientCredentials) || !string.IsNullOrWhiteSpace(client.ClientSecret))
         && options.AllowedOrigins.All(IsOrigin);
@@ -104,7 +119,6 @@ public static class OAuthServerServiceCollectionExtensions
         && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
         && uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment);
 
-    private static X509Certificate2 Load(string? base64) =>
-        X509CertificateLoader.LoadPkcs12(Convert.FromBase64String(base64 ?? throw new OptionsValidationException(
-            SectionName, typeof(OAuthServerOptions), ["KeySource 가 Certificates 면 SigningCertificate · EncryptionCertificate 가 필요하다"])), password: null);
+    private static X509Certificate2 Load(string base64) =>
+        X509CertificateLoader.LoadPkcs12(Convert.FromBase64String(base64), password: null);
 }

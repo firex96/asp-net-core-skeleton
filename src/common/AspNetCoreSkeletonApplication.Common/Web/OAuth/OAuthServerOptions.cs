@@ -7,18 +7,22 @@ namespace AspNetCoreSkeletonApplication.Common.Web.OAuth;
 public sealed class OAuthServerOptions
 {
     /// <summary>
-    /// 토큰 서명 · 암호화 키를 어디서 얻나. <c>Certificates</c> — <see cref="SigningCertificate"/> · <see cref="EncryptionCertificate"/>(비밀값),
+    /// 토큰 서명 · 암호화 키를 어디서 얻나. <c>Certificates</c> — <see cref="SigningCertificates"/> · <see cref="EncryptionCertificates"/>(비밀값),
     /// 인스턴스가 여럿이어도 같은 키다. <c>Ephemeral</c> — 기동할 때마다 새 키(로컬 · 테스트 전용: 재기동하면 발급한 토큰이 모두 무효, 인스턴스끼리 서로의 토큰을 못 읽는다).
     /// 기본값이 없다 — 배포가 고른다.
     /// </summary>
     [Required]
     public OAuthKeySource? KeySource { get; set; }
 
-    /// <summary>서명용 X.509 인증서(PKCS#12, 암호 없음)의 base64. 키 사용 <c>DigitalSignature</c>.</summary>
-    public string? SigningCertificate { get; set; }
+    /// <summary>
+    /// 서명용 X.509 인증서(PKCS#12, 암호 없음)의 base64 들. 키 사용 <c>DigitalSignature</c>. 둘 이상이면 교체 중이다 — 지금 유효한 것 중
+    /// 만료가 가장 늦은 것으로 서명하고, 공개 키(JWKS)에는 모두 싣는다. 아직 유효 기간 전인 새 인증서를 미리 넣어 두면 그 시각 뒤 재기동할 때
+    /// 넘어가고, 이전 인증서로 서명한 토큰도 검증된다(README 「OAuth 서버」 키 교체).
+    /// </summary>
+    public List<string> SigningCertificates { get; set; } = [];
 
-    /// <summary>암호화용 X.509 인증서(PKCS#12, 암호 없음)의 base64. 키 사용 <c>KeyEncipherment</c>.</summary>
-    public string? EncryptionCertificate { get; set; }
+    /// <summary>암호화용 X.509 인증서(PKCS#12, 암호 없음)의 base64 들. 키 사용 <c>KeyEncipherment</c>. 교체는 서명 인증서와 같다.</summary>
+    public List<string> EncryptionCertificates { get; set; } = [];
 
     /// <summary>
     /// OAuth 엔드포인트를 브라우저에서 직접 부르는 다른 출처의 앱(다른 도메인의 SPA 등). <c>/connect/*</c> · <c>/.well-known/*</c> 에만 CORS 를 연다 —
