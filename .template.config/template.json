@@ -93,6 +93,31 @@
         ]
       }
     },
+    "pruneTokensInServer": {
+      "type": "generated",
+      "generator": "switch",
+      "description": "Server 의 Authentication:OAuthServer:TokenPruning:RunInServer — Batch 를 빼면 만료 OAuth 토큰을 Server 가 정리한다",
+      "replaces": "false",
+      "onlyIf": [
+        {
+          "after": "\"RunInServer\": "
+        }
+      ],
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "string",
+        "cases": [
+          {
+            "condition": "(!batch)",
+            "value": "true"
+          },
+          {
+            "condition": "(true)",
+            "value": "false"
+          }
+        ]
+      }
+    },
     "kebabName": {
       "type": "derived",
       "valueSource": "name",

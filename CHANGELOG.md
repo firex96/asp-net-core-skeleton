@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- Batch 없이 만든 앱의 OAuth 토큰 정리 — `Authentication:OAuthServer:TokenPruning:RunInServer` 면 Server 의 `OAuthTokenPruneWorker` 가 Batch Job 과 같은 규칙으로 정리한다(기본 false, 템플릿 `--batch false` 가 true 로 만든다)
 - 구성에서 뺀 OAuth 클라이언트의 사용 중지 — 기동할 때 구성에 없는 클라이언트의 권한을 모두 비운다(지우지 않는다, 경고 로그). 다시 넣으면 다시 켜진다
 - OAuth 서버 키 교체 — 서명 · 암호화 인증서를 배열(`SigningCertificates[]` · `EncryptionCertificates[]`)로 겹쳐 둔다. 지금 유효한 것 중 만료가 가장 늦은 인증서로 서명하고 JWKS 에는 모두 싣는다 — 새 인증서를 유효 시작을 미래로 미리 넣고, 그 시각 뒤 재기동하고, 가장 긴 토큰 수명 뒤에 이전 것을 뺀다(README). 단일 키 `SigningCertificate` · `EncryptionCertificate` 는 없앴다(Gcp `Secrets` 도 `…Certificates--0`)
 - 다른 출처의 브라우저 앱이 OAuth 엔드포인트를 쓴다 — 구성 `Authentication:OAuthServer:AllowedOrigins` 의 출처에만 `/connect/*` · `/.well-known/*` CORS(GET · POST, 자격 증명 없음, `UseSkeletonOAuthServerCors`). Fetch Metadata 는 세션 쿠키가 실린 cross-site 변경 요청만 막는다 — 쿠키 없는 토큰 요청은 통과

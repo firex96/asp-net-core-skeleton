@@ -102,6 +102,9 @@ public static class OAuthServerServiceCollectionExtensions
                     : IdentityConstants.ApplicationScheme);
 
         services.AddHostedService<OAuthClientSynchronizer>();
+        // 만료 토큰 정리 — 기본은 Batch 가 한다. RunInServer 일 때만 Server 가 한다(Batch 없이 배포할 때).
+        services.AddOptions<OAuthTokenPruningOptions>().BindConfiguration(SectionName + ":TokenPruning").ValidateDataAnnotations().ValidateOnStart();
+        services.AddHostedService<OAuthTokenPruneWorker>();
         return services;
     }
 
