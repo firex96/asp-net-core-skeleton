@@ -14,7 +14,7 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (password !== confirmPassword) {
-			error = new ApiError(400, undefined, 'Passwords do not match.');
+			error = new ApiError(400, undefined, '비밀번호가 서로 달라요. 다시 입력해 주세요.');
 			return;
 		}
 
@@ -24,7 +24,7 @@
 			await resetPassword(email, code, password);
 			await goto('/login?reset=done');
 		} catch (caught) {
-			error = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.');
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
 		} finally {
 			busy = false;
 		}
@@ -32,19 +32,19 @@
 </script>
 
 <svelte:head>
-	<title>Reset password</title>
+	<title>비밀번호 재설정</title>
 </svelte:head>
 
-<main class="page">
-	<h1>Reset password</h1>
-	<p>For {email}</p>
-	<form onsubmit={submit}>
-		<label>
-			New password
+<main class="card">
+	<h1>새 비밀번호 정하기</h1>
+	<p class="lead">{email} 계정에서 쓸 새 비밀번호를 입력해 주세요.</p>
+	<form class="form" onsubmit={submit}>
+		<label class="field">
+			새 비밀번호
 			<input name="password" type="password" autocomplete="new-password" required bind:value={password} />
 		</label>
-		<label>
-			Confirm new password
+		<label class="field">
+			새 비밀번호 확인
 			<input
 				name="confirmPassword"
 				type="password"
@@ -53,8 +53,9 @@
 				bind:value={confirmPassword}
 			/>
 		</label>
+		<p class="hint">10자 이상, 영문 대문자 · 소문자와 숫자, 특수 문자를 섞어 주세요.</p>
 		{#if error}
-			<div class="error" role="alert">
+			<div class="alert alert-error" role="alert">
 				<p>{error.message}</p>
 				{#if error.fieldErrors.length > 0}
 					<ul>
@@ -64,10 +65,10 @@
 					</ul>
 				{/if}
 				{#if error.code === 'INVALID_TOKEN_ERROR'}
-					<p><a href="/forgot-password">Request a new link</a></p>
+					<p><a href="/forgot-password">재설정 링크 다시 받기</a></p>
 				{/if}
 			</div>
 		{/if}
-		<button type="submit" disabled={busy}>Change password</button>
+		<button type="submit" class="btn btn-primary btn-block" disabled={busy}>비밀번호 바꾸기</button>
 	</form>
 </main>

@@ -1,11 +1,11 @@
-<header>
-  <a routerLink="/">AspNetCoreSkeletonApplication</a>
-  <nav>
+<header class="app-header">
+  <a routerLink="/" class="brand">AspNetCoreSkeletonApplication</a>
+  <nav class="nav">
     @if (auth.user(); as user) {
-      <a routerLink="/account" class="user">{{ user.email }}</a>
-      <button type="button" (click)="logout()">Log out</button>
-    } @else if (auth.user() === null) {
-      <a routerLink="/login" [queryParams]="loginQueryParams">Log in</a>
+      <a routerLink="/account">{{ user.email }}</a>
+      <button type="button" class="btn btn-small" (click)="logout()">로그아웃</button>
+    } @else if (auth.user() === null && !onLoginPage) {
+      <a routerLink="/login" [queryParams]="loginQueryParams" class="btn btn-primary btn-small">로그인</a>
     }
   </nav>
 </header>

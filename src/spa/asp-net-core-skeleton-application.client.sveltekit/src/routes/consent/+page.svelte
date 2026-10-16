@@ -24,33 +24,41 @@
 				page.url.searchParams.get('scope') ?? ''
 			);
 		} catch (caught) {
-			error = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.');
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
 		}
 	});
 </script>
 
 <svelte:head>
-	<title>Allow access?</title>
+	<title>접근 허용</title>
 </svelte:head>
 
-<main class="page">
-	<h1>Allow access?</h1>
+<main class="card">
 	{#if details}
-		<p><strong>{details.displayName}</strong> wants to:</p>
-		<ul>
+		<h1>{details.displayName}에 접근을 허용할까요?</h1>
+		<p class="lead">허용하면 이 앱이 회원님 계정으로 아래 일을 할 수 있어요.</p>
+		<ul class="list">
 			{#each details.scopes as scope (scope.name)}
-				<li>{scope.description} <code>{scope.name}</code></li>
+				<li>
+					<span>{scope.description}</span>
+					<code class="muted">{scope.name}</code>
+				</li>
 			{/each}
 		</ul>
 		<form method="post" action="/connect/authorize">
 			{#each parameters as [name, value] (name)}
 				<input type="hidden" {name} {value} />
 			{/each}
-			<button type="submit" name="consent" value="accept">Allow</button>
-			<button type="submit" name="consent" value="deny">Deny</button>
+			<div class="actions">
+				<button type="submit" name="consent" value="deny" class="btn">거부</button>
+				<button type="submit" name="consent" value="accept" class="btn btn-primary">허용</button>
+			</div>
 		</form>
+		<p class="hint">한 번 허용하면 다음부터는 묻지 않아요.</p>
+	{:else if !error}
+		<p class="muted">불러오는 중이에요…</p>
 	{/if}
 	{#if error}
-		<p class="error" role="alert">{error.message}</p>
+		<p class="alert alert-error" role="alert">{error.message}</p>
 	{/if}
 </main>

@@ -14,8 +14,7 @@ import { externalLoginMessage, isServerPath } from '../auth/navigation';
   selector: 'app-login',
   imports: [FormsModule, RouterLink],
   templateUrl: './login.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: './login.component.css'
+  changeDetection: ChangeDetectionStrategy.Eager
 })
 export class LoginComponent implements OnInit {
   private readonly auth = inject(AuthService);
@@ -39,7 +38,7 @@ export class LoginComponent implements OnInit {
   async ngOnInit() {
     const query = this.route.snapshot.queryParamMap;
     this.notice.set(externalLoginMessage(query.get('error'), query.get('provider'))
-      ?? (query.get('reset') === 'done' ? 'Your password was changed. Log in with the new password.' : null));
+      ?? (query.get('reset') === 'done' ? '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.' : null));
     const user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
     if (user) {
       await this.continue();
@@ -60,7 +59,7 @@ export class LoginComponent implements OnInit {
 
   async submit() {
     if (this.mode() === 'register' && this.password !== this.confirmPassword) {
-      this.error.set(new ApiError(400, undefined, 'Passwords do not match.'));
+      this.error.set(new ApiError(400, undefined, '비밀번호가 서로 달라요. 다시 입력해 주세요.'));
       return;
     }
 

@@ -69,7 +69,7 @@ describe('LoginComponent', () => {
 
     await component.submit();
 
-    expect(component.error()?.message).toBe('Passwords do not match.');
+    expect(component.error()?.message).toBe('비밀번호가 서로 달라요. 다시 입력해 주세요.');
   });
 
   it('returns to a same-origin returnUrl after login', async () => {
@@ -104,6 +104,6 @@ describe('LoginComponent', () => {
     queryParams = { error: 'EXTERNAL_LOGIN_NOT_LINKED_ERROR', provider: 'Kakao' };
     const fixture = await create();
 
-    expect((fixture.nativeElement as HTMLElement).querySelector('[role=status]')?.textContent).toContain('Kakao account is not linked');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role=status]')?.textContent).toContain('아직 연결하지 않은 카카오 계정');
   });
 });

@@ -8,7 +8,7 @@ const error = ref<ApiError | null>(null)
 const notice = ref<string | null>(null)
 const linked = computed(() => new Set(logins.value.map(login => login.provider)))
 
-useHead({ title: 'Account' })
+useHead({ title: '내 계정' })
 
 function queryValue(name: string): string | null {
   const value = route.query[name]
@@ -24,7 +24,7 @@ onMounted(async () => {
 
   const linkedProvider = queryValue('linked')
   notice.value = linkedProvider
-    ? `Your ${linkedProvider} account is linked. You can now log in with it.`
+    ? `${providerName(linkedProvider)} 계정을 연결했어요. 이제 ${providerName(linkedProvider)}로 로그인할 수 있어요.`
     : externalLoginMessage(queryValue('error'), queryValue('provider'))
   await load()
 })
@@ -41,42 +41,55 @@ async function remove(provider: string) {
     await load()
   }
   catch (caught) {
-    error.value = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.')
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
   }
 }
 </script>
 
 <template>
-  <main class="page">
-    <h1>Account</h1>
+  <main class="card card-wide">
+    <h1>내 계정</h1>
     <template v-if="session.user.value">
-      <p>{{ session.user.value.email }}</p>
-      <h2>Permissions</h2>
-      <p v-if="session.user.value.permissions.length === 0">
-        None
+      <p class="lead">
+        {{ session.user.value.email }}
       </p>
-      <ul v-else>
-        <li v-for="permission in session.user.value.permissions" :key="permission">
+
+      <h2 class="section-title">
+        권한
+      </h2>
+      <p v-if="session.user.value.permissions.length === 0" class="muted">
+        아직 받은 권한이 없어요.
+      </p>
+      <ul v-else class="tags">
+        <li v-for="permission in session.user.value.permissions" :key="permission" class="tag">
           <code>{{ permission }}</code>
         </li>
       </ul>
 
-      <h2>Linked accounts</h2>
-      <p v-if="notice" class="notice" role="status">
+      <h2 class="section-title">
+        연결된 계정
+      </h2>
+      <p class="muted">
+        연결해 두면 비밀번호 없이 그 계정으로 로그인할 수 있어요.
+      </p>
+      <p v-if="notice" class="alert alert-info" role="status">
         {{ notice }}
       </p>
-      <p v-if="error" class="error" role="alert">
+      <p v-if="error" class="alert alert-error" role="alert">
         {{ error.message }}
       </p>
-      <ul class="providers">
+      <ul class="list">
         <li v-for="provider in providers" :key="provider.name">
-          <span>{{ provider.displayName }}</span>
-          <button v-if="linked.has(provider.name)" type="button" @click="remove(provider.name)">
-            Unlink
+          <span>
+            <strong>{{ provider.displayName }}</strong>
+            <span class="muted"> · {{ linked.has(provider.name) ? '연결됨' : '연결 안 됨' }}</span>
+          </span>
+          <button v-if="linked.has(provider.name)" type="button" class="btn btn-small" @click="remove(provider.name)">
+            연결 끊기
           </button>
           <form v-else method="post" :action="`/api/auth/external/${encodeURIComponent(provider.name)}/link`">
-            <button type="submit">
-              Link
+            <button type="submit" class="btn btn-primary btn-small">
+              연결하기
             </button>
           </form>
         </li>

@@ -86,6 +86,8 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 
 세 SPA 는 같은 예제(`/weatherforecast` 표)와 같은 계정 화면을 같은 방식으로 붙인다 — `/login`(로그인 · 가입 · 소셜 로그인 버튼), `/forgot-password` · `/reset-password`(메일 링크로 재설정), `/account`(권한 · 소셜 계정 연결 · 끊기), `/consent`(OAuth 동의), 상단 바의 로그인 상태 · 로그아웃. dev 서버는 `dotnet dev-certs` 인증서로 HTTPS 를 열고, `/weatherforecast` · `/api` · `/connect` · `/.well-known` 을 ASP.NET Core 로 프록시한다(`ASPNETCORE_HTTPS_PORT` · `ASPNETCORE_URLS` 로 대상 결정). API 를 dev 서버 출처로 프록시하므로 세션 쿠키가 SPA 와 같은 출처에 저장되고, Fetch Metadata 검사도 same-origin 으로 통과한다. 로그인 상태는 `/api/auth/me` 로만 확인한다(쿠키는 HttpOnly 라 JS 가 읽지 않는다). 소셜 로그인 · 연결과 OAuth 동의는 서버로 가는 진짜 폼 POST 이고, 백엔드가 콜백 · OAuth 주소를 dev 서버 출처로 만들도록 프록시는 Host 를 바꾸지 않는다. 기본 SPA(Angular)가 아닌 SPA 로 띄우면 메일 링크 · issuer 출처를 맞춘다 — `App__PublicOrigin=https://localhost:61195 dotnet run … -p:SpaClient=sveltekit`.
 
+화면 문구는 한국어(해요체)이고, 스타일은 의존성 없는 공통 CSS 하나다 — Angular `src/styles.css`, SvelteKit `src/app.css`, Nuxt `app/assets/css/app.css` 가 같은 내용이다(색은 `:root` 변수, 라이트 · 다크는 시스템 설정). 디자인을 바꾸면 세 파일을 함께 고친다.
+
 ### 4. 비밀값 출처를 고른다
 
 애플리케이션은 비밀값을 **.NET 구성 키**(`ConnectionStrings:Default`)로만 읽는다. 어디서 채울지는 실행 프로파일(`ASPNETCORE_ENVIRONMENT`)이 고른다 — 「설정과 비밀값」 참고. 쓰지 않는 클라우드는 「쓰지 않는 클라우드 지우기」대로 지운다.

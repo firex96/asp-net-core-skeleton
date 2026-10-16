@@ -8,11 +8,11 @@ import { ResetPasswordComponent } from './reset-password/reset-password.componen
 import { WeatherComponent } from './weather/weather.component';
 
 export const routes: Routes = [
-  { path: '', component: WeatherComponent },
-  { path: 'login', component: LoginComponent },
-  { path: 'forgot-password', component: ForgotPasswordComponent },
-  { path: 'reset-password', component: ResetPasswordComponent },
-  { path: 'account', component: AccountComponent },
-  { path: 'consent', component: ConsentComponent },
+  { path: '', component: WeatherComponent, title: '날씨 예보' },
+  { path: 'login', component: LoginComponent, title: '로그인' },
+  { path: 'forgot-password', component: ForgotPasswordComponent, title: '비밀번호 찾기' },
+  { path: 'reset-password', component: ResetPasswordComponent, title: '비밀번호 재설정' },
+  { path: 'account', component: AccountComponent, title: '내 계정' },
+  { path: 'consent', component: ConsentComponent, title: '접근 허용' },
   { path: '**', redirectTo: '' }
 ];

@@ -10,25 +10,29 @@ import { AuthService } from '../auth/auth.service';
   selector: 'app-forgot-password',
   imports: [FormsModule, RouterLink],
   template: `
-    <h1>Forgot password</h1>
-    @if (sent()) {
-      <p role="status">If an account exists for {{ email }}, we sent a link to reset the password. The link works once within 2 hours.</p>
-    } @else {
-      <form (ngSubmit)="submit()">
-        <label>
-          Email
-          <input name="email" type="email" autocomplete="username" required [(ngModel)]="email" />
-        </label>
-        @if (error(); as error) {
-          <p class="error" role="alert">{{ error.message }}</p>
-        }
-        <button type="submit" [disabled]="busy()">Send reset link</button>
-      </form>
-    }
-    <p><a routerLink="/login">Back to log in</a></p>
+    <main class="card">
+      <h1>비밀번호 찾기</h1>
+      @if (sent()) {
+        <p class="alert alert-info" role="status">
+          {{ email }}로 가입한 계정이 있다면 비밀번호 재설정 링크를 보냈어요. 메일함을 확인해 주세요. 링크는 2시간 동안 한 번만 쓸 수 있어요.
+        </p>
+      } @else {
+        <p class="lead">가입한 이메일을 입력하면 비밀번호를 다시 정할 수 있는 링크를 보내 드려요.</p>
+        <form class="form" (ngSubmit)="submit()">
+          <label class="field">
+            이메일
+            <input name="email" type="email" autocomplete="username" placeholder="name@example.com" required [(ngModel)]="email" />
+          </label>
+          @if (error(); as error) {
+            <p class="alert alert-error" role="alert">{{ error.message }}</p>
+          }
+          <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">재설정 링크 받기</button>
+        </form>
+      }
+      <p class="links"><a routerLink="/login">로그인으로 돌아가기</a></p>
+    </main>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: '../login/login.component.css'
+  changeDetection: ChangeDetectionStrategy.Eager
 })
 export class ForgotPasswordComponent {
   private readonly auth = inject(AuthService);

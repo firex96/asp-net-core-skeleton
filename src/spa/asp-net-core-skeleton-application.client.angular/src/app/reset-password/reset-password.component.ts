@@ -10,37 +10,39 @@ import { AuthService } from '../auth/auth.service';
   selector: 'app-reset-password',
   imports: [FormsModule, RouterLink],
   template: `
-    <h1>Reset password</h1>
-    <p>For {{ email }}</p>
-    <form (ngSubmit)="submit()">
-      <label>
-        New password
-        <input name="password" type="password" autocomplete="new-password" required [(ngModel)]="password" />
-      </label>
-      <label>
-        Confirm new password
-        <input name="confirmPassword" type="password" autocomplete="new-password" required [(ngModel)]="confirmPassword" />
-      </label>
-      @if (error(); as error) {
-        <div class="error" role="alert">
-          <p>{{ error.message }}</p>
-          @if (error.fieldErrors.length > 0) {
-            <ul>
-              @for (message of error.fieldErrors; track message) {
-                <li>{{ message }}</li>
-              }
-            </ul>
-          }
-          @if (error.code === 'INVALID_TOKEN_ERROR') {
-            <p><a routerLink="/forgot-password">Request a new link</a></p>
-          }
-        </div>
-      }
-      <button type="submit" [disabled]="busy()">Change password</button>
-    </form>
+    <main class="card">
+      <h1>새 비밀번호 정하기</h1>
+      <p class="lead">{{ email }} 계정에서 쓸 새 비밀번호를 입력해 주세요.</p>
+      <form class="form" (ngSubmit)="submit()">
+        <label class="field">
+          새 비밀번호
+          <input name="password" type="password" autocomplete="new-password" required [(ngModel)]="password" />
+        </label>
+        <label class="field">
+          새 비밀번호 확인
+          <input name="confirmPassword" type="password" autocomplete="new-password" required [(ngModel)]="confirmPassword" />
+        </label>
+        <p class="hint">10자 이상, 영문 대문자 · 소문자와 숫자, 특수 문자를 섞어 주세요.</p>
+        @if (error(); as error) {
+          <div class="alert alert-error" role="alert">
+            <p>{{ error.message }}</p>
+            @if (error.fieldErrors.length > 0) {
+              <ul>
+                @for (message of error.fieldErrors; track message) {
+                  <li>{{ message }}</li>
+                }
+              </ul>
+            }
+            @if (error.code === 'INVALID_TOKEN_ERROR') {
+              <p><a routerLink="/forgot-password">재설정 링크 다시 받기</a></p>
+            }
+          </div>
+        }
+        <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">비밀번호 바꾸기</button>
+      </form>
+    </main>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: '../login/login.component.css'
+  changeDetection: ChangeDetectionStrategy.Eager
 })
 export class ResetPasswordComponent {
   private readonly auth = inject(AuthService);
@@ -56,7 +58,7 @@ export class ResetPasswordComponent {
 
   async submit() {
     if (this.password !== this.confirmPassword) {
-      this.error.set(new ApiError(400, undefined, 'Passwords do not match.'));
+      this.error.set(new ApiError(400, undefined, '비밀번호가 서로 달라요. 다시 입력해 주세요.'));
       return;
     }
 

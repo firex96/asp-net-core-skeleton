@@ -26,7 +26,7 @@
 	const notice = $derived(
 		externalLoginMessage(page.url.searchParams.get('error'), page.url.searchParams.get('provider')) ??
 			(page.url.searchParams.get('reset') === 'done'
-				? 'Your password was changed. Log in with the new password.'
+				? '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.'
 				: null)
 	);
 
@@ -57,7 +57,7 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (mode === 'register' && password !== confirmPassword) {
-			error = new ApiError(400, undefined, 'Passwords do not match.');
+			error = new ApiError(400, undefined, '비밀번호가 서로 달라요. 다시 입력해 주세요.');
 			return;
 		}
 
@@ -67,7 +67,7 @@
 			await (mode === 'login' ? signIn(email, password) : signUp(email, password));
 			await continueTo(returnUrl);
 		} catch (caught) {
-			error = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.');
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
 		} finally {
 			busy = false;
 		}
@@ -75,23 +75,31 @@
 </script>
 
 <svelte:head>
-	<title>{mode === 'login' ? 'Log in' : 'Create account'}</title>
+	<title>{mode === 'login' ? '로그인' : '회원가입'}</title>
 </svelte:head>
 
-<main class="page">
-	<h1>{mode === 'login' ? 'Log in' : 'Create account'}</h1>
+<main class="card">
+	<h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
+	<p class="lead">{mode === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.'}</p>
 
 	{#if notice}
-		<p class="notice" role="status">{notice}</p>
+		<p class="alert alert-info" role="status">{notice}</p>
 	{/if}
 
-	<form onsubmit={submit}>
-		<label>
-			Email
-			<input name="email" type="email" autocomplete="username" required bind:value={email} />
+	<form class="form" onsubmit={submit}>
+		<label class="field">
+			이메일
+			<input
+				name="email"
+				type="email"
+				autocomplete="username"
+				placeholder="name@example.com"
+				required
+				bind:value={email}
+			/>
 		</label>
-		<label>
-			Password
+		<label class="field">
+			비밀번호
 			<input
 				name="password"
 				type="password"
@@ -101,8 +109,8 @@
 			/>
 		</label>
 		{#if mode === 'register'}
-			<label>
-				Confirm password
+			<label class="field">
+				비밀번호 확인
 				<input
 					name="confirmPassword"
 					type="password"
@@ -111,10 +119,11 @@
 					bind:value={confirmPassword}
 				/>
 			</label>
+			<p class="hint">10자 이상, 영문 대문자 · 소문자와 숫자, 특수 문자를 섞어 주세요.</p>
 		{/if}
 
 		{#if error}
-			<div class="error" role="alert">
+			<div class="alert alert-error" role="alert">
 				<p>{error.message}</p>
 				{#if error.fieldErrors.length > 0}
 					<ul>
@@ -126,29 +135,36 @@
 			</div>
 		{/if}
 
-		<button type="submit" disabled={busy}>{mode === 'login' ? 'Log in' : 'Create account'}</button>
+		<button type="submit" class="btn btn-primary btn-block" disabled={busy}>
+			{mode === 'login' ? '로그인' : '가입하기'}
+		</button>
 	</form>
 
 	{#if mode === 'login'}
-		<p><a href="/forgot-password">Forgot your password?</a></p>
-
 		{#if providers.length > 0}
+			<div class="divider">또는</div>
 			<div class="social">
 				{#each providers as provider (provider.name)}
 					<form
 						method="post"
 						action={`/api/auth/external/${encodeURIComponent(provider.name)}/login?returnUrl=${encodeURIComponent(returnUrl)}`}
 					>
-						<button type="submit">Continue with {provider.displayName}</button>
+						<button type="submit" class={`btn btn-block btn-${provider.name.toLowerCase()}`}>
+							{provider.displayName}로 계속하기
+						</button>
 					</form>
 				{/each}
 			</div>
 		{/if}
-	{/if}
 
-	<p>
-		<button type="button" class="link" onclick={toggleMode}>
-			{mode === 'login' ? 'Need an account? Create one' : 'Already have an account? Log in'}
-		</button>
-	</p>
+		<p class="links">
+			<a href="/forgot-password">비밀번호를 잊으셨나요?</a>
+			<button type="button" class="link-button" onclick={toggleMode}>회원가입</button>
+		</p>
+	{:else}
+		<p class="links">
+			<span class="muted">이미 계정이 있나요?</span>
+			<button type="button" class="link-button" onclick={toggleMode}>로그인</button>
+		</p>
+	{/if}
 </main>

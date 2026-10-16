@@ -7,6 +7,7 @@
 		externalLoginMessage,
 		listLogins,
 		listProviders,
+		providerName,
 		unlink,
 		type ExternalLogin,
 		type ExternalProvider
@@ -30,7 +31,7 @@
 
 		const linkedProvider = page.url.searchParams.get('linked');
 		notice = linkedProvider
-			? `Your ${linkedProvider} account is linked. You can now log in with it.`
+			? `${providerName(linkedProvider)} 계정을 연결했어요. 이제 ${providerName(linkedProvider)}로 로그인할 수 있어요.`
 			: externalLoginMessage(page.url.searchParams.get('error'), page.url.searchParams.get('provider'));
 		await load();
 	});
@@ -46,46 +47,51 @@
 			await unlink(provider);
 			await load();
 		} catch (caught) {
-			error = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.');
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Account</title>
+	<title>내 계정</title>
 </svelte:head>
 
-<main class="page">
-	<h1>Account</h1>
+<main class="card card-wide">
+	<h1>내 계정</h1>
 	{#if session.user}
-		<p>{session.user.email}</p>
-		<h2>Permissions</h2>
+		<p class="lead">{session.user.email}</p>
+
+		<h2 class="section-title">권한</h2>
 		{#if session.user.permissions.length === 0}
-			<p>None</p>
+			<p class="muted">아직 받은 권한이 없어요.</p>
 		{:else}
-			<ul>
+			<ul class="tags">
 				{#each session.user.permissions as permission (permission)}
-					<li><code>{permission}</code></li>
+					<li class="tag"><code>{permission}</code></li>
 				{/each}
 			</ul>
 		{/if}
 
-		<h2>Linked accounts</h2>
+		<h2 class="section-title">연결된 계정</h2>
+		<p class="muted">연결해 두면 비밀번호 없이 그 계정으로 로그인할 수 있어요.</p>
 		{#if notice}
-			<p class="notice" role="status">{notice}</p>
+			<p class="alert alert-info" role="status">{notice}</p>
 		{/if}
 		{#if error}
-			<p class="error" role="alert">{error.message}</p>
+			<p class="alert alert-error" role="alert">{error.message}</p>
 		{/if}
-		<ul class="providers">
+		<ul class="list">
 			{#each providers as provider (provider.name)}
 				<li>
-					<span>{provider.displayName}</span>
+					<span>
+						<strong>{provider.displayName}</strong>
+						<span class="muted"> · {linked.has(provider.name) ? '연결됨' : '연결 안 됨'}</span>
+					</span>
 					{#if linked.has(provider.name)}
-						<button type="button" onclick={() => remove(provider.name)}>Unlink</button>
+						<button type="button" class="btn btn-small" onclick={() => remove(provider.name)}>연결 끊기</button>
 					{:else}
 						<form method="post" action={`/api/auth/external/${encodeURIComponent(provider.name)}/link`}>
-							<button type="submit">Link</button>
+							<button type="submit" class="btn btn-primary btn-small">연결하기</button>
 						</form>
 					{/if}
 				</li>

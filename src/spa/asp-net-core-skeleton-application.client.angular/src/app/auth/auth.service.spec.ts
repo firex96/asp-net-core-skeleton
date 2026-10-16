@@ -63,7 +63,7 @@ describe('AuthService', () => {
       { status: 400, statusText: 'Bad Request' });
 
     const error = await rejection(result);
-    expect(error.message).toBe('One or more validation errors occurred.');
+    expect(error.message).toBe('입력한 내용을 확인해 주세요.');
     expect(error.fieldErrors).toEqual(['too short', 'digit']);
   });
 
@@ -123,7 +123,7 @@ describe('navigation', () => {
   });
 
   it('explains social login results', () => {
-    expect(externalLoginMessage('EXTERNAL_LOGIN_IN_USE_ERROR', 'Naver')).toContain('Naver account is already linked');
+    expect(externalLoginMessage('EXTERNAL_LOGIN_IN_USE_ERROR', 'Naver')).toBe('이 네이버 계정은 이미 다른 회원과 연결돼 있어요.');
     expect(externalLoginMessage(null, null)).toBeNull();
   });
 });

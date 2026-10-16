@@ -28,7 +28,7 @@ describe('AppComponent', () => {
     fixture.detectChanges();
 
     const header = (fixture.nativeElement as HTMLElement).querySelector('header')!;
-    expect(header.textContent).toContain('Log in');
+    expect(header.textContent).toContain('로그인');
   });
 
   it('shows the user and a logout button when signed in', async () => {
@@ -40,6 +40,6 @@ describe('AppComponent', () => {
 
     const header = (fixture.nativeElement as HTMLElement).querySelector('header')!;
     expect(header.textContent).toContain('user@example.com');
-    expect(header.textContent).toContain('Log out');
+    expect(header.textContent).toContain('로그아웃');
   });
 });

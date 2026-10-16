@@ -30,32 +30,16 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<header>
-	<a href="/">AspNetCoreSkeletonApplication</a>
-	<nav>
+<header class="app-header">
+	<a href="/" class="brand">AspNetCoreSkeletonApplication</a>
+	<nav class="nav">
 		{#if session.user}
-			<a href="/account" class="user">{session.user.email}</a>
-			<button type="button" onclick={logOut}>Log out</button>
-		{:else if session.user === null}
-			<a href={loginHref}>Log in</a>
+			<a href="/account">{session.user.email}</a>
+			<button type="button" class="btn btn-small" onclick={logOut}>로그아웃</button>
+		{:else if session.user === null && page.url.pathname !== '/login'}
+			<a href={loginHref} class="btn btn-primary btn-small">로그인</a>
 		{/if}
 	</nav>
 </header>
 
 {@render children()}
-
-<style>
-	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.75rem 2rem;
-		border-bottom: 1px solid #ddd;
-	}
-
-	nav {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-</style>

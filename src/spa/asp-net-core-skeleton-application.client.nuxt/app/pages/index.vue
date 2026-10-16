@@ -1,6 +1,8 @@
 <script setup lang="ts">
 const forecasts = ref<WeatherForecast[]>()
 
+useHead({ title: '날씨 예보' })
+
 onMounted(async () => {
   try {
     forecasts.value = await getForecasts()
@@ -12,52 +14,36 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main>
-    <h1 id="tableLabel">
-      Weather forecast
-    </h1>
-
-    <p>This component demonstrates fetching data from the server.</p>
-
-    <p v-if="!forecasts">
-      <em>Loading... Please refresh once the ASP.NET backend has started.</em>
+  <main class="container">
+    <h1>날씨 예보</h1>
+    <p class="lead">
+      백엔드 API(<code>/weatherforecast</code>)에서 받아 온 예시 데이터예요.
     </p>
-    <table v-else>
+
+    <p v-if="!forecasts" class="muted">
+      불러오는 중이에요… 백엔드가 아직 준비되지 않았다면 잠시 후 새로고침해 주세요.
+    </p>
+    <table v-else class="table">
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Temp. (C)</th>
-          <th>Temp. (F)</th>
-          <th>Summary</th>
+          <th>날짜</th>
+          <th>기온(°C)</th>
+          <th>기온(°F)</th>
+          <th>요약</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="forecast in forecasts" :key="forecast.date">
           <td>{{ forecast.date }}</td>
-          <td>{{ forecast.temperatureC }}</td>
-          <td>{{ forecast.temperatureF }}</td>
+          <td class="number">
+            {{ forecast.temperatureC }}
+          </td>
+          <td class="number">
+            {{ forecast.temperatureF }}
+          </td>
           <td>{{ forecast.summary }}</td>
         </tr>
       </tbody>
     </table>
   </main>
 </template>
-
-<style scoped>
-main {
-  max-width: 1280px;
-  padding: 2rem;
-  margin: 0 auto;
-  text-align: center;
-}
-
-th,
-td {
-  padding-left: 1rem;
-  padding-right: 1rem;
-}
-
-table {
-  margin: 0 auto;
-}
-</style>

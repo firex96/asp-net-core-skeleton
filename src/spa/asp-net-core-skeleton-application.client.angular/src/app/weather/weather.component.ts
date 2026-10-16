@@ -11,8 +11,7 @@ interface WeatherForecast {
 @Component({
   selector: 'app-weather',
   templateUrl: './weather.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: './weather.component.css'
+  changeDetection: ChangeDetectionStrategy.Eager
 })
 export class WeatherComponent implements OnInit {
   private readonly http = inject(HttpClient);

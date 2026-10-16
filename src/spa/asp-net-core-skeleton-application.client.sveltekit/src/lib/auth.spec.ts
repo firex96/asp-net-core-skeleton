@@ -75,7 +75,7 @@ describe('register', () => {
 
 		const error = (await register(user.email, 'short', fetchFn).catch((caught: unknown) => caught)) as ApiError;
 
-		expect(error.message).toBe('One or more validation errors occurred.');
+		expect(error.message).toBe('입력한 내용을 확인해 주세요.');
 		expect(error.fieldErrors).toEqual(['too short', 'digit']);
 		expect(fetchFn).toHaveBeenCalledTimes(1);
 	});
@@ -131,7 +131,7 @@ describe('social accounts and consent', () => {
 	it('sends server paths through a full page navigation and explains results', () => {
 		expect(isServerPath('/connect/authorize?client_id=a')).toBe(true);
 		expect(isServerPath('/products')).toBe(false);
-		expect(externalLoginMessage('EXTERNAL_LOGIN_NOT_LINKED_ERROR', 'Kakao')).toContain('Kakao account is not linked');
+		expect(externalLoginMessage('EXTERNAL_LOGIN_NOT_LINKED_ERROR', 'Kakao')).toContain('아직 연결하지 않은 카카오 계정');
 		expect(externalLoginMessage(null, null)).toBeNull();
 	});
 });

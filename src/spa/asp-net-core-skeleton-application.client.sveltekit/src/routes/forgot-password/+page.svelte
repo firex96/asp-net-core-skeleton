@@ -15,7 +15,7 @@
 			await forgotPassword(email);
 			sent = true;
 		} catch (caught) {
-			error = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.');
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
 		} finally {
 			busy = false;
 		}
@@ -23,26 +23,35 @@
 </script>
 
 <svelte:head>
-	<title>Forgot password</title>
+	<title>비밀번호 찾기</title>
 </svelte:head>
 
-<main class="page">
-	<h1>Forgot password</h1>
+<main class="card">
+	<h1>비밀번호 찾기</h1>
 	{#if sent}
-		<p role="status">
-			If an account exists for {email}, we sent a link to reset the password. The link works once within 2 hours.
+		<p class="alert alert-info" role="status">
+			{email}로 가입한 계정이 있다면 비밀번호 재설정 링크를 보냈어요. 메일함을 확인해 주세요. 링크는 2시간 동안 한 번만
+			쓸 수 있어요.
 		</p>
 	{:else}
-		<form onsubmit={submit}>
-			<label>
-				Email
-				<input name="email" type="email" autocomplete="username" required bind:value={email} />
+		<p class="lead">가입한 이메일을 입력하면 비밀번호를 다시 정할 수 있는 링크를 보내 드려요.</p>
+		<form class="form" onsubmit={submit}>
+			<label class="field">
+				이메일
+				<input
+					name="email"
+					type="email"
+					autocomplete="username"
+					placeholder="name@example.com"
+					required
+					bind:value={email}
+				/>
 			</label>
 			{#if error}
-				<p class="error" role="alert">{error.message}</p>
+				<p class="alert alert-error" role="alert">{error.message}</p>
 			{/if}
-			<button type="submit" disabled={busy}>Send reset link</button>
+			<button type="submit" class="btn btn-primary btn-block" disabled={busy}>재설정 링크 받기</button>
 		</form>
 	{/if}
-	<p><a href="/login">Back to log in</a></p>
+	<p class="links"><a href="/login">로그인으로 돌아가기</a></p>
 </main>

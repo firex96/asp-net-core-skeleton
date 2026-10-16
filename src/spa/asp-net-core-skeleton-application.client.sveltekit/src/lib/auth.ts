@@ -33,9 +33,28 @@ export class ApiError extends Error {
 
 	static async from(response: Response): Promise<ApiError> {
 		const problem = (await response.json().catch(() => ({}))) as ProblemDetails;
-		const fieldErrors = problem.errors ? Object.values(problem.errors).flat() : [];
-		const message = problem.detail ?? problem.title ?? `The request failed (${response.status}).`;
+		// 검증 실패는 항목마다 문장이 온다 — 같은 문장은 한 번만(이메일 중복은 두 오류가 같은 문장이다)
+		const fieldErrors = problem.errors ? [...new Set(Object.values(problem.errors).flat())] : [];
+		const message = fieldErrors.length > 0 ? '입력한 내용을 확인해 주세요.' : (problem.detail ?? messageOf(response.status));
 		return new ApiError(response.status, problem.code, message, fieldErrors);
+	}
+
+	/** 서버까지 가지 못했거나 알 수 없는 실패. */
+	static unexpected(): ApiError {
+		return new ApiError(0, undefined, GENERIC_MESSAGE);
+	}
+}
+
+const GENERIC_MESSAGE = '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.';
+
+function messageOf(status: number): string {
+	switch (status) {
+		case 401:
+			return '로그인이 필요해요.';
+		case 403:
+			return '이 작업을 할 권한이 없어요.';
+		default:
+			return GENERIC_MESSAGE;
 	}
 }
 
@@ -121,18 +140,32 @@ export function isServerPath(url: string): boolean {
 
 /** 로그인 화면 · 계정 화면이 쿼리로 받는 결과 코드를 사람이 읽을 문장으로. */
 export function externalLoginMessage(error: string | null, provider: string | null): string | null {
-	const name = provider ?? 'social';
+	const name = providerName(provider);
 	switch (error) {
 		case null:
 			return null;
 		case 'EXTERNAL_LOGIN_NOT_LINKED_ERROR':
-			return `Your ${name} account is not linked yet. Log in with your password, then link it on the Account page.`;
+			return `아직 연결하지 않은 ${name} 계정이에요. 이메일로 로그인한 뒤 내 계정에서 연결해 주세요.`;
 		case 'EXTERNAL_LOGIN_IN_USE_ERROR':
-			return `That ${name} account is already linked to another user.`;
+			return `이 ${name} 계정은 이미 다른 회원과 연결돼 있어요.`;
 		case 'ACCOUNT_LOCKED_ERROR':
-			return 'Your account is locked after too many failed attempts. Try again later.';
+			return '로그인에 여러 번 실패해서 계정이 잠겼어요. 30분 뒤에 다시 시도하거나 비밀번호를 재설정해 주세요.';
 		default:
-			return 'Social login failed. Please try again.';
+			return '소셜 로그인을 마치지 못했어요. 다시 시도해 주세요.';
+	}
+}
+
+/** 공급자 이름(Google · Kakao · Naver)을 화면에 보일 이름으로. */
+export function providerName(provider: string | null): string {
+	switch (provider) {
+		case 'Kakao':
+			return '카카오';
+		case 'Naver':
+			return '네이버';
+		case null:
+			return '소셜';
+		default:
+			return provider;
 	}
 }
 

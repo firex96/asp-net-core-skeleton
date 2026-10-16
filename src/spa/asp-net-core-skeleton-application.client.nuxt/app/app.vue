@@ -22,40 +22,24 @@ async function logOut() {
 <template>
   <div>
     <NuxtRouteAnnouncer />
-    <header>
-      <NuxtLink to="/">
+    <header class="app-header">
+      <NuxtLink to="/" class="brand">
         AspNetCoreSkeletonApplication
       </NuxtLink>
-      <nav>
+      <nav class="nav">
         <template v-if="session.user.value">
-          <NuxtLink to="/account" class="user">
+          <NuxtLink to="/account">
             {{ session.user.value.email }}
           </NuxtLink>
-          <button type="button" @click="logOut">
-            Log out
+          <button type="button" class="btn btn-small" @click="logOut">
+            로그아웃
           </button>
         </template>
-        <NuxtLink v-else-if="session.user.value === null" :to="loginLink">
-          Log in
+        <NuxtLink v-else-if="session.user.value === null && route.path !== '/login'" :to="loginLink" class="btn btn-primary btn-small">
+          로그인
         </NuxtLink>
       </nav>
     </header>
     <NuxtPage />
   </div>
 </template>
-
-<style scoped>
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 2rem;
-  border-bottom: 1px solid #ddd;
-}
-
-nav {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-</style>

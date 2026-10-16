@@ -13,10 +13,10 @@ const busy = ref(false)
 const providers = ref<ExternalProvider[]>([])
 
 const returnUrl = computed(() => safeReturnUrl(typeof route.query.returnUrl === 'string' ? route.query.returnUrl : null))
-const title = computed(() => (mode.value === 'login' ? 'Log in' : 'Create account'))
+const title = computed(() => (mode.value === 'login' ? '로그인' : '회원가입'))
 const notice = computed(() =>
   externalLoginMessage(queryValue('error'), queryValue('provider'))
-  ?? (queryValue('reset') === 'done' ? 'Your password was changed. Log in with the new password.' : null),
+  ?? (queryValue('reset') === 'done' ? '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.' : null),
 )
 
 function queryValue(name: string): string | null {
@@ -56,7 +56,7 @@ function toggleMode() {
 
 async function submit() {
   if (mode.value === 'register' && password.value !== confirmPassword.value) {
-    error.value = new ApiError(400, undefined, 'Passwords do not match.')
+    error.value = new ApiError(400, undefined, '비밀번호가 서로 달라요. 다시 입력해 주세요.')
     return
   }
 
@@ -67,7 +67,7 @@ async function submit() {
     await continueTo(returnUrl.value)
   }
   catch (caught) {
-    error.value = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.')
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
   }
   finally {
     busy.value = false
@@ -76,20 +76,23 @@ async function submit() {
 </script>
 
 <template>
-  <main class="page">
+  <main class="card">
     <h1>{{ title }}</h1>
+    <p class="lead">
+      {{ mode === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.' }}
+    </p>
 
-    <p v-if="notice" class="notice" role="status">
+    <p v-if="notice" class="alert alert-info" role="status">
       {{ notice }}
     </p>
 
-    <form @submit.prevent="submit">
-      <label>
-        Email
-        <input v-model="email" name="email" type="email" autocomplete="username" required>
+    <form class="form" @submit.prevent="submit">
+      <label class="field">
+        이메일
+        <input v-model="email" name="email" type="email" autocomplete="username" placeholder="name@example.com" required>
       </label>
-      <label>
-        Password
+      <label class="field">
+        비밀번호
         <input
           v-model="password"
           name="password"
@@ -98,12 +101,17 @@ async function submit() {
           required
         >
       </label>
-      <label v-if="mode === 'register'">
-        Confirm password
-        <input v-model="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required>
-      </label>
+      <template v-if="mode === 'register'">
+        <label class="field">
+          비밀번호 확인
+          <input v-model="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required>
+        </label>
+        <p class="hint">
+          10자 이상, 영문 대문자 · 소문자와 숫자, 특수 문자를 섞어 주세요.
+        </p>
+      </template>
 
-      <div v-if="error" class="error" role="alert">
+      <div v-if="error" class="alert alert-error" role="alert">
         <p>{{ error.message }}</p>
         <ul v-if="error.fieldErrors.length > 0">
           <li v-for="message in error.fieldErrors" :key="message">
@@ -112,30 +120,38 @@ async function submit() {
         </ul>
       </div>
 
-      <button type="submit" :disabled="busy">
-        {{ title }}
+      <button type="submit" class="btn btn-primary btn-block" :disabled="busy">
+        {{ mode === 'login' ? '로그인' : '가입하기' }}
       </button>
     </form>
 
     <template v-if="mode === 'login'">
-      <p>
+      <template v-if="providers.length > 0">
+        <div class="divider">
+          또는
+        </div>
+        <div class="social">
+          <form v-for="provider in providers" :key="provider.name" method="post" :action="externalLoginAction(provider.name)">
+            <button type="submit" :class="`btn btn-block btn-${provider.name.toLowerCase()}`">
+              {{ provider.displayName }}로 계속하기
+            </button>
+          </form>
+        </div>
+      </template>
+
+      <p class="links">
         <NuxtLink to="/forgot-password">
-          Forgot your password?
+          비밀번호를 잊으셨나요?
         </NuxtLink>
+        <button type="button" class="link-button" @click="toggleMode">
+          회원가입
+        </button>
       </p>
-
-      <div v-if="providers.length > 0" class="social">
-        <form v-for="provider in providers" :key="provider.name" method="post" :action="externalLoginAction(provider.name)">
-          <button type="submit">
-            Continue with {{ provider.displayName }}
-          </button>
-        </form>
-      </div>
     </template>
-
-    <p>
-      <button type="button" class="link" @click="toggleMode">
-        {{ mode === 'login' ? 'Need an account? Create one' : 'Already have an account? Log in' }}
+    <p v-else class="links">
+      <span class="muted">이미 계정이 있나요?</span>
+      <button type="button" class="link-button" @click="toggleMode">
+        로그인
       </button>
     </p>
   </main>
