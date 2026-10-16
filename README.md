@@ -27,7 +27,8 @@
 | Angular | 22.2 (Vitest) |
 | SvelteKit / Svelte | 3.0 / 5 (adapter-static) |
 | Nuxt / Vue | 4.6 / 3.5 (`ssr: false`) |
-| 로컬 DB · 캐시 · 메일 | SQL Server 2022 · Redis 7.4 · Mailpit 컨테이너 (`docker-compose.yml`) |
+| 로컬 인프라 | SQL Server 2022 · Redis 7.4 · Mailpit · mock OAuth 컨테이너 (`docker-compose.yml`) |
+| 소셜 로그인 | Google(Microsoft) · Kakao · Naver(aspnet-contrib) OAuth 핸들러 |
 | 메일 | MailKit (SMTP) |
 | 캐시 | FusionCache (`HybridCache` 로 노출) — 메모리 L1 + Redis L2 + Redis 백플레인 |
 
@@ -102,7 +103,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 ### 6. 뜨는지 확인한다
 
 ```bash
-docker compose up -d                                    # SQL Server · Redis · Mailpit(http://localhost:8025) — mssql-init 이 skeleton DB 를 만든다
+docker compose up -d                                    # SQL Server · Redis · Mailpit(http://localhost:8025) · mock OAuth(8090) — mssql-init 이 skeleton DB 를 만든다
 dotnet tool restore                                     # dotnet-ef (dotnet-tools.json 에 버전 고정)
 ASPNETCORE_ENVIRONMENT=Local dotnet ef database update \
   --project src/common/AspNetCoreSkeletonApplication.Common \
@@ -394,6 +395,24 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 - **관리 API** (`authorization.manage`) — `/api/authorization/groups`(CRUD, `/{id}/members/{userId}` · `/{id}/roles/{roleId}` 는 PUT 추가 · DELETE 제거, 멱등), `/api/authorization/roles`(CRUD, 권한은 집합째 보낸다), `/api/authorization/permissions`(카탈로그). **마지막 `authorization.manage` 보유자를 없애는 변경은 409** 로 되돌린다 — 운영자가 스스로를 잠그지 않는다. 카탈로그 밖 코드는 400.
 - **시드** — 마이그레이션 `AddAuthorizationGroups` 가 그룹 `Administrators` 와 역할 `Administrator`(모든 권한)를 만든다. 첫 관리자는 가입한 뒤 SQL 로 그룹에 넣는다(아래). 그다음부터는 관리 API 로 한다.
 
+**소셜 로그인** (Google · Kakao · Naver, `Common/Web/ExternalLoginEndpoints`)
+
+- **연결된 계정만 로그인한다 — 자동 가입은 없다.** 연결은 로그인한 사용자가 계정 화면에서 한다. 공급자 이메일이 같다고 기존 계정에 붙이지 않는다(공급자 이메일 검증 여부에 기대지 않는다).
+- **공급자는 구성으로 켠다** — `Authentication:External:{Google|Kakao|Naver}` 섹션이 있는 것만. 섹션이 있으면 `ClientId` · `ClientSecret`(비밀값)은 필수다. 나머지 키는 핸들러 옵션에 그대로 묶인다(로컬은 엔드포인트 주소 · scope 를 mock 서버에 맞춘다). 공급자 콘솔에 등록할 redirect URI 는 `{출처}/api/auth/external/signin-{google|kakao|naver}` 다.
+- 패키지 — Google 은 `Microsoft.AspNetCore.Authentication.Google`, Kakao · Naver 는 aspnet-contrib 의 `AspNet.Security.OAuth.KakaoTalk` · `AspNet.Security.OAuth.Naver`.
+
+| 엔드포인트 (`/api/auth/external`) | 동작 |
+|---|---|
+| `GET /providers` | 켜진 공급자 `[{name, displayName}]` — SPA 가 버튼을 그린다 |
+| `POST /{provider}/login?returnUrl=` | 공급자 로그인으로 보낸다(브라우저 폼 이동). 연결된 계정이면 세션 쿠키를 받고 `returnUrl`(같은 출처 경로만)로, 아니면 `/login?error=EXTERNAL_LOGIN_NOT_LINKED_ERROR&provider=…` 로 돌아온다 |
+| `POST /{provider}/link` | 로그인 필요. 공급자 계정을 연결하고 `/account?linked=…` 로, 다른 사용자에게 이미 연결된 계정이면 `/account?error=EXTERNAL_LOGIN_IN_USE_ERROR` 로 돌아온다 |
+| `GET /logins` · `DELETE /{provider}` | 로그인 필요. 연결 목록 · 끊기(204). 마지막 로그인 수단(비밀번호 없음 + 마지막 연결)이면 409 `LAST_LOGIN_METHOD_ERROR` |
+
+- **시작은 POST 다** — cross-site POST 는 Fetch Metadata 가 막으므로 다른 사이트가 로그인 · 연결을 몰래 시작하지 못한다(로그인 CSRF, 원치 않는 연결).
+- **state · correlation 은 OAuth 핸들러가 검증한다.** 공급자 콜백(`signin-{공급자}`)이 외부 쿠키에 담고, 앱 콜백(`/api/auth/external/callback`)이 세션으로 바꾸거나 계정에 연결한 뒤 SPA 화면으로 보낸다. 토큰을 URL 에 싣지 않는다.
+- 콜백은 공급자에서 돌아오는 cross-site 이동이라 SameSite=Strict 세션 쿠키가 실리지 않는다. 그래서 연결할 사용자 ID 는 시작할 때 보호된 state 에 담아 둔다. 콜백 뒤 SPA 는 same-origin 요청으로 `/api/auth/me` 를 읽으므로 세션 쿠키가 실린다.
+- **로컬 · 테스트는 mock 서버로** — docker compose 의 `mock-oauth`(`ghcr.io/navikt/mock-oauth2-server`, http://localhost:8090)가 issuer 하나씩(`/google` · `/kakao` · `/naver`)으로 세 공급자를 흉내 내고, 로그인 화면 없이 고정된 사용자로 돌아온다(`docker/mock-oauth2-server.json` — Kakao 의 `kakao_account`, Naver 의 `response` 모양까지). 통합 테스트도 같은 파일로 컨테이너를 띄워 실제 핸들러로 왕복한다.
+
 **CSRF** — 쿠키가 SameSite=Strict 이고, 그 위에 **Fetch Metadata** 를 한 번 더 본다: 브라우저가 붙이는 `Sec-Fetch-Site` 가 `cross-site` 인 변경 요청(POST · PUT · PATCH · DELETE)은 403(`FetchMetadataMiddleware`, `UseSkeletonWeb` 에 들어 있다). antiforgery 토큰을 주고받지 않으므로 SPA 코드는 바꿀 것이 없다. 헤더가 없는 요청(서버 간 호출)은 막지 않는다.
 
 ```sql
@@ -527,7 +546,7 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND g.Name = 'Administrator
 |---|---|---|
 | `UnitTests` | 없음 | xUnit v3 |
 | `FunctionalTests` | 없음 — 앱을 메모리에 띄우고 DB 에는 붙지 않는다 | `WebApplicationFactory` |
-| `IntegrationTests` | **Docker** | Testcontainers (SQL Server · Redis · Mailpit · LocalStack) |
+| `IntegrationTests` | **Docker** | Testcontainers (SQL Server · Redis · Mailpit · mock OAuth · LocalStack) |
 
 ```bash
 dotnet test --solution AspNetCoreSkeletonApplication.slnx                       # 전부 — Docker 필요
@@ -545,7 +564,7 @@ dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.Integ
 | HTTP 계약(상태 코드 · JSON · 에러 응답) | `I~EntityService` 를 메모리 구현으로 바꿔 DB 없이 | `FunctionalTests` |
 | EntityService · 트랜잭션 · 감사 필드 | 대역 없음 — SQL Server 컨테이너에 마이그레이션을 적용해 HTTP 로 끝까지 | `IntegrationTests` |
 
-DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server · Redis · Mailpit 컨테이너는 `[Collection(InfrastructureCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름과 캐시 키 접두사를 달리한다 — 앱은 `InfrastructureFixture.ConfigureApp(builder, "<데이터베이스>")` 한 줄로 붙인다.
+DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server · Redis · Mailpit · mock OAuth 컨테이너는 `[Collection(InfrastructureCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름과 캐시 키 접두사를 달리한다 — 앱은 `InfrastructureFixture.ConfigureApp(builder, "<데이터베이스>")` 한 줄로 붙인다.
 
 SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 `npm test -- --watch=false` 로 단발 실행)다. 타입 검사는 SvelteKit · Nuxt 에서 `npm run check`.
 
@@ -563,7 +582,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | `Azure` | Azure Key Vault — 볼트의 모든 비밀 | `Azure:KeyVault:Endpoint`, `DefaultAzureCredential` |
 | `Gcp` | GCP Secret Manager — `Gcp:SecretManager:Secrets` 에 적은 비밀 | `Gcp:SecretManager:ProjectId`, Application Default Credentials |
 
-저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Server 는 SMTP 비밀번호 `Mail:Smtp:Password` 가, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 와 대시보드 비밀번호 `Batch:Dashboard:Password` 가 더 있다**(Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` · `Batch--Dashboard--Password` 를 추가한다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
+저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Server 는 SMTP 비밀번호 `Mail:Smtp:Password` 와 켠 소셜 공급자의 `Authentication:External:{공급자}:ClientSecret` 이, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 와 대시보드 비밀번호 `Batch:Dashboard:Password` 가 더 있다**(Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` · `Batch--Dashboard--Password`, 켠 공급자의 `Authentication--External--{공급자}--ClientSecret` 을 추가한다 — 목록의 비밀이 없으면 기동하다 멈추므로 켠 것만 적는다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
 
 ### 키 이름 대응
 

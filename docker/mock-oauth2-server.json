@@ -1,0 +1,60 @@
+{
+  "interactiveLogin": false,
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "google",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "*",
+          "claims": {
+            "sub": "google-user-1",
+            "email": "google-user@example.com",
+            "email_verified": true,
+            "name": "Google User"
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "kakao",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "*",
+          "claims": {
+            "sub": "424242",
+            "id": 424242,
+            "kakao_account": {
+              "email": "kakao-user@example.com",
+              "profile": { "nickname": "Kakao User" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "naver",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "*",
+          "claims": {
+            "sub": "naver-user-1",
+            "resultcode": "00",
+            "message": "success",
+            "response": {
+              "id": "naver-user-1",
+              "email": "naver-user@example.com",
+              "name": "Naver User"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

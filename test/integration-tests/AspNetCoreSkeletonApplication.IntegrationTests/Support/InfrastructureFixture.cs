@@ -10,7 +10,7 @@ using Testcontainers.Redis;
 namespace AspNetCoreSkeletonApplication.IntegrationTests.Support;
 
 /// <summary>
-/// SQL Server · Redis · Mailpit 컨테이너 한 벌을 테스트 클래스들이 함께 쓴다. 클래스마다 다른 데이터베이스 이름과 캐시 키 접두사를 써서
+/// SQL Server · Redis · Mailpit · mock OAuth 컨테이너 한 벌을 테스트 클래스들이 함께 쓴다. 클래스마다 다른 데이터베이스 이름과 캐시 키 접두사를 써서
 /// 서로 섞이지 않게 한다 — 앱을 띄울 때는 <see cref="ConfigureApp"/> 하나로 맞춘다.
 /// </summary>
 public sealed class InfrastructureFixture : IAsyncLifetime
@@ -27,6 +27,14 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(MailpitApiPort).ForPath("/livez")))
         .Build();
 
+    // 소셜 로그인 공급자 흉내 — Google · Kakao · Naver 를 issuer 하나씩. 설정은 docker compose 와 같은 파일이다.
+    private readonly IContainer _mockOAuth = new ContainerBuilder("ghcr.io/navikt/mock-oauth2-server:6.0.8")
+        .WithEnvironment("JSON_CONFIG", File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "mock-oauth2-server.json")))
+        .WithPortBinding(MockOAuthPort, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(MockOAuthPort).ForPath("/google/.well-known/openid-configuration")))
+        .Build();
+
+    private const ushort MockOAuthPort = 8080;
     private const ushort MailpitSmtpPort = 1025;
     private const ushort MailpitApiPort = 8025;
 
@@ -59,6 +67,16 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         builder.UseSetting("Mail:Smtp:Username", "test");
         builder.UseSetting("Mail:Smtp:Password", "test");
         builder.UseSetting("Mail:Smtp:From", "no-reply@spa.test");
+        foreach (var provider in new[] { "Google", "Kakao", "Naver" })
+        {
+            var issuer = $"http://{_mockOAuth.Hostname}:{_mockOAuth.GetMappedPublicPort(MockOAuthPort)}/{provider.ToLowerInvariant()}";
+            builder.UseSetting($"Authentication:External:{provider}:ClientId", "test");
+            builder.UseSetting($"Authentication:External:{provider}:ClientSecret", "test");
+            builder.UseSetting($"Authentication:External:{provider}:AuthorizationEndpoint", $"{issuer}/authorize");
+            builder.UseSetting($"Authentication:External:{provider}:TokenEndpoint", $"{issuer}/token");
+            builder.UseSetting($"Authentication:External:{provider}:UserInformationEndpoint", $"{issuer}/userinfo");
+            builder.UseSetting($"Authentication:External:{provider}:Scope:0", "openid"); // mock 서버가 요구한다
+        }
     }
 
     /// <summary>
@@ -74,10 +92,12 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         await dbContext.Database.MigrateAsync();
     }
 
-    public async ValueTask InitializeAsync() => await Task.WhenAll(_sqlServer.StartAsync(), _redis.StartAsync(), _mailpit.StartAsync());
+    public async ValueTask InitializeAsync() =>
+        await Task.WhenAll(_sqlServer.StartAsync(), _redis.StartAsync(), _mailpit.StartAsync(), _mockOAuth.StartAsync());
 
     public async ValueTask DisposeAsync()
     {
+        await _mockOAuth.DisposeAsync();
         await _mailpit.DisposeAsync();
         await _redis.DisposeAsync();
         await _sqlServer.DisposeAsync();

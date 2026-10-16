@@ -15,6 +15,9 @@ public sealed class ErrorCode(string code, int status, string divisionCode, stri
     public static readonly ErrorCode Conflict = new("CONFLICT_ERROR", 409, "G013", "Conflict");
     public static readonly ErrorCode AccountLocked = new("ACCOUNT_LOCKED_ERROR", 423, "AUTH001", "Account Locked");
     public static readonly ErrorCode InvalidToken = new("INVALID_TOKEN_ERROR", 400, "AUTH002", "Invalid Token");
+    public static readonly ErrorCode ExternalLoginNotLinked = new("EXTERNAL_LOGIN_NOT_LINKED_ERROR", 401, "AUTH003", "External Login Not Linked");
+    public static readonly ErrorCode ExternalLoginInUse = new("EXTERNAL_LOGIN_IN_USE_ERROR", 409, "AUTH004", "External Login In Use");
+    public static readonly ErrorCode LastLoginMethod = new("LAST_LOGIN_METHOD_ERROR", 409, "AUTH005", "Last Login Method");
     public static readonly ErrorCode ExternalApiError = new("EXTERNAL_API_ERROR", 502, "G014", "Bad Gateway");
     public static readonly ErrorCode InternalServerError = new("INTERNAL_SERVER_ERROR", 500, "G999", "Internal Server Error");
 

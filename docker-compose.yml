@@ -1,5 +1,5 @@
 # 로컬 개발용 인프라. Local 프로파일(appsettings.Local.json)의 연결 문자열과 짝이다.
-#   docker compose up -d      # 기동 — SQL Server · Redis · Mailpit. mssql-init 이 skeleton DB 를 만들고 끝난다
+#   docker compose up -d      # 기동 — SQL Server · Redis · Mailpit · mock OAuth. mssql-init 이 skeleton DB 를 만들고 끝난다
 #   docker compose down -v    # 데이터까지 삭제
 services:
   mssql:
@@ -54,6 +54,17 @@ services:
     ports:
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
       - "${MAILPIT_UI_PORT:-8025}:8025"
+
+  # 소셜 로그인 공급자 흉내 — Google · Kakao · Naver 를 issuer 하나씩(/google · /kakao · /naver)으로 흉내 낸다.
+  # 로그인 화면 없이 곧바로 고정된 사용자로 돌아온다(docker/mock-oauth2-server.json). 실제 공급자 자격증명 없이 흐름을 끝까지 본다.
+  mock-oauth:
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.8
+    environment:
+      JSON_CONFIG_PATH: /config/mock-oauth2-server.json
+    volumes:
+      - ./docker/mock-oauth2-server.json:/config/mock-oauth2-server.json:ro
+    ports:
+      - "${MOCK_OAUTH_PORT:-8090}:8080"
 
 volumes:
   mssql-data:

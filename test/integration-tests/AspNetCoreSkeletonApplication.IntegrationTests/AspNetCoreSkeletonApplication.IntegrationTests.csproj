@@ -16,4 +16,8 @@
     <ProjectReference Include="..\..\..\src\internal-api\AspNetCoreSkeletonApplication.InternalApi\AspNetCoreSkeletonApplication.InternalApi.csproj" />
     <!--#endif -->
   </ItemGroup>
+  <ItemGroup>
+    <!-- 소셜 로그인 mock 서버 설정 — docker compose 와 같은 파일을 쓴다 -->
+    <None Include="..\..\..\docker\mock-oauth2-server.json" Link="mock-oauth2-server.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
