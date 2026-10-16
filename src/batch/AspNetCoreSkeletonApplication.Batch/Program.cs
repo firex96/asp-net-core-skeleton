@@ -1,5 +1,6 @@
 using AspNetCoreSkeletonApplication.Batch.Configuration;
 using AspNetCoreSkeletonApplication.Batch.Product.Jobs;
+using AspNetCoreSkeletonApplication.Batch.Scheduling;
 using AspNetCoreSkeletonApplication.Batch.Security;
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;
@@ -39,7 +40,7 @@ public class Program
         builder.Services.AddQuartzDashboard(options =>
         {
             options.AuthorizationPolicy = BatchPolicies.Operator;
-            options.IsJobTypeAllowed = typeName => typeName.StartsWith(typeof(Program).Namespace + ".Jobs.", StringComparison.Ordinal);
+            options.IsJobTypeAllowed = DashboardJobTypeFilter.IsAllowed;
         });
 
         // 대시보드에 외부 DB 를 붙이지(attach) 않으므로 그 탐색 서비스는 할 일이 없다. Quartz 4.5.0 에서는 기동 직후 종료하면 이 서비스의
