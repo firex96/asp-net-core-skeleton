@@ -7,7 +7,7 @@ import type { ServerOptions } from 'vite';
 
 const certificateName = 'asp-net-core-skeleton-application.client.sveltekit';
 const port = 61195;
-const apiPaths = ['/weatherforecast', '/api'];
+const apiPaths = ['/weatherforecast', '/api', '/connect', '/.well-known'];
 
 export function aspNetCoreDevServer(): ServerOptions {
 	const baseFolder =

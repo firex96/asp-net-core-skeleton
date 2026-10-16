@@ -1,5 +1,9 @@
 <h1>{{ mode() === 'login' ? 'Log in' : 'Create account' }}</h1>
 
+@if (notice(); as notice) {
+  <p class="notice" role="status">{{ notice }}</p>
+}
+
 <form (ngSubmit)="submit()">
   <label>
     Email
@@ -33,6 +37,21 @@
 
   <button type="submit" [disabled]="busy()">{{ mode() === 'login' ? 'Log in' : 'Create account' }}</button>
 </form>
+
+@if (mode() === 'login') {
+  <p><a routerLink="/forgot-password">Forgot your password?</a></p>
+
+  @if (providers().length > 0) {
+    <div class="social">
+      @for (provider of providers(); track provider.name) {
+        <!-- ngNoForm — FormsModule 의 NgForm 이 브라우저 기본 제출을 막지 않게 한다(서버로 가는 진짜 폼 POST 다) -->
+        <form ngNoForm method="post" [attr.action]="externalLoginAction(provider.name)">
+          <button type="submit">Continue with {{ provider.displayName }}</button>
+        </form>
+      }
+    </div>
+  }
+}
 
 <p>
   <button type="button" class="link" (click)="toggleMode()">

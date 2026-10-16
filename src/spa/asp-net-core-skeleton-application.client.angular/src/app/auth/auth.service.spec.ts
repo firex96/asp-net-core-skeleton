@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { ApiError, safeReturnUrl } from './api-error';
 import { AuthService } from './auth.service';
+import { externalLoginMessage, isServerPath } from './navigation';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -66,6 +67,36 @@ describe('AuthService', () => {
     expect(error.fieldErrors).toEqual(['too short', 'digit']);
   });
 
+  it('requests a reset link and resets the password', async () => {
+    const forgot = service.forgotPassword(user.email);
+    const forgotRequest = httpMock.expectOne('/api/auth/password/forgot');
+    expect(forgotRequest.request.body).toEqual({ email: user.email });
+    forgotRequest.flush(null, { status: 202, statusText: 'Accepted' });
+    await forgot;
+
+    const reset = service.resetPassword(user.email, 'code-1', 'N3w-Passw0rd!');
+    const resetRequest = httpMock.expectOne('/api/auth/password/reset');
+    expect(resetRequest.request.body).toEqual({ email: user.email, code: 'code-1', newPassword: 'N3w-Passw0rd!' });
+    resetRequest.flush(null, { status: 204, statusText: 'No Content' });
+    await reset;
+  });
+
+  it('unlinks a social account with DELETE', async () => {
+    const result = service.unlink('Google');
+    const request = httpMock.expectOne('/api/auth/external/Google');
+    expect(request.request.method).toEqual('DELETE');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await result;
+  });
+
+  it('reads consent details for the client and scopes', async () => {
+    const result = service.consent('sample-app', 'openid email');
+    httpMock.expectOne('/api/oauth/consent?client_id=sample-app&scope=openid%20email')
+      .flush({ clientId: 'sample-app', displayName: 'Sample App', scopes: [] });
+
+    expect((await result).displayName).toBe('Sample App');
+  });
+
   it('clears the user on logout', async () => {
     service.user.set(user);
     const result = service.logout();
@@ -84,6 +115,18 @@ async function rejection(promise: Promise<unknown>): Promise<ApiError> {
   }
   throw new Error('expected the request to fail');
 }
+
+describe('navigation', () => {
+  it('sends server paths through a full page navigation', () => {
+    expect(isServerPath('/connect/authorize?client_id=a')).toBe(true);
+    expect(isServerPath('/products')).toBe(false);
+  });
+
+  it('explains social login results', () => {
+    expect(externalLoginMessage('EXTERNAL_LOGIN_IN_USE_ERROR', 'Naver')).toContain('Naver account is already linked');
+    expect(externalLoginMessage(null, null)).toBeNull();
+  });
+});
 
 describe('safeReturnUrl', () => {
   it.each([

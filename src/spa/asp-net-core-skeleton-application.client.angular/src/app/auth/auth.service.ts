@@ -10,6 +10,22 @@ export interface CurrentUser {
   permissions: string[];
 }
 
+export interface ExternalProvider {
+  name: string;
+  displayName: string;
+}
+
+export interface ExternalLogin {
+  provider: string;
+  displayName: string;
+}
+
+export interface ConsentDetails {
+  clientId: string;
+  displayName: string;
+  scopes: { name: string; description: string }[];
+}
+
 /**
  * 쿠키 세션 로그인. 세션 쿠키(HttpOnly)는 브라우저가 들고 다니므로 이 서비스는 토큰을 저장하지 않는다 —
  * 로그인 상태는 /api/auth/me 로만 확인한다.
@@ -49,6 +65,43 @@ export class AuthService {
   async logout(): Promise<void> {
     await this.post('/api/auth/logout');
     this.user.set(null);
+  }
+
+  /** 계정이 있든 없든 성공한다 — 서버가 가입 여부를 드러내지 않는다. */
+  forgotPassword(email: string): Promise<void> {
+    return this.post('/api/auth/password/forgot', { email });
+  }
+
+  resetPassword(email: string, code: string, newPassword: string): Promise<void> {
+    return this.post('/api/auth/password/reset', { email, code, newPassword });
+  }
+
+  listProviders(): Promise<ExternalProvider[]> {
+    return this.get<ExternalProvider[]>('/api/auth/external/providers');
+  }
+
+  listLogins(): Promise<ExternalLogin[]> {
+    return this.get<ExternalLogin[]>('/api/auth/external/logins');
+  }
+
+  async unlink(provider: string): Promise<void> {
+    try {
+      await firstValueFrom(this.http.delete(`/api/auth/external/${encodeURIComponent(provider)}`));
+    } catch (error) {
+      throw ApiError.from(error);
+    }
+  }
+
+  consent(clientId: string, scope: string): Promise<ConsentDetails> {
+    return this.get<ConsentDetails>(`/api/oauth/consent?client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}`);
+  }
+
+  private async get<T>(url: string): Promise<T> {
+    try {
+      return await firstValueFrom(this.http.get<T>(url));
+    } catch (error) {
+      throw ApiError.from(error);
+    }
   }
 
   private async post(url: string, body?: object): Promise<void> {

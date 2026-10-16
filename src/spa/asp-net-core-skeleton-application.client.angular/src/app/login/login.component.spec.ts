@@ -31,10 +31,20 @@ describe('LoginComponent', () => {
     httpMock.verify();
   });
 
-  it('shows the server message when login fails', async () => {
+  /** 화면을 띄우고 시작할 때 읽는 소셜 공급자 목록에 답한다. */
+  async function create(providers: { name: string; displayName: string }[] = []) {
     const fixture = TestBed.createComponent(LoginComponent);
     fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve));
+    httpMock.expectOne('/api/auth/external/providers').flush(providers);
+    await new Promise(resolve => setTimeout(resolve));
     await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('shows the server message when login fails', async () => {
+    const fixture = await create();
     const component = fixture.componentInstance;
     component.email = 'user@example.com';
     component.password = 'wrong';
@@ -50,9 +60,7 @@ describe('LoginComponent', () => {
   });
 
   it('rejects mismatched passwords before calling the server', async () => {
-    const fixture = TestBed.createComponent(LoginComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
+    const fixture = await create();
     const component = fixture.componentInstance;
     component.toggleMode();
     component.email = 'user@example.com';
@@ -67,9 +75,7 @@ describe('LoginComponent', () => {
   it('returns to a same-origin returnUrl after login', async () => {
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     queryParams = { returnUrl: '/products' };
-    const fixture = TestBed.createComponent(LoginComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
+    const fixture = await create();
     const component = fixture.componentInstance;
     component.email = 'user@example.com';
     component.password = 'Passw0rd!';
@@ -81,5 +87,23 @@ describe('LoginComponent', () => {
     await submitted;
 
     expect(navigate).toHaveBeenCalledWith('/products');
+  });
+
+  it('offers a form post per social provider that keeps the returnUrl', async () => {
+    queryParams = { returnUrl: '/products' };
+    const fixture = await create([{ name: 'Google', displayName: 'Google' }]);
+
+    const form = (fixture.nativeElement as HTMLElement).querySelector('.social form') as HTMLFormElement;
+    expect(form.getAttribute('method')).toBe('post');
+    // FormsModule 의 NgForm 은 브라우저 기본 제출을 막는다 — 서버로 가는 폼은 ngNoForm 이어야 한다(실제 제출은 브라우저로 확인)
+    expect(form.hasAttribute('ngnoform')).toBe(true);
+    expect(form.getAttribute('action')).toBe('/api/auth/external/Google/login?returnUrl=%2Fproducts');
+  });
+
+  it('explains an unlinked social account', async () => {
+    queryParams = { error: 'EXTERNAL_LOGIN_NOT_LINKED_ERROR', provider: 'Kakao' };
+    const fixture = await create();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role=status]')?.textContent).toContain('Kakao account is not linked');
   });
 });

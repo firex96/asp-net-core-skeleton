@@ -2,14 +2,16 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import '../app.css';
 	import favicon from '#lib/assets/favicon.svg';
 	import { refreshSession, session, signOut } from '#lib/session.svelte.js';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 
+	// 계정 화면들(로그인 · 비밀번호 찾기 · 재설정)에서는 돌아올 곳을 싣지 않는다 — 재설정 주소의 일회용 코드를 다른 주소로 옮기지 않는다.
 	const loginHref = $derived(
-		page.url.pathname === '/login'
+		['/login', '/forgot-password', '/reset-password'].includes(page.url.pathname)
 			? '/login'
 			: `/login?returnUrl=${encodeURIComponent(page.url.pathname + page.url.search)}`
 	);
@@ -32,7 +34,7 @@
 	<a href="/">AspNetCoreSkeletonApplication</a>
 	<nav>
 		{#if session.user}
-			<span class="user">{session.user.email}</span>
+			<a href="/account" class="user">{session.user.email}</a>
 			<button type="button" onclick={logOut}>Log out</button>
 		{:else if session.user === null}
 			<a href={loginHref}>Log in</a>

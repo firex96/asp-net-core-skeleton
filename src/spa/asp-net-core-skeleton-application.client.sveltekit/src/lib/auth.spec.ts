@@ -1,5 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, getCurrentUser, login, logout, register, safeReturnUrl } from './auth';
+import {
+	ApiError,
+	externalLoginMessage,
+	forgotPassword,
+	getConsent,
+	getCurrentUser,
+	isServerPath,
+	login,
+	logout,
+	register,
+	resetPassword,
+	safeReturnUrl,
+	unlink
+} from './auth';
 
 const user = { id: 7, email: 'user@example.com', permissions: [] };
 
@@ -75,6 +88,51 @@ describe('logout', () => {
 		await logout(fetchFn);
 
 		expect(fetchFn).toHaveBeenCalledWith('/api/auth/logout', { method: 'POST', headers: undefined, body: undefined });
+	});
+});
+
+describe('password reset', () => {
+	it('requests a link and then resets the password', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+
+		await forgotPassword(user.email, fetchFn);
+		await resetPassword(user.email, 'code-1', 'N3w-Passw0rd!', fetchFn);
+
+		expect(fetchFn.mock.calls.map(([url]) => url)).toEqual(['/api/auth/password/forgot', '/api/auth/password/reset']);
+		expect(fetchFn.mock.calls[1]?.[1]?.body).toBe(
+			JSON.stringify({ email: user.email, code: 'code-1', newPassword: 'N3w-Passw0rd!' })
+		);
+	});
+});
+
+describe('social accounts and consent', () => {
+	it('unlinks with DELETE and reports the last-method conflict', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () =>
+			Response.json({ code: 'LAST_LOGIN_METHOD_ERROR', detail: 'last' }, { status: 409 })
+		);
+
+		const error = (await unlink('Google', fetchFn).catch((caught: unknown) => caught)) as ApiError;
+
+		expect(fetchFn).toHaveBeenCalledWith('/api/auth/external/Google', { method: 'DELETE' });
+		expect(error.code).toBe('LAST_LOGIN_METHOD_ERROR');
+	});
+
+	it('reads consent details for the client and scopes', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () =>
+			Response.json({ clientId: 'sample-app', displayName: 'Sample App', scopes: [] })
+		);
+
+		const details = await getConsent('sample-app', 'openid email', fetchFn);
+
+		expect(fetchFn).toHaveBeenCalledWith('/api/oauth/consent?client_id=sample-app&scope=openid%20email');
+		expect(details.displayName).toBe('Sample App');
+	});
+
+	it('sends server paths through a full page navigation and explains results', () => {
+		expect(isServerPath('/connect/authorize?client_id=a')).toBe(true);
+		expect(isServerPath('/products')).toBe(false);
+		expect(externalLoginMessage('EXTERNAL_LOGIN_NOT_LINKED_ERROR', 'Kakao')).toContain('Kakao account is not linked');
+		expect(externalLoginMessage(null, null)).toBeNull();
 	});
 });
 

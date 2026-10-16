@@ -1,0 +1,53 @@
+/* 계정 화면들(로그인 · 비밀번호 · 계정 · 동의)이 함께 쓰는 폼 모양 */
+.page {
+  max-width: 24rem;
+  margin: 2rem auto;
+}
+
+.page form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.page label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.error {
+  color: #b00020;
+}
+
+.notice {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.social {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.providers {
+  list-style: none;
+  padding: 0;
+}
+
+.providers li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+}

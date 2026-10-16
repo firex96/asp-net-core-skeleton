@@ -84,7 +84,7 @@ SpaClient=nuxt dotnet run --launch-profile https   # 환경 변수로도 된다
 
 SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Choose` 에서 해당 `When` 과 `AspNetCoreSkeletonApplication.slnx` 의 해당 `Project` 를 지운다. 기본값이 지운 SPA 였다면 `SpaClient` 기본값도 바꾼다.
 
-세 SPA 는 같은 예제(`/weatherforecast` 표)와 같은 로그인 화면(`/login` — 로그인 · 가입, 상단 바의 로그인 상태 · 로그아웃)을 같은 방식으로 붙인다 — dev 서버는 `dotnet dev-certs` 인증서로 HTTPS 를 열고, `/weatherforecast` · `/api` 를 ASP.NET Core 로 프록시한다(`ASPNETCORE_HTTPS_PORT` · `ASPNETCORE_URLS` 로 대상 결정). API 를 dev 서버 출처로 프록시하므로 세션 쿠키가 SPA 와 같은 출처에 저장되고, Fetch Metadata 검사도 same-origin 으로 통과한다. 로그인 상태는 `/api/auth/me` 로만 확인한다(쿠키는 HttpOnly 라 JS 가 읽지 않는다).
+세 SPA 는 같은 예제(`/weatherforecast` 표)와 같은 계정 화면을 같은 방식으로 붙인다 — `/login`(로그인 · 가입 · 소셜 로그인 버튼), `/forgot-password` · `/reset-password`(메일 링크로 재설정), `/account`(권한 · 소셜 계정 연결 · 끊기), `/consent`(OAuth 동의), 상단 바의 로그인 상태 · 로그아웃. dev 서버는 `dotnet dev-certs` 인증서로 HTTPS 를 열고, `/weatherforecast` · `/api` · `/connect` · `/.well-known` 을 ASP.NET Core 로 프록시한다(`ASPNETCORE_HTTPS_PORT` · `ASPNETCORE_URLS` 로 대상 결정). API 를 dev 서버 출처로 프록시하므로 세션 쿠키가 SPA 와 같은 출처에 저장되고, Fetch Metadata 검사도 same-origin 으로 통과한다. 로그인 상태는 `/api/auth/me` 로만 확인한다(쿠키는 HttpOnly 라 JS 가 읽지 않는다). 소셜 로그인 · 연결과 OAuth 동의는 서버로 가는 진짜 폼 POST 이고, 백엔드가 콜백 · OAuth 주소를 dev 서버 출처로 만들도록 프록시는 Host 를 바꾸지 않는다. 기본 SPA(Angular)가 아닌 SPA 로 띄우면 메일 링크 · issuer 출처를 맞춘다 — `App__PublicOrigin=https://localhost:61195 dotnet run … -p:SpaClient=sveltekit`.
 
 ### 4. 비밀값 출처를 고른다
 
@@ -443,7 +443,7 @@ Server 는 **OAuth 2.0 인가 서버 + OpenID Connect**(OpenIddict)이기도 하
 - **scope = 권한** — scope 는 OIDC 표준 넷(`openid` · `profile` · `email` · `offline_access`)과 **권한 코드 카탈로그 전부**다. 클라이언트는 등록된 scope 만 요청할 수 있다.
 - **클라이언트는 구성으로 등록한다** — `Authentication:OAuthServer:Clients[]`(`ClientId`, `ClientSecret`(있으면 기밀 클라이언트 — 비밀값), `DisplayName`, `ConsentType`, `GrantTypes`, `RedirectUris`, `PostLogoutRedirectUris`, `Scopes`). 기동할 때 저장소와 맞춘다(만들거나 고친다). 구성에서 빠진 클라이언트는 지우지 않는다. 클라이언트 자격 증명을 쓰는 클라이언트는 비밀이 필수다.
 - **키** — `Authentication:OAuthServer:KeySource`(기본값 없음). `Certificates` 는 서명 · 암호화 X.509 인증서 둘(`SigningCertificate` · `EncryptionCertificate`, PKCS#12 base64, 비밀값)로 모든 인스턴스가 같은 키를 쓴다. `Ephemeral` 은 기동할 때마다 새 키라 **로컬 · 테스트 전용**이다(재기동하면 토큰이 무효, 인스턴스끼리 서로의 토큰을 못 읽는다). 액세스 토큰은 암호화된 JWT 다 — 이 서버만 읽는다.
-- **issuer 는 `App:PublicOrigin`** — 사용자가 여는 출처와 같다(로컬은 SPA dev 서버 출처).
+- **issuer 는 `App:PublicOrigin`** — 사용자가 여는 출처와 같다. 로컬은 SPA dev 서버 출처이고, dev 서버가 `/connect` · `/.well-known` 도 백엔드로 넘긴다. 로그인 화면은 돌아갈 곳이 `/connect/…` 이면 라우터가 아니라 브라우저 이동으로 간다.
 - **저장소** — `oauth_application` · `oauth_authorization` · `oauth_scope` · `oauth_token`(마이그레이션 `AddOAuthServer`, 프레임워크 테이블).
 - **로컬 샘플 클라이언트** — `sample-app`(공개, 인가 코드 + PKCE, 동의 화면, redirect `http://localhost:8091/callback` — 아무것도 듣지 않으므로 주소창에서 `code` 를 읽는다), `sample-service`(기밀, 클라이언트 자격 증명). 예:
 

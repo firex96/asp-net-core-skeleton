@@ -6,7 +6,7 @@ import { env } from 'node:process'
 
 const certificateName = 'asp-net-core-skeleton-application.client.nuxt'
 const port = 61196
-const apiPaths = ['/weatherforecast', '/api']
+const apiPaths = ['/weatherforecast', '/api', '/connect', '/.well-known']
 
 export function aspNetCoreDevServer() {
   const baseFolder
@@ -45,7 +45,8 @@ export function aspNetCoreDevServer() {
       https: { cert: certFilePath, key: keyFilePath },
     },
     devProxy: Object.fromEntries(
-      apiPaths.map(apiPath => [apiPath, { target: `${target}${apiPath}`, changeOrigin: true, secure: false }]),
+      // Host 는 바꾸지 않는다 — 백엔드가 소셜 로그인 콜백 · OAuth 주소를 브라우저가 보는 dev 서버 출처로 만들어야 쿠키가 같은 출처에 남는다.
+      apiPaths.map(apiPath => [apiPath, { target: `${target}${apiPath}`, changeOrigin: false, secure: false }]),
     ),
   }
 }

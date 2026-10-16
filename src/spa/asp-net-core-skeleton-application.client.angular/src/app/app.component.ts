@@ -18,8 +18,10 @@ export class AppComponent implements OnInit {
     this.auth.refresh().catch(error => console.error(error));
   }
 
+  /** 계정 화면들(로그인 · 비밀번호 찾기 · 재설정)에서는 돌아올 곳을 싣지 않는다 — 재설정 주소의 일회용 코드를 다른 주소로 옮기지 않는다. */
   get loginQueryParams() {
-    return this.router.url.startsWith('/login') ? {} : { returnUrl: this.router.url };
+    const path = this.router.url.split('?')[0];
+    return ['/login', '/forgot-password', '/reset-password'].includes(path) ? {} : { returnUrl: this.router.url };
   }
 
   async logout() {

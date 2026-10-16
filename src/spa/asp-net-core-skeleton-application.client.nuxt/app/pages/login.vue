@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// 로그인과 가입을 한 화면에서 전환한다. 성공하면 returnUrl(같은 출처 경로만)로 돌아간다.
+// 로그인과 가입을 한 화면에서 전환한다. 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
+// 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
 const session = useSession()
 const route = useRoute()
 
@@ -9,17 +10,43 @@ const password = ref('')
 const confirmPassword = ref('')
 const error = ref<ApiError | null>(null)
 const busy = ref(false)
+const providers = ref<ExternalProvider[]>([])
 
 const returnUrl = computed(() => safeReturnUrl(typeof route.query.returnUrl === 'string' ? route.query.returnUrl : null))
 const title = computed(() => (mode.value === 'login' ? 'Log in' : 'Create account'))
+const notice = computed(() =>
+  externalLoginMessage(queryValue('error'), queryValue('provider'))
+  ?? (queryValue('reset') === 'done' ? 'Your password was changed. Log in with the new password.' : null),
+)
+
+function queryValue(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' ? value : null
+}
+
+function externalLoginAction(provider: string): string {
+  return `/api/auth/external/${encodeURIComponent(provider)}/login?returnUrl=${encodeURIComponent(returnUrl.value)}`
+}
+
+async function continueTo(target: string) {
+  if (isServerPath(target)) {
+    window.location.assign(target)
+    return
+  }
+
+  await navigateTo(target)
+}
 
 useHead({ title })
 
 onMounted(async () => {
   const user = session.user.value === undefined ? await session.refresh() : session.user.value
   if (user) {
-    await navigateTo(returnUrl.value)
+    await continueTo(returnUrl.value)
+    return
   }
+
+  providers.value = await listProviders().catch(() => [])
 })
 
 function toggleMode() {
@@ -37,7 +64,7 @@ async function submit() {
   error.value = null
   try {
     await (mode.value === 'login' ? session.signIn(email.value, password.value) : session.signUp(email.value, password.value))
-    await navigateTo(returnUrl.value)
+    await continueTo(returnUrl.value)
   }
   catch (caught) {
     error.value = caught instanceof ApiError ? caught : new ApiError(0, undefined, 'The request failed. Please try again.')
@@ -49,8 +76,12 @@ async function submit() {
 </script>
 
 <template>
-  <main>
+  <main class="page">
     <h1>{{ title }}</h1>
+
+    <p v-if="notice" class="notice" role="status">
+      {{ notice }}
+    </p>
 
     <form @submit.prevent="submit">
       <label>
@@ -86,6 +117,22 @@ async function submit() {
       </button>
     </form>
 
+    <template v-if="mode === 'login'">
+      <p>
+        <NuxtLink to="/forgot-password">
+          Forgot your password?
+        </NuxtLink>
+      </p>
+
+      <div v-if="providers.length > 0" class="social">
+        <form v-for="provider in providers" :key="provider.name" method="post" :action="externalLoginAction(provider.name)">
+          <button type="submit">
+            Continue with {{ provider.displayName }}
+          </button>
+        </form>
+      </div>
+    </template>
+
     <p>
       <button type="button" class="link" @click="toggleMode">
         {{ mode === 'login' ? 'Need an account? Create one' : 'Already have an account? Log in' }}
@@ -93,34 +140,3 @@ async function submit() {
     </p>
   </main>
 </template>
-
-<style scoped>
-main {
-  max-width: 24rem;
-  margin: 2rem auto;
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.error {
-  color: #b00020;
-}
-
-.link {
-  background: none;
-  border: none;
-  color: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-</style>

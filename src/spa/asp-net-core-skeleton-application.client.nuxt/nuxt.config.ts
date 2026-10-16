@@ -9,6 +9,8 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   // SPA 모드: ASP.NET Core 가 nuxt generate 산출물(.output/public)을 wwwroot 로 서빙한다.
   ssr: false,
+  // 계정 화면들(로그인 · 비밀번호 · 계정 · 동의)이 함께 쓰는 폼 모양
+  css: ['~/assets/css/forms.css'],
   app: {
     head: { title: 'AspNetCoreSkeletonApplication' },
   },
