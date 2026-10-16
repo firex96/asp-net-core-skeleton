@@ -56,6 +56,10 @@
     <Error Text="알 수 없는 SpaClient '$(SpaClient)'. angular, sveltekit, nuxt 중 하나를 지정하세요." />
   </Target>
   <ItemGroup>
+    <!-- Local 프로파일이 App:PublicOrigin(메일 링크 · OAuth issuer) 기본값으로 쓴다 — 고른 SPA 의 dev 서버 출처(SecretSourceExtensions) -->
+    <AssemblyMetadata Include="SpaProxyServerUrl" Value="$(SpaProxyServerUrl)" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
     <!-- dotnet ef 의 시작 프로젝트 요건 (마이그레이션은 Common 에 있다) -->

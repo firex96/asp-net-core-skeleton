@@ -27,8 +27,25 @@ public class SecretSourceExtensionsTests
 
         SecretSourceExtensions.AddSecretSource(configuration, SecretSourceExtensions.Local, typeof(Program).Assembly);
 
-        var added = Assert.Single(((IConfigurationBuilder)configuration).Sources.Skip(sourceCount));
+        var added = Assert.Single(((IConfigurationBuilder)configuration).Sources.Skip(sourceCount + 1));
         Assert.Equal("secrets.json", Assert.IsType<JsonConfigurationSource>(added).Path);
+    }
+
+    [Fact]
+    public void AddSecretSource_Local_DefaultsPublicOriginToTheChosenSpa_ButAnythingElseWins()
+    {
+        var spaOrigin = typeof(Program).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+            .Cast<System.Reflection.AssemblyMetadataAttribute>().Single(metadata => metadata.Key == SecretSourceExtensions.SpaProxyServerUrlMetadata).Value;
+        var defaulted = new ConfigurationManager();
+        var overridden = new ConfigurationManager();
+        overridden.AddInMemoryCollection(new Dictionary<string, string?> { ["App:PublicOrigin"] = "https://shop.example.com" });
+
+        SecretSourceExtensions.AddSecretSource(defaulted, SecretSourceExtensions.Local, typeof(Program).Assembly);
+        SecretSourceExtensions.AddSecretSource(overridden, SecretSourceExtensions.Local, typeof(Program).Assembly);
+
+        Assert.StartsWith("https://localhost:", spaOrigin, StringComparison.Ordinal);
+        Assert.Equal(spaOrigin, defaulted["App:PublicOrigin"]);
+        Assert.Equal("https://shop.example.com", overridden["App:PublicOrigin"]);
     }
 
     [Theory]

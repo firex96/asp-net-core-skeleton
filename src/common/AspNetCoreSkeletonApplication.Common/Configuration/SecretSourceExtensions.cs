@@ -4,6 +4,7 @@ using Azure.Identity;
 using System.Reflection;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.Hosting;
 
 namespace AspNetCoreSkeletonApplication.Common.Configuration;
@@ -11,7 +12,8 @@ namespace AspNetCoreSkeletonApplication.Common.Configuration;
 /// <summary>
 /// 실행 프로파일별 비밀값 출처를 구성에 붙인다. 프로파일은 비밀값을 어디서 읽을지만 고른다.
 /// <list type="bullet">
-/// <item><c>Local</c> — appsettings.Local.json(docker compose 값) + user-secrets</item>
+/// <item><c>Local</c> — appsettings.Local.json(docker compose 값) + user-secrets. 메일 링크 · OAuth issuer 출처(<c>App:PublicOrigin</c>)의 기본값은
+/// 앱이 빌드할 때 고른 SPA 의 dev 서버 출처(어셈블리 메타데이터 <c>SpaProxyServerUrl</c>)다 — 가장 약한 값이라 다른 구성이 덮어쓴다.</item>
 /// <item><c>Aws</c> — AWS Secrets Manager 의 JSON 비밀 하나</item>
 /// <item><c>Azure</c> — Azure Key Vault 의 모든 비밀</item>
 /// <item><c>Gcp</c> — GCP Secret Manager 에서 이름을 적은 비밀만</item>
@@ -44,6 +46,7 @@ public static class SecretSourceExtensions
         {
             // user-secrets 는 Development 환경에서만 자동으로 읽히므로 Local 에서 명시적으로 추가한다.
             configuration.AddUserSecrets(userSecretsAssembly, optional: true);
+            AddLocalSpaOrigin(configuration, userSecretsAssembly);
         }
         else if (Is(environmentName, Aws))
         {
@@ -77,6 +80,27 @@ public static class SecretSourceExtensions
         }
 
         return configuration;
+    }
+
+    public const string SpaProxyServerUrlMetadata = "SpaProxyServerUrl";
+
+    /// <summary>
+    /// 고른 SPA(<c>SpaClient</c>)의 dev 서버 출처를 <c>App:PublicOrigin</c> 의 기본값으로 — 구성 소스 맨 앞(가장 약한 자리)에 넣어
+    /// appsettings · 환경변수 · user-secrets 가 덮어쓴다. SPA 를 서빙하지 않는 앱(메타데이터 없음)은 넣지 않는다.
+    /// </summary>
+    private static void AddLocalSpaOrigin(IConfigurationManager configuration, Assembly appAssembly)
+    {
+        var spaOrigin = appAssembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(metadata => metadata.Key == SpaProxyServerUrlMetadata)?.Value;
+        if (string.IsNullOrEmpty(spaOrigin))
+        {
+            return;
+        }
+
+        configuration.Sources.Insert(0, new MemoryConfigurationSource
+        {
+            InitialData = new Dictionary<string, string?> { ["App:PublicOrigin"] = spaOrigin },
+        });
     }
 
     /// <summary>

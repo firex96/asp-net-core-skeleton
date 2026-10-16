@@ -84,7 +84,7 @@ SpaClient=nuxt dotnet run --launch-profile https   # 환경 변수로도 된다
 
 SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Choose` 에서 해당 `When` 과 `AspNetCoreSkeletonApplication.slnx` 의 해당 `Project` 를 지운다. 기본값이 지운 SPA 였다면 `SpaClient` 기본값도 바꾼다.
 
-세 SPA 는 같은 예제(`/weatherforecast` 표)와 같은 계정 화면을 같은 방식으로 붙인다 — `/login`(로그인 · 가입 · 소셜 로그인 버튼), `/forgot-password` · `/reset-password`(메일 링크로 재설정), `/account`(권한 · 소셜 계정 연결 · 끊기), `/consent`(OAuth 동의), 상단 바의 로그인 상태 · 로그아웃. dev 서버는 `dotnet dev-certs` 인증서로 HTTPS 를 열고, `/weatherforecast` · `/api` · `/connect` · `/.well-known` 을 ASP.NET Core 로 프록시한다(`ASPNETCORE_HTTPS_PORT` · `ASPNETCORE_URLS` 로 대상 결정). API 를 dev 서버 출처로 프록시하므로 세션 쿠키가 SPA 와 같은 출처에 저장되고, Fetch Metadata 검사도 same-origin 으로 통과한다. 로그인 상태는 `/api/auth/me` 로만 확인한다(쿠키는 HttpOnly 라 JS 가 읽지 않는다). 소셜 로그인 · 연결과 OAuth 동의는 서버로 가는 진짜 폼 POST 이고, 백엔드가 콜백 · OAuth 주소를 dev 서버 출처로 만들도록 프록시는 Host 를 바꾸지 않는다. 기본 SPA(Angular)가 아닌 SPA 로 띄우면 메일 링크 · issuer 출처를 맞춘다 — `App__PublicOrigin=https://localhost:61195 dotnet run … -p:SpaClient=sveltekit`.
+세 SPA 는 같은 예제(`/weatherforecast` 표)와 같은 계정 화면을 같은 방식으로 붙인다 — `/login`(로그인 · 가입 · 소셜 로그인 버튼), `/forgot-password` · `/reset-password`(메일 링크로 재설정), `/account`(권한 · 소셜 계정 연결 · 끊기), `/consent`(OAuth 동의), 상단 바의 로그인 상태 · 로그아웃. dev 서버는 `dotnet dev-certs` 인증서로 HTTPS 를 열고, `/weatherforecast` · `/api` · `/connect` · `/.well-known` 을 ASP.NET Core 로 프록시한다(`ASPNETCORE_HTTPS_PORT` · `ASPNETCORE_URLS` 로 대상 결정). API 를 dev 서버 출처로 프록시하므로 세션 쿠키가 SPA 와 같은 출처에 저장되고, Fetch Metadata 검사도 same-origin 으로 통과한다. 로그인 상태는 `/api/auth/me` 로만 확인한다(쿠키는 HttpOnly 라 JS 가 읽지 않는다). 소셜 로그인 · 연결과 OAuth 동의는 서버로 가는 진짜 폼 POST 이고, 백엔드가 콜백 · OAuth 주소를 dev 서버 출처로 만들도록 프록시는 Host 를 바꾸지 않는다. 메일 링크 · issuer 출처(`App:PublicOrigin`)는 Local 프로파일이 고른 SPA 의 dev 서버 출처로 맞춘다 — `-p:SpaClient=sveltekit` 로 띄우면 `https://localhost:61195` 다.
 
 화면 문구는 한국어(해요체)이고, 스타일은 의존성 없는 공통 CSS 하나다 — Angular `src/styles.css`, SvelteKit `src/app.css`, Nuxt `app/assets/css/app.css` 가 같은 내용이다(색은 `:root` 변수, 라이트 · 다크는 시스템 설정). 디자인을 바꾸면 세 파일을 함께 고친다.
 
@@ -509,7 +509,7 @@ curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
 - **링크 출처는 구성으로만** — `App:PublicOrigin`. 요청의 Host · Origin 헤더로 만들면 공격자가 헤더를 바꿔 남의 재설정 토큰을 자기 서버로 받아 간다.
 - **SMTP 는 언제나 인증한다**(`Mail:Smtp:Username` · `Password` 필수) — 인증 여부로 갈리는 분기를 두지 않는다. 로컬 Mailpit 은 아무 계정이나 받도록 띄운다.
 - **본문은 로그에 남기지 않는다**(링크에 토큰이 있다). 로그에는 가린 받는 주소(`ab***@example.com`)와 제목만 남는다. 전송이 실패하면 `IMailClient` 가 예외를 던지고 아웃박스가 다시 시도한다 — 보냈다고 가정하지 않는다.
-- **로컬** — `docker compose up -d` 의 Mailpit 이 SMTP 1025 로 받고, 받은 메일은 http://localhost:8025 에서 본다. 밖으로 나가지 않는다. 기본 SPA 가 아닌 SPA 로 띄우면 링크 출처를 바꾼다(`App__PublicOrigin=https://localhost:61196`). 템플릿으로 만들면 고른 SPA 의 출처가 들어간다.
+- **로컬** — `docker compose up -d` 의 Mailpit 이 SMTP 1025 로 받고, 받은 메일은 http://localhost:8025 에서 본다. 밖으로 나가지 않는다. 링크 출처는 Local 프로파일이 고른 SPA(`SpaClient`)의 dev 서버 출처로 정한다 — 서버 csproj 가 `SpaProxyServerUrl` 을 어셈블리 메타데이터로 싣고 `SecretSourceExtensions` 의 Local 분기가 가장 약한 기본값으로 넣는다. 다른 값을 쓰려면 `App__PublicOrigin` 이나 user-secrets 로 덮어쓴다.
 - **테스트** — 통합 · 브라우저 테스트가 Mailpit 컨테이너의 REST API(`/api/v1/search` · `/api/v1/message/{ID}`)로 메일을 읽어 링크를 따라간다. 아웃박스를 거치므로 메일이 올 때까지 기다린다(테스트 구성은 `PollInterval` 0.2초). "보내지 않았다" 는 아웃박스에 행이 없는지로 확인한다.
 
 ## 아키텍처 선택
@@ -682,7 +682,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | Azure Key Vault · GCP Secret Manager 비밀 이름 | `:` → `--` | `ConnectionStrings--Default` |
 | AWS Secrets Manager JSON 비밀의 키 | 구성 키 그대로 | `{"ConnectionStrings:Default": "…"}` |
 
-Server 는 비밀이 아니어도 배포마다 꼭 정해야 하는 값이 있다 — `App:PublicOrigin`(사용자가 여는 SPA 출처, 메일 링크와 OAuth issuer 에 쓴다), `Mail:Smtp:Host` · `Username` · `From`, `Authentication:OAuthServer:KeySource`. 기본값이 없어 빠지면 기동할 때 키 이름을 담아 멈춘다.
+Server 는 비밀이 아니어도 배포마다 꼭 정해야 하는 값이 있다 — `App:PublicOrigin`(사용자가 여는 SPA 출처, 메일 링크와 OAuth issuer 에 쓴다. Local 프로파일만 고른 SPA 의 dev 서버 출처가 기본값이다), `Mail:Smtp:Host` · `Username` · `From`, `Authentication:OAuthServer:KeySource`. 기본값이 없어 빠지면 기동할 때 키 이름을 담아 멈춘다.
 
 비밀이 아닌 환경별 값은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — SMTP 포트 · 보안 `Mail:Smtp:Port`(587) · `Security`(`StartTls`), 외부 API 주소 `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`, 감사 헤더 신뢰 `Audit:TrustUserHeader` ← `Audit__TrustUserHeader`, 느린 쿼리 · 요청 임계값 `Diagnostics:*`.
 

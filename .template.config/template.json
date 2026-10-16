@@ -64,35 +64,6 @@
       "description": "배치 앱(Batch — Quartz.NET 스케줄 · 웹훅 · 대시보드)을 함께 만든다 — Common 을 같이 쓴다",
       "defaultValue": "true"
     },
-    "publicOrigin": {
-      "type": "generated",
-      "generator": "switch",
-      "description": "Local 프로파일의 App:PublicOrigin — 고른 SPA 의 dev 서버 출처(메일 링크가 가리킨다)",
-      "replaces": "https://localhost:61194",
-      "onlyIf": [
-        {
-          "after": "\"PublicOrigin\": \""
-        }
-      ],
-      "parameters": {
-        "evaluator": "C++",
-        "datatype": "string",
-        "cases": [
-          {
-            "condition": "(frontend == \"sveltekit\")",
-            "value": "https://localhost:61195"
-          },
-          {
-            "condition": "(frontend == \"nuxt\")",
-            "value": "https://localhost:61196"
-          },
-          {
-            "condition": "(true)",
-            "value": "https://localhost:61194"
-          }
-        ]
-      }
-    },
     "pruneTokensInServer": {
       "type": "generated",
       "generator": "switch",

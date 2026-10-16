@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- Local 프로파일의 `App:PublicOrigin` 기본값 — 고른 SPA(`SpaClient`)의 dev 서버 출처(서버 어셈블리 메타데이터 `SpaProxyServerUrl`). 다른 SPA 로 띄울 때 `App__PublicOrigin` 을 맞추지 않아도 된다. `appsettings.Local.json` 의 값과 템플릿의 `publicOrigin` 치환은 없앴다
 - Batch 없이 만든 앱의 OAuth 토큰 정리 — `Authentication:OAuthServer:TokenPruning:RunInServer` 면 Server 의 `OAuthTokenPruneWorker` 가 Batch Job 과 같은 규칙으로 정리한다(기본 false, 템플릿 `--batch false` 가 true 로 만든다)
 - 구성에서 뺀 OAuth 클라이언트의 사용 중지 — 기동할 때 구성에 없는 클라이언트의 권한을 모두 비운다(지우지 않는다, 경고 로그). 다시 넣으면 다시 켜진다
 - OAuth 서버 키 교체 — 서명 · 암호화 인증서를 배열(`SigningCertificates[]` · `EncryptionCertificates[]`)로 겹쳐 둔다. 지금 유효한 것 중 만료가 가장 늦은 인증서로 서명하고 JWKS 에는 모두 싣는다 — 새 인증서를 유효 시작을 미래로 미리 넣고, 그 시각 뒤 재기동하고, 가장 긴 토큰 수명 뒤에 이전 것을 뺀다(README). 단일 키 `SigningCertificate` · `EncryptionCertificate` 는 없앴다(Gcp `Secrets` 도 `…Certificates--0`)
