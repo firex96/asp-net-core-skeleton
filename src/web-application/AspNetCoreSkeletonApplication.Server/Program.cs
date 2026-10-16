@@ -49,6 +49,8 @@ if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 
 app.UseHttpsRedirection();
 
+// 다른 출처의 브라우저 앱이 OAuth 엔드포인트를 부를 수 있게(구성 AllowedOrigins) — OpenIddict 가 처리하기 전, 인증 앞에 둔다.
+app.UseSkeletonOAuthServerCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAuditorContext();

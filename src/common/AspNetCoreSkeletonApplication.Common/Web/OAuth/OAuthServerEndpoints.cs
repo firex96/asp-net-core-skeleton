@@ -31,6 +31,18 @@ public static class OAuthServerEndpoints
 {
     public const string ClientSubjectPrefix = "client:";
 
+    /// <summary>다른 출처의 브라우저 앱에 여는 CORS 정책 — 구성 <c>Authentication:OAuthServer:AllowedOrigins</c>.</summary>
+    public const string CorsPolicy = "OAuthServer";
+
+    /// <summary>
+    /// OAuth 엔드포인트(<c>/connect/*</c> · <c>/.well-known/*</c>)에만 CORS 를 건다. OpenIddict 는 이 요청을 라우팅된 엔드포인트가 아니라 인증 단계에서
+    /// 처리하므로(탐색 문서 · JWKS 는 거기서 끝난다) 경로로 고르고, <c>UseAuthentication</c> 앞에 둔다.
+    /// </summary>
+    public static IApplicationBuilder UseSkeletonOAuthServerCors(this IApplicationBuilder app) =>
+        app.UseWhen(
+            context => context.Request.Path.StartsWithSegments("/connect") || context.Request.Path.StartsWithSegments("/.well-known"),
+            branch => branch.UseCors(CorsPolicy));
+
     public static IEndpointRouteBuilder MapSkeletonOAuthServerEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], AuthorizeAsync).AllowAnonymous();

@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 다른 출처의 브라우저 앱이 OAuth 엔드포인트를 쓴다 — 구성 `Authentication:OAuthServer:AllowedOrigins` 의 출처에만 `/connect/*` · `/.well-known/*` CORS(GET · POST, 자격 증명 없음, `UseSkeletonOAuthServerCors`). Fetch Metadata 는 세션 쿠키가 실린 cross-site 변경 요청만 막는다 — 쿠키 없는 토큰 요청은 통과
 - 관리 화면 — SPA 세 개의 `/admin`: 그룹(만들기 · 고치기 · 지우기, 이메일로 구성원 넣기 · 빼기, 역할 지정), 역할(만들기 · 고치기 · 지우기, 권한 체크박스). 상단 바의 "관리" 링크는 `authorization.manage` 가 있을 때만. 사용자 찾기 API `GET /api/authorization/users?email=`(정확히 일치, Account 도메인 `GetByEmailAsync`). E2E: 관리자가 만든 그룹 · 역할의 권한이 구성원에게 닿는다
 - 패스키로 비밀번호 없이 로그인 — .NET 10 Identity 내장 WebAuthn(`/api/auth/passkey/options` · `login`, 관리 `/api/account/passkeys`), RP ID 는 `App:PublicOrigin` 의 호스트, 패스키는 2단계 인증을 건너뛴다. 저장 `identity_user_passkey`(Identity 스키마 3판 — `AddCommon` 이 모든 앱에 같은 판을 정한다, 마이그레이션 `AddPasskeys`). 마지막 로그인 수단 검사에 패스키를 센다. SPA 세 개: `webauthn` 모듈, 로그인 화면의 "패스키로 로그인", 내 계정의 「패스키」 절. E2E 는 Playwright 가상 인증기로 등록 · 로그인
 - 2단계 인증 — 인증 앱(TOTP, 서버가 그린 QR 코드) 또는 메일 코드, 복구 코드 10개(1회용), "이 브라우저 기억하기". 로그인은 202 `{providers}` 뒤 `POST /api/auth/login/2fa`, 소셜 로그인도 두 번째 단계를 거친다(`/login?step=two-factor`). 관리 `/api/account/two-factor`(세션 쿠키만) — 켜기는 꺼져 있을 때만, 끄기는 비밀번호 재확인. 쿠키 `__Host-tfa` · `__Host-tfa-remember`(SameSite=Lax). SPA 세 개: 로그인의 두 번째 단계 화면, 내 계정의 「2단계 인증」 절. 패키지 QRCoder 1.8

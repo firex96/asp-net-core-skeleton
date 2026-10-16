@@ -92,13 +92,19 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
         Assert.Equal(["products.manage", "authorization.manage"], catalog!.Select(permission => permission.Code));
     }
 
+    /// <summary>CSRF 는 브라우저가 붙여 주는 세션 쿠키로 성립한다 — 쿠키가 실린 cross-site 쓰기만 막는다(서버 간 호출 · 다른 출처 앱의 토큰 요청은 통과).</summary>
     [Theory]
-    [InlineData("cross-site", HttpStatusCode.Forbidden)]
-    [InlineData("same-origin", HttpStatusCode.Created)]
-    public async Task FetchMetadata_BlocksCrossSiteWrites(string fetchSite, HttpStatusCode expected)
+    [InlineData("cross-site", true, HttpStatusCode.Forbidden)]
+    [InlineData("cross-site", false, HttpStatusCode.Created)]
+    [InlineData("same-origin", true, HttpStatusCode.Created)]
+    public async Task FetchMetadata_BlocksCrossSiteWritesCarryingTheSession(string fetchSite, bool withSessionCookie, HttpStatusCode expected)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/products") { Content = JsonContent.Create(new { name = "Csrf", price = 1 }) };
         request.Headers.Add("Sec-Fetch-Site", fetchSite);
+        if (withSessionCookie)
+        {
+            request.Headers.Add("Cookie", "__Host-session=stolen");
+        }
 
         var response = await ClientAs("7").SendAsync(request, TestContext.Current.CancellationToken);
 
@@ -113,6 +119,7 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
             Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "client_credentials" }),
         };
         request.Headers.Add("Sec-Fetch-Site", "cross-site");
+        request.Headers.Add("Cookie", "__Host-session=stolen");
 
         var response = await factory.CreateClient().SendAsync(request, TestContext.Current.CancellationToken);
 

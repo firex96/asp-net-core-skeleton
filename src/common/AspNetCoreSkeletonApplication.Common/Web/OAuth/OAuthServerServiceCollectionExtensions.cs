@@ -1,5 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using AspNetCoreSkeletonApplication.Common.Web.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,10 +22,14 @@ public static class OAuthServerServiceCollectionExtensions
     public static IServiceCollection AddSkeletonOAuthServer(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<OAuthServerOptions>().BindConfiguration(SectionName).ValidateDataAnnotations()
-            .Validate(Validate, "Authentication:OAuthServer 구성이 맞지 않는다 — KeySource 가 Certificates 면 두 인증서가, 클라이언트 자격 증명을 쓰는 클라이언트는 ClientSecret 이 필요하다")
+            .Validate(Validate, "Authentication:OAuthServer 구성이 맞지 않는다 — KeySource 가 Certificates 면 두 인증서가, 클라이언트 자격 증명을 쓰는 클라이언트는 ClientSecret 이 필요하고, AllowedOrigins 는 경로 없는 http(s) 출처여야 한다")
             .ValidateOnStart();
         var server = configuration.GetSection(SectionName).Get<OAuthServerOptions>() ?? new OAuthServerOptions();
         var issuer = configuration["App:PublicOrigin"];
+        services.AddCors(cors => cors.AddPolicy(OAuthServerEndpoints.CorsPolicy, policy => policy
+            .WithOrigins(server.AllowedOrigins.Where(IsOrigin).Select(origin => new Uri(origin).GetLeftPart(UriPartial.Authority)).ToArray())
+            .WithMethods(HttpMethods.Get, HttpMethods.Post)
+            .AllowAnyHeader()));
 
         services.AddOpenIddict().AddServer(options =>
         {
@@ -90,7 +95,14 @@ public static class OAuthServerServiceCollectionExtensions
         (options.KeySource != OAuthKeySource.Certificates
          || (!string.IsNullOrWhiteSpace(options.SigningCertificate) && !string.IsNullOrWhiteSpace(options.EncryptionCertificate)))
         && options.Clients.All(client =>
-            !client.GrantTypes.Contains(GrantTypes.ClientCredentials) || !string.IsNullOrWhiteSpace(client.ClientSecret));
+            !client.GrantTypes.Contains(GrantTypes.ClientCredentials) || !string.IsNullOrWhiteSpace(client.ClientSecret))
+        && options.AllowedOrigins.All(IsOrigin);
+
+    /// <summary>경로 · 쿼리 없는 http(s) 출처인가 — <c>https://app.example.com</c>.</summary>
+    internal static bool IsOrigin(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
+        && uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment);
 
     private static X509Certificate2 Load(string? base64) =>
         X509CertificateLoader.LoadPkcs12(Convert.FromBase64String(base64 ?? throw new OptionsValidationException(

@@ -20,6 +20,12 @@ public sealed class OAuthServerOptions
     /// <summary>암호화용 X.509 인증서(PKCS#12, 암호 없음)의 base64. 키 사용 <c>KeyEncipherment</c>.</summary>
     public string? EncryptionCertificate { get; set; }
 
+    /// <summary>
+    /// OAuth 엔드포인트를 브라우저에서 직접 부르는 다른 출처의 앱(다른 도메인의 SPA 등). <c>/connect/*</c> · <c>/.well-known/*</c> 에만 CORS 를 연다 —
+    /// 자격 증명(쿠키)은 싣지 않는다. 비우면 열지 않는다. 출처는 <c>https://app.example.com</c> 처럼 경로 없이 쓴다.
+    /// </summary>
+    public List<string> AllowedOrigins { get; set; } = [];
+
     /// <summary>등록할 클라이언트. 기동할 때 저장소와 맞춘다(만들거나 고친다 — 목록에서 빠진 클라이언트는 지우지 않는다).</summary>
     public List<OAuthClientOptions> Clients { get; set; } = [];
 }

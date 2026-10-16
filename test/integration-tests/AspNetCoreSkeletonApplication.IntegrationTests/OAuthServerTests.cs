@@ -19,6 +19,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     private const string Database = "oauth_server";
     private const string Callback = OAuthFlows.Callback;
     private const string ServiceSecret = "test-service-secret";
+    private const string BrowserAppOrigin = "https://app.client.test";
 
     private WebApplicationFactory<Program> _factory = null!;
 
@@ -32,6 +33,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
                 scopes: ["openid", "profile", "email", "offline_access", "products.manage"]);
             OAuthFlows.RegisterClient(builder, 1, "third-party", consent: "Explicit", grants: ["authorization_code"], scopes: ["openid", "email"]);
             OAuthFlows.RegisterClient(builder, 2, "service", consent: "Implicit", grants: ["client_credentials"], scopes: ["products.manage"], secret: ServiceSecret);
+            builder.UseSetting("Authentication:OAuthServer:AllowedOrigins:0", BrowserAppOrigin);
         });
     }
 
@@ -131,6 +133,32 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
         var refreshToken = tokens.GetProperty("refresh_token").GetString();
         var refreshed = await OAuthFlows.TokenAsync(NewClient(), new() { ["grant_type"] = "refresh_token", ["refresh_token"] = refreshToken!, ["client_id"] = "first-party" });
         Assert.NotEqual(refreshToken, refreshed.GetProperty("refresh_token").GetString());
+    }
+
+    [Fact]
+    public async Task BrowserAppOnAnotherOrigin_ExchangesTheCode_ThroughCors()
+    {
+        var (browser, _) = await SignInAsync("cors-app@example.com");
+        var pkce = OAuthFlows.Pkce();
+        var code = await OAuthFlows.AuthorizeCodeAsync(browser, OAuthFlows.AuthorizeUrl("first-party", "openid", pkce.Challenge));
+
+        // 다른 출처의 SPA 가 fetch 로 보내는 요청 — cross-site 이고 쿠키가 없다(자격 증명을 싣지 않는다).
+        var request = new HttpRequestMessage(HttpMethod.Post, "/connect/token")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "authorization_code", ["code"] = code, ["redirect_uri"] = Callback,
+                ["client_id"] = "first-party", ["code_verifier"] = pkce.Verifier,
+            }),
+        };
+        request.Headers.Add("Origin", BrowserAppOrigin);
+        request.Headers.Add("Sec-Fetch-Site", "cross-site");
+        var response = await NewClient().SendAsync(request, Token);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(Token);
+        Assert.True(response.IsSuccessStatusCode, body.ToString());
+        Assert.True(body.TryGetProperty("access_token", out _));
+        Assert.Equal(BrowserAppOrigin, Assert.Single(response.Headers.GetValues("Access-Control-Allow-Origin")));
     }
 
     [Fact]

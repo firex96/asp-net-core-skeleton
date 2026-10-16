@@ -438,7 +438,7 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 - 콜백은 공급자에서 돌아오는 cross-site 이동이라 SameSite=Strict 세션 쿠키가 실리지 않는다. 그래서 연결할 사용자 ID 는 시작할 때 보호된 state 에 담아 둔다. 콜백 뒤 SPA 는 same-origin 요청으로 `/api/auth/me` 를 읽으므로 세션 쿠키가 실린다.
 - **로컬 · 테스트는 mock 서버로** — docker compose 의 `mock-oauth`(`ghcr.io/navikt/mock-oauth2-server`, http://localhost:8090)가 issuer 하나씩(`/google` · `/kakao` · `/naver`)으로 세 공급자를 흉내 내고, 로그인 화면 없이 고정된 사용자로 돌아온다(`docker/mock-oauth2-server.json` — Kakao 의 `kakao_account`, Naver 의 `response` 모양까지). 통합 테스트도 같은 파일로 컨테이너를 띄워 실제 핸들러로 왕복한다.
 
-**CSRF** — 쿠키가 SameSite=Strict 이고, 그 위에 **Fetch Metadata** 를 한 번 더 본다: 브라우저가 붙이는 `Sec-Fetch-Site` 가 `cross-site` 인 변경 요청(POST · PUT · PATCH · DELETE)은 403(`FetchMetadataMiddleware`, `UseSkeletonWeb` 에 들어 있다). OAuth 엔드포인트(`/connect/*`)는 OAuth 클라이언트가 읽는 형식인 400 `{"error":"invalid_request","error_description":…}` 로 답한다. antiforgery 토큰을 주고받지 않으므로 SPA 코드는 바꿀 것이 없다. 헤더가 없는 요청(서버 간 호출)은 막지 않는다.
+**CSRF** — 쿠키가 SameSite=Strict 이고, 그 위에 **Fetch Metadata** 를 한 번 더 본다: 브라우저가 붙이는 `Sec-Fetch-Site` 가 `cross-site` 이고 세션 쿠키(`__Host-session`)가 실린 변경 요청(POST · PUT · PATCH · DELETE)은 403(`FetchMetadataMiddleware`, `UseSkeletonWeb` 에 들어 있다). OAuth 엔드포인트(`/connect/*`)는 OAuth 클라이언트가 읽는 형식인 400 `{"error":"invalid_request","error_description":…}` 로 답한다. CSRF 는 브라우저가 대신 붙여 주는 세션 쿠키로 성립하므로, 쿠키가 없는 요청 — 서버 간 호출, 다른 출처 앱의 토큰 요청 — 은 막지 않는다(경로로 예외를 두지 않는다). antiforgery 토큰을 주고받지 않으므로 SPA 코드는 바꿀 것이 없다.
 
 ```sql
 -- 첫 관리자 지정 — 다음 요청부터 반영된다(권한은 쿠키가 아니라 요청마다 판정한다). 이미 떠 있는 앱의 캐시는 최대 Cache:Expiration 뒤에 바뀐다
@@ -466,6 +466,7 @@ Server 는 **OAuth 2.0 인가 서버 + OpenID Connect**(OpenIddict)이기도 하
 - **`prompt`** — 탐색 문서에는 처리하는 값만 싣는다(`prompt_values_supported`: `none` · `login` · `consent`). `none` 은 로그인 · 동의가 필요하면 묻지 않고 `login_required` · `consent_required` 로 돌려준다. `login` 은 세션을 끊고 로그인 화면으로 보낸다 — 돌아올 주소에서는 `login` 을 빼서 다시 끊지 않는다. `consent` 는 이미 허락했거나 `Implicit` 이어도 동의 화면을 보인다. 계정을 여럿 두지 않으므로 `select_account` 는 `invalid_request` 다.
 - **scope = 권한** — scope 는 OIDC 표준 넷(`openid` · `profile` · `email` · `offline_access`)과 **권한 코드 카탈로그 전부**다. 클라이언트는 등록된 scope 만 요청할 수 있다.
 - **클라이언트는 구성으로 등록한다** — `Authentication:OAuthServer:Clients[]`(`ClientId`, `ClientSecret`(있으면 기밀 클라이언트 — 비밀값), `DisplayName`, `ConsentType`, `GrantTypes`, `RedirectUris`, `PostLogoutRedirectUris`, `Scopes`). 기동할 때 저장소와 맞춘다(만들거나 고친다). 구성에서 빠진 클라이언트는 지우지 않는다. 클라이언트 자격 증명을 쓰는 클라이언트는 비밀이 필수다.
+- **다른 출처의 브라우저 앱** — `Authentication:OAuthServer:AllowedOrigins[]`(예: `https://app.example.com`, 경로 없이)의 출처에만, `/connect/*` · `/.well-known/*` 에만 CORS 를 연다(GET · POST, 자격 증명 없음). OpenIddict 가 인증 단계에서 처리하는 엔드포인트라 경로로 골라 `UseAuthentication` 앞에 둔다(`UseSkeletonOAuthServerCors`). 비우면 열지 않는다. 그런 앱은 공개 클라이언트(인가 코드 + PKCE)로 등록한다.
 - **키** — `Authentication:OAuthServer:KeySource`(기본값 없음). `Certificates` 는 서명 · 암호화 X.509 인증서 둘(`SigningCertificate` · `EncryptionCertificate`, PKCS#12 base64, 비밀값)로 모든 인스턴스가 같은 키를 쓴다. `Ephemeral` 은 기동할 때마다 새 키라 **로컬 · 테스트 전용**이다(재기동하면 토큰이 무효, 인스턴스끼리 서로의 토큰을 못 읽는다). 액세스 토큰은 암호화된 JWT 다 — 이 서버만 읽는다.
 - **issuer 는 `App:PublicOrigin`** — 사용자가 여는 출처와 같다. 로컬은 SPA dev 서버 출처이고, dev 서버가 `/connect` · `/.well-known` 도 백엔드로 넘긴다. 로그인 화면은 돌아갈 곳이 `/connect/…` 이면 라우터가 아니라 브라우저 이동으로 간다.
 - **저장소** — `oauth_application` · `oauth_authorization` · `oauth_scope` · `oauth_token`(마이그레이션 `AddOAuthServer`, 프레임워크 테이블).

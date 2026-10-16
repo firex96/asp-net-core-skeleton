@@ -41,6 +41,17 @@ public class OAuthServerConfigurationTests
     }
 
     [Theory]
+    [InlineData("https://app.example.com", true)]
+    [InlineData("https://app.example.com/", true)]
+    [InlineData("http://localhost:5173", true)]
+    [InlineData("https://app.example.com/callback", false)]
+    [InlineData("https://app.example.com?x=1", false)]
+    [InlineData("app.example.com", false)]
+    [InlineData("ftp://app.example.com", false)]
+    public void AllowedOrigin_IsAnOriginWithoutAPath(string value, bool expected) =>
+        Assert.Equal(expected, OAuthServerServiceCollectionExtensions.IsOrigin(value));
+
+    [Theory]
     [InlineData(null, null)]                                                   // KeySource 없음
     [InlineData("Certificates", null)]                                         // 인증서 없음
     [InlineData("Ephemeral", "client_credentials")]                            // 비밀 없는 클라이언트 자격 증명
