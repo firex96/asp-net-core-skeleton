@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- GitHub Actions CI(`.github/workflows/ci.yml`) — `main` 푸시 · PR 마다 세 SPA 의 테스트 · 타입 검사, 빌드, 단위 · 기능 · 통합 · 브라우저 테스트. 실패하면 테스트 결과 · Playwright 트레이스를 아티팩트로
 - Local 프로파일의 `App:PublicOrigin` 기본값 — 고른 SPA(`SpaClient`)의 dev 서버 출처(서버 어셈블리 메타데이터 `SpaProxyServerUrl`). 다른 SPA 로 띄울 때 `App__PublicOrigin` 을 맞추지 않아도 된다. `appsettings.Local.json` 의 값과 템플릿의 `publicOrigin` 치환은 없앴다
 - Batch 없이 만든 앱의 OAuth 토큰 정리 — `Authentication:OAuthServer:TokenPruning:RunInServer` 면 Server 의 `OAuthTokenPruneWorker` 가 Batch Job 과 같은 규칙으로 정리한다(기본 false, 템플릿 `--batch false` 가 true 로 만든다)
 - 구성에서 뺀 OAuth 클라이언트의 사용 중지 — 기동할 때 구성에 없는 클라이언트의 권한을 모두 비운다(지우지 않는다, 경고 로그). 다시 넣으면 다시 켜진다

@@ -655,6 +655,8 @@ DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에�
 - **실패하면** Playwright 트레이스가 `bin/…/playwright-traces/<테스트>.zip` 에 남는다 — `pwsh bin/Debug/net10.0/playwright.ps1 show-trace <파일>` 또는 `npx playwright show-trace <파일>` 로 화면 · 네트워크를 단계별로 본다.
 - 화면 밖에서 준비할 것(가입만 해 두기, 토큰 교환)은 `SpaServer.CreateApiClient()` 로 API 를 직접 부른다. 메일 링크는 `Mailbox.WaitForLinkAsync` 가 Mailpit 에서 꺼낸다.
 
+**CI** — GitHub Actions(`.github/workflows/ci.yml`)가 `main` 푸시와 PR 마다 세 SPA 의 테스트 · 타입 검사, 솔루션 빌드, 단위 · 기능 · 통합 · 브라우저 테스트 전부를 돌린다(러너의 Docker 로 Testcontainers, Chromium 은 `playwright.ps1 install --with-deps`). 실패하면 테스트 결과와 Playwright 트레이스를 아티팩트로 올린다. 템플릿 생성 확인(최소 · 전체 조합)은 CI 에 없다 — 템플릿을 바꾸면 로컬에서 「템플릿 확인」 명령으로 본다.
+
 SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 `npm test -- --watch=false` 로 단발 실행)다. 타입 검사는 SvelteKit · Nuxt 에서 `npm run check`.
 
 ## 설정과 비밀값
