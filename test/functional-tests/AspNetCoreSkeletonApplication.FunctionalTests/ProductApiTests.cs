@@ -102,13 +102,15 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     }
 
     [Fact]
-    public async Task Response_DoesNotExposeAuditorIds()
+    public async Task Response_ExposesCreatorButNotLastUpdater()
     {
+        // 작성자는 내보낸다 — 화면이 "내 Draft 상품은 지울 수 있다" 를 안다. 마지막 수정자는 내보내지 않는다.
         var response = await ManagerClient().PostAsJsonAsync(
             "/api/products", new { name = "Pad", price = 9000 }, TestContext.Current.CancellationToken);
 
         var product = await ReadJsonAsync(response);
-        Assert.False(product.TryGetProperty("createdBy", out _));
+        Assert.Equal(1, product.GetProperty("createdBy").GetInt64());
+        Assert.False(product.TryGetProperty("updatedBy", out _));
         Assert.True(product.TryGetProperty("createdAt", out _));
     }
 

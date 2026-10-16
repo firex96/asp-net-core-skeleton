@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using AspNetCoreSkeletonApplication.Common.Product.Dtos;
 using AspNetCoreSkeletonApplication.Common.Product.Enums;
+using AspNetCoreSkeletonApplication.Common.Contexts;
 using AspNetCoreSkeletonApplication.Common.Errors;
 using AspNetCoreSkeletonApplication.Common.Product.Persistence.Services;
 
@@ -34,7 +35,8 @@ public sealed class InMemoryProductEntityService : IProductEntityService
     public Task<ProductDto> CreateAsync(ProductCreateDto product, ProductStatus status, CancellationToken cancellationToken)
     {
         var id = Interlocked.Increment(ref _lastId);
-        var created = new ProductDto(id, product.Name, product.Price, status, 0, DateTimeOffset.UnixEpoch, 0, DateTimeOffset.UnixEpoch);
+        var created = new ProductDto(
+            id, product.Name, product.Price, status, AuditorContext.CurrentOrSystem, DateTimeOffset.UnixEpoch, AuditorContext.CurrentOrSystem, DateTimeOffset.UnixEpoch);
         _products[id] = created;
         return Task.FromResult(created);
     }

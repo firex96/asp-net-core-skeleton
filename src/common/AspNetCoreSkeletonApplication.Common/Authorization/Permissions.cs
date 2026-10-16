@@ -11,7 +11,7 @@ public static class Permissions
 {
     public static class Products
     {
-        /// <summary>상품 상태 변경 · 삭제.</summary>
+        /// <summary>상품 상태 변경 · 남의 상품 삭제.</summary>
         public const string Manage = "products.manage";
     }
 
@@ -23,7 +23,7 @@ public static class Permissions
 
     public static readonly IReadOnlyList<PermissionDto> All =
     [
-        new(Products.Manage, "상품 상태 변경과 삭제"),
+        new(Products.Manage, "상품 상태 변경과 다른 사용자의 상품 삭제"),
         new(Authorization.Manage, "사용자 그룹 · 역할 · 권한 관리"),
     ];
 

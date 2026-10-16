@@ -7,8 +7,7 @@ namespace AspNetCoreSkeletonApplication.Server.Product.Mappers;
 [Mapper]
 public static partial class ProductModelMapper
 {
-    /// <summary>감사 주체 ID 는 응답에 내보내지 않는다.</summary>
-    [MapperIgnoreSource(nameof(ProductDto.CreatedBy))]
+    /// <summary>작성자 ID 는 내보낸다(본인 상품을 지울 수 있는지 화면이 안다). 마지막 수정자는 내보내지 않는다.</summary>
     [MapperIgnoreSource(nameof(ProductDto.UpdatedBy))]
     public static partial ProductModel ToModel(this ProductDto dto);
 

@@ -1,5 +1,6 @@
 using System.Reflection;
 using AspNetCoreSkeletonApplication.Common.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -59,7 +60,8 @@ public class LayeringConventionTests
         var name = dependency.Name;
         return layer switch
         {
-            Layer.Controller => name.EndsWith("MappingService", StringComparison.Ordinal),
+            // IAuthorizationService — 리소스 기반 인가(데이터를 읽은 뒤에야 판정할 수 있는 규칙)를 컨트롤러가 부른다.
+            Layer.Controller => name.EndsWith("MappingService", StringComparison.Ordinal) || dependency == typeof(IAuthorizationService),
             Layer.Job => name.EndsWith("BizService", StringComparison.Ordinal)
                          || IsGenericOf(dependency, typeof(IOptions<>))
                          || dependency == typeof(TimeProvider),

@@ -5,8 +5,8 @@ using AspNetCoreSkeletonApplication.FunctionalTests.Support;
 namespace AspNetCoreSkeletonApplication.FunctionalTests;
 
 /// <summary>
-/// 인가 규칙 — 기본은 로그인 필요, 조회는 익명으로 열었고, 상태 변경 · 삭제는 권한 <c>products.manage</c>,
-/// 인가 관리 API 는 <c>authorization.manage</c>. cross-site 변경 요청은 로그인했어도 403.
+/// 인가 규칙 — 기본은 로그인 필요, 조회는 익명으로 열었고, 상태 변경은 권한 <c>products.manage</c>, 삭제는 리소스 판정
+/// (권한이 있거나 자기 Draft 상품), 인가 관리 API 는 <c>authorization.manage</c>. cross-site 변경 요청은 로그인했어도 403.
 /// </summary>
 public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFixture<ProductWebApplicationFactory>
 {
@@ -45,14 +45,28 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
     }
 
     [Fact]
-    public async Task Delete_NeedsProductManagePermission()
+    public async Task Creator_CanDeleteOwnDraft_ButNotSomeoneElses()
     {
-        var id = await CreateAsync(ClientAs("7"), "Mine");
+        var mine = await CreateAsync(ClientAs("7"), "Mine");
+        var theirs = await CreateAsync(ClientAs("8"), "Theirs");
 
-        var byUser = await ClientAs("7").DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
+        var deleteMine = await ClientAs("7").DeleteAsync($"/api/products/{mine}", TestContext.Current.CancellationToken);
+        var deleteTheirs = await ClientAs("7").DeleteAsync($"/api/products/{theirs}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteMine.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, deleteTheirs.StatusCode);
+    }
+
+    [Fact]
+    public async Task Creator_CannotDeleteOwnProductOnceOnSale_ButManagerCan()
+    {
+        var id = await CreateAsync(ClientAs("7"), "Selling");
+        await ClientAs("1;products.manage").PutAsJsonAsync($"/api/products/{id}/status", new { status = "OnSale" }, TestContext.Current.CancellationToken);
+
+        var byCreator = await ClientAs("7").DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
         var byManager = await ClientAs("1;products.manage").DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.Forbidden, byUser.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, byCreator.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, byManager.StatusCode);
     }
 

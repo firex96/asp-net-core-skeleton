@@ -7,5 +7,6 @@ public sealed record ProductModel(
     string Name,
     decimal Price,
     ProductStatus Status,
+    long CreatedBy,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

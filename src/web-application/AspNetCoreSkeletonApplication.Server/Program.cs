@@ -1,6 +1,8 @@
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;
 using AspNetCoreSkeletonApplication.Server.Example.Clients;
+using AspNetCoreSkeletonApplication.Server.Product.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +16,8 @@ builder.Services.AddLayeredServices(typeof(Program).Assembly);
 builder.Services.AddSkeletonWeb();
 // 로그인 — Identity + 쿠키(같은 출처 SPA), 권한 인가(그룹 · 역할 · 권한). README 「인증」 · 「인가」
 builder.Services.AddSkeletonIdentity();
+// 리소스 기반 인가 — 데이터에 따라 갈리는 판정(작성자 본인 등)
+builder.Services.AddScoped<IAuthorizationHandler, ProductAuthorizationHandler>();
 
 // 외부 API 클라이언트 — 구성 바인딩 · 재시도 · 추적 ID 전파 · 실패 → ApiCallException
 builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:ExampleApi");

@@ -168,7 +168,7 @@ ASPNETCORE_ENVIRONMENT=Local dotnet ef migrations add <이름> \
 
 | 계층 (네임스페이스) | 하는 일 | 주입받는 것 |
 |---|---|---|
-| Controller (`.Controllers`) | HTTP 처리와 검증. 요청과 응답 모두 Model | MappingService |
+| Controller (`.Controllers`) | HTTP 처리와 검증. 요청과 응답 모두 Model | MappingService, `IAuthorizationService`(리소스 기반 인가) |
 | MappingService (`.Services.Mapping`) | 화면용 변환 전부 — 파생 값, 포맷, 여러 BizService 결과 조합. 트랜잭션 없음 | BizService, `IOptions<>`, `TimeProvider` |
 | BizService (`.Services.Biz`) | 조회·저장·트랜잭션·호출 순서. 업무 판단은 Domain 을 불러 얻는다. 변경 메서드는 **항상** `IMainTransaction.ExecuteAsync` 안에서 돈다 | `I~EntityService`, `IMainTransaction`, `~Client`, 다른 BizService, `IOptions<>`, `TimeProvider` |
 | Domain (`.Domain`) | 업무 값 계산과 상태 전이 판단 전부. EF 를 모르는 순수 클래스, DI 대상이 아니다 | — (Dto · 열거형 · 에러 · System 만 참조) |
@@ -383,10 +383,11 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 **인가** (예외 없음) — **사용자 → 그룹 → 역할 → 권한 코드**
 
 - **기본은 로그인 필요다**(fallback 정책). 익명으로 열 엔드포인트는 하나씩 연다 — 컨트롤러 · 액션의 `[AllowAnonymous]`, 엔드포인트의 `.AllowAnonymous()`. Server 에서 열린 것: WeatherForecast, Product 조회(목록 · 단건 · 상태 이력), `/health`, OpenAPI · Scalar, SPA 정적 파일 · fallback, `/api/auth/register` · `login`.
-- **권한 코드로 선언한다** — `[HasPermission(Permissions.Products.Manage)]`. 코드는 `Common/Authorization/Permissions` 카탈로그 하나가 정본이고(`{대상}.{동작}` 소문자), 카탈로그 밖 코드와 역할 문자열(`Roles = "…"`)은 규약 테스트가 막는다(`AuthorizationConventionTests`). 지금 코드: `products.manage`(상품 상태 변경 · 삭제), `authorization.manage`(그룹 · 역할 · 권한 관리).
+- **권한 코드로 선언한다** — `[HasPermission(Permissions.Products.Manage)]`. 코드는 `Common/Authorization/Permissions` 카탈로그 하나가 정본이고(`{대상}.{동작}` 소문자), 카탈로그 밖 코드와 역할 문자열(`Roles = "…"`)은 규약 테스트가 막는다(`AuthorizationConventionTests`). 지금 코드: `products.manage`(상품 상태 변경 · 남의 상품 삭제), `authorization.manage`(그룹 · 역할 · 권한 관리).
 - **사용자에게 역할을 직접 주지 않는다.** 사용자는 그룹(`user_group_member`)에 속하고, 그룹이 역할(`user_group_role`)을, 역할이 권한 코드(`role_permission`)를 갖는다. 실효 권한은 그 합집합이다(`EffectivePermissions`).
 - **판정은 요청마다 서버가 한다** — 쿠키에 굳은 클레임을 쓰지 않는다. 조회 셋(사용자의 그룹, 그룹-역할, 역할-권한)은 캐시되고, 바뀌면 태그 무효화가 백플레인으로 모든 인스턴스에 곧바로 닿는다 — 권한을 빼면 다음 요청부터 403 이다.
-- **판정의 입구는 `IPermissionEvaluator` 하나다.** 권한 정책 핸들러가 이것만 부른다. 그룹 · 역할 · 권한의 변경은 인가 도메인의 BizService(`UserGroupBizService` · `RoleBizService`)에서만 일어난다(도메인 경계 규약). 그래서 판정 방식을 ReBAC(OpenFGA 등)으로 바꿀 때 바꿀 곳은 평가기 구현과 이 두 BizService 의 관계 동기화다. 권한으로 목록을 거르는 조회는 두지 않는다 — 필요해지면 평가기에 목록 판정을 더해 그것만 쓴다.
+- **판정의 입구는 `IPermissionEvaluator` 하나다.** 권한 정책 핸들러와 리소스 핸들러가 이것만 부른다. 그룹 · 역할 · 권한의 변경은 인가 도메인의 BizService(`UserGroupBizService` · `RoleBizService`)에서만 일어난다(도메인 경계 규약). 그래서 판정 방식을 ReBAC(OpenFGA 등)으로 바꿀 때 바꿀 곳은 평가기 구현과 이 두 BizService 의 관계 동기화다. 권한으로 목록을 거르는 조회는 두지 않는다 — 필요해지면 평가기에 목록 판정을 더해 그것만 쓴다.
+- **데이터에 따라 갈리는 판정은 리소스 기반 인가로** — 컨트롤러가 리소스를 읽은 뒤 `IAuthorizationService.AuthorizeAsync(User, product, ProductOperations.Delete)` 를 부르고, 핸들러(`ProductAuthorizationHandler`)가 권한은 평가기에, 규칙은 순수 Domain(`ProductAccessRule`)에 묻는다. 샘플 규칙: 상품 관리 권한이 있거나, 아직 Draft 인 자기 상품이면 지울 수 있다.
 - **관리 API** (`authorization.manage`) — `/api/authorization/groups`(CRUD, `/{id}/members/{userId}` · `/{id}/roles/{roleId}` 는 PUT 추가 · DELETE 제거, 멱등), `/api/authorization/roles`(CRUD, 권한은 집합째 보낸다), `/api/authorization/permissions`(카탈로그). **마지막 `authorization.manage` 보유자를 없애는 변경은 409** 로 되돌린다 — 운영자가 스스로를 잠그지 않는다. 카탈로그 밖 코드는 400.
 - **시드** — 마이그레이션 `AddAuthorizationGroups` 가 그룹 `Administrators` 와 역할 `Administrator`(모든 권한)를 만든다. 첫 관리자는 가입한 뒤 SQL 로 그룹에 넣는다(아래). 그다음부터는 관리 API 로 한다.
 
