@@ -147,4 +147,31 @@ describe('LoginComponent', () => {
 
     expect((fixture.nativeElement as HTMLElement).querySelector('[role=status]')?.textContent).toContain('아직 연결하지 않은 카카오 계정');
   });
+
+  it('tells when the social providers cannot be loaded', async () => {
+    const fixture = TestBed.createComponent(LoginComponent);
+    fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve));
+    httpMock.expectOne('/api/auth/external/providers').flush(null, { status: 500, statusText: 'Server Error' });
+    await new Promise(resolve => setTimeout(resolve));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')?.textContent).toContain('소셜 로그인 목록을 불러오지 못했어요');
+  });
+
+  it('still loads the social providers when the current user cannot be read', async () => {
+    TestBed.inject(AuthService).user.set(undefined);
+    const fixture = TestBed.createComponent(LoginComponent);
+    fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve));
+    httpMock.expectOne('/api/auth/me').flush(null, { status: 500, statusText: 'Server Error' });
+    await new Promise(resolve => setTimeout(resolve));
+    httpMock.expectOne('/api/auth/external/providers').flush([{ name: 'Google', displayName: 'Google' }]);
+    await new Promise(resolve => setTimeout(resolve));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.social button[type=submit]')?.textContent).toContain('Google로 계속하기');
+  });
 });

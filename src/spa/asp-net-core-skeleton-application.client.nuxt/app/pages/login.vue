@@ -13,6 +13,7 @@ const confirmPassword = ref('')
 const error = ref<ApiError | null>(null)
 const busy = ref(false)
 const providers = ref<ExternalProvider[]>([])
+const providersFailed = ref(false)
 const message = ref<string | null>(null)
 const twoFactor = ref<TwoFactorProvider[] | null>(null)
 const passkeySupported = ref(false)
@@ -45,7 +46,8 @@ async function continueTo(target: string) {
 useHead({ title })
 
 onMounted(async () => {
-  const user = session.user.value === undefined ? await session.refresh() : session.user.value
+  // 현재 사용자를 못 읽으면 로그인 안 된 것으로 보고 화면을 그대로 준비한다 — 로그인 폼 · 소셜 로그인이 막히지 않게.
+  const user = session.user.value === undefined ? await session.refresh().catch(() => null) : session.user.value
   if (user) {
     await continueTo(returnUrl.value)
     return
@@ -59,7 +61,10 @@ onMounted(async () => {
   }
 
   passkeySupported.value = isPasskeySupported()
-  providers.value = await listProviders().catch(() => [])
+  providers.value = await listProviders().catch(() => {
+    providersFailed.value = true
+    return []
+  })
 })
 
 function toggleMode() {
@@ -210,6 +215,9 @@ async function resend() {
           </form>
         </div>
       </template>
+      <p v-if="providersFailed" class="alert alert-error" role="alert">
+        소셜 로그인 목록을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.
+      </p>
 
       <p class="links">
         <NuxtLink to="/forgot-password">

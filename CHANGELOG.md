@@ -66,6 +66,7 @@
 - Identity 역할(`identity_role` · `identity_user_role` · `identity_role_claim`, `ApplicationRole`), `Roles` · `Policies.Administrator` — 인가 도메인의 그룹 · 역할 · 권한으로 바뀌었다
 - 쓰지 않던 `LanguageExt.Core` · `FluentValidation` 패키지
 ### Fixed
+- SPA 세 개의 로그인 화면이 준비 요청 하나의 실패에 멈추던 문제 — 현재 사용자 조회(`/api/auth/me`)가 실패하면 초기화가 멈춰 소셜 로그인 버튼을 아예 불러오지 않았고, 공급자 목록 요청이 실패하면 버튼이 안내 없이 사라졌다. 이제 현재 사용자를 못 읽으면 로그인 안 된 것으로 보고 이어 가고, 공급자 목록을 못 받으면 "소셜 로그인 목록을 불러오지 못했어요" 를 알린다. E2E `LoginPageTests` 가 두 요청을 500 으로 바꿔 확인한다
 - OAuth 오류 설명(`error_description`)을 자연스러운 한국어로 — "로그인이 필요해요." · "사용자가 접근을 허용하지 않았어요." 등
 - OIDC `email_verified` — 이메일 확인 기능 전에는 userinfo 에서 늘 false 였고, id_token 에는 아예 없었다. 이제 확인한 계정만 로그인하므로 userinfo 와 id_token(email scope) 모두 true 를 싣는다
 - OAuth 탐색 문서가 처리하지 않는 `prompt` 값까지 광고하던 문제 — `prompt_values_supported` 를 `none` · `login` · `consent` 로 줄이고, `login`(세션을 끊고 다시 로그인)과 `consent`(이미 허락했거나 Implicit 이어도 동의 화면)를 실제로 처리한다. `select_account` 는 `invalid_request`

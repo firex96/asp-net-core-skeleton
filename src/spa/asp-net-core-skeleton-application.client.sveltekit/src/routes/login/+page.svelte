@@ -28,6 +28,7 @@
 	let error = $state<ApiError | null>(null);
 	let busy = $state(false);
 	let providers = $state<ExternalProvider[]>([]);
+	let providersFailed = $state(false);
 	let message = $state<string | null>(null);
 	let twoFactor = $state<TwoFactorProvider[] | null>(null);
 	let passkeySupported = $state(false);
@@ -41,7 +42,8 @@
 	);
 
 	onMount(async () => {
-		const user = session.user === undefined ? await refreshSession() : session.user;
+		// 현재 사용자를 못 읽으면 로그인 안 된 것으로 보고 화면을 그대로 준비한다 — 로그인 폼 · 소셜 로그인이 막히지 않게.
+		const user = session.user === undefined ? await refreshSession().catch(() => null) : session.user;
 		if (user) {
 			await continueTo(returnUrl);
 			return;
@@ -55,7 +57,10 @@
 		}
 
 		passkeySupported = isPasskeySupported();
-		providers = await listProviders().catch(() => []);
+		providers = await listProviders().catch(() => {
+			providersFailed = true;
+			return [];
+		});
 	});
 
 	async function continueTo(target: string) {
@@ -228,6 +233,9 @@
 					</form>
 				{/each}
 			</div>
+		{/if}
+		{#if providersFailed}
+			<p class="alert alert-error" role="alert">소셜 로그인 목록을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.</p>
 		{/if}
 
 		<p class="links">

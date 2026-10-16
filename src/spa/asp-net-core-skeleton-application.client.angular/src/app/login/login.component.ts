@@ -29,6 +29,7 @@ export class LoginComponent implements OnInit {
   readonly error = signal<ApiError | null>(null);
   readonly busy = signal(false);
   readonly providers = signal<ExternalProvider[]>([]);
+  readonly providersFailed = signal(false);
   readonly notice = signal<string | null>(null);
   readonly twoFactor = signal<TwoFactorProvider[] | null>(null);
   readonly passkeySupported = signal(false);
@@ -45,7 +46,8 @@ export class LoginComponent implements OnInit {
     const query = this.route.snapshot.queryParamMap;
     this.notice.set(externalLoginMessage(query.get('error'), query.get('provider'))
       ?? (query.get('reset') === 'done' ? '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.' : null));
-    const user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
+    // 현재 사용자를 못 읽으면 로그인 안 된 것으로 보고 화면을 그대로 준비한다 — 로그인 폼 · 소셜 로그인이 막히지 않게.
+    const user = this.auth.user() === undefined ? await this.auth.refresh().catch(() => null) : this.auth.user();
     if (user) {
       await this.continue();
       return;
@@ -59,7 +61,10 @@ export class LoginComponent implements OnInit {
     }
 
     this.passkeySupported.set(isPasskeySupported());
-    this.providers.set(await this.auth.listProviders().catch(() => []));
+    this.providers.set(await this.auth.listProviders().catch(() => {
+      this.providersFailed.set(true);
+      return [];
+    }));
   }
 
   externalLoginAction(provider: string): string {

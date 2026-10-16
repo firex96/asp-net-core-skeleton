@@ -66,6 +66,9 @@
           }
         </div>
       }
+      @if (providersFailed()) {
+        <p class="alert alert-error" role="alert">소셜 로그인 목록을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.</p>
+      }
 
       <p class="links">
         <a routerLink="/forgot-password">비밀번호를 잊으셨나요?</a>
