@@ -44,10 +44,17 @@ interface ProblemDetails {
   errors?: Record<string, string[]>;
 }
 
-/** 로그인 뒤 돌아갈 경로. 같은 출처의 경로만 허용한다 — 외부 주소로 보내는 열린 리다이렉트를 막는다. */
+/**
+ * 로그인 뒤 돌아갈 경로. 같은 출처의 경로만 허용한다 — 외부 주소로 보내는 열린 리다이렉트를 막는다. 공백 · 제어 문자가 있으면 거절한다:
+ * 브라우저는 주소의 탭 · 줄바꿈을 지우므로 `/\t/evil.example` 이 `//evil.example`(다른 사이트)이 된다.
+ */
 export function safeReturnUrl(value: string | null | undefined): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\') || hasControlOrSpace(value)) {
     return '/';
   }
   return value;
+}
+
+function hasControlOrSpace(value: string): boolean {
+  return Array.from(value).some(character => character.charCodeAt(0) <= 0x20 || character.charCodeAt(0) === 0x7f);
 }

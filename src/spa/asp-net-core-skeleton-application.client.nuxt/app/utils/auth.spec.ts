@@ -190,7 +190,10 @@ describe('safeReturnUrl', () => {
     ['', '/'],
     ['https://evil.example', '/'],
     ['//evil.example', '/'],
-    ['/\\evil.example', '/']
+    ['/\\evil.example', '/'],
+    ['/\t/evil.example', '/'],
+    ['/\n/evil.example', '/'],
+    ['/ /evil.example', '/']
   ])('maps %s to %s', (value, expected) => {
     expect(safeReturnUrl(value)).toBe(expected)
   })

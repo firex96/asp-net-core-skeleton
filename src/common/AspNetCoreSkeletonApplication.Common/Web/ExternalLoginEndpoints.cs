@@ -176,8 +176,13 @@ public static class ExternalLoginEndpoints
         (await ProvidersAsync(signInManager)).Any(scheme => scheme.Name == provider);
 
     /// <summary>같은 출처의 경로만 — 외부 주소로 보내는 열린 리다이렉트를 막는다.</summary>
-    private static string SafeLocalPath(string? value) =>
+    /// <summary>
+    /// 같은 출처의 경로만 돌려준다 — 아니면 <c>/</c>. 공백 · 제어 문자가 있으면 거절한다: 브라우저는 Location 의 탭 · 줄바꿈을 지우므로
+    /// <c>/\t/evil.example</c> 이 <c>//evil.example</c>(다른 사이트)로 간다.
+    /// </summary>
+    internal static string SafeLocalPath(string? value) =>
         value is { Length: > 0 } && value[0] == '/' && !value.StartsWith("//", StringComparison.Ordinal) && !value.StartsWith("/\\", StringComparison.Ordinal)
+        && !value.Any(character => character <= ' ' || character == '\x7f')
             ? value
             : "/";
 
