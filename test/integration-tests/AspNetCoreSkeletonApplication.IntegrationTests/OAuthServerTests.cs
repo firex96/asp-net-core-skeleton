@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Web;
 using AspNetCoreSkeletonApplication.IntegrationTests.Support;
@@ -19,7 +17,7 @@ namespace AspNetCoreSkeletonApplication.IntegrationTests;
 public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLifetime
 {
     private const string Database = "oauth_server";
-    private const string Callback = "https://client.test/callback";
+    private const string Callback = OAuthFlows.Callback;
     private const string ServiceSecret = "test-service-secret";
 
     private WebApplicationFactory<Program> _factory = null!;
@@ -30,10 +28,10 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             infrastructure.ConfigureApp(builder, Database);
-            Client(builder, 0, "first-party", consent: "Implicit", grants: ["authorization_code", "refresh_token"],
+            OAuthFlows.RegisterClient(builder, 0, "first-party", consent: "Implicit", grants: ["authorization_code", "refresh_token"],
                 scopes: ["openid", "profile", "email", "offline_access", "products.manage"]);
-            Client(builder, 1, "third-party", consent: "Explicit", grants: ["authorization_code"], scopes: ["openid", "email"]);
-            Client(builder, 2, "service", consent: "Implicit", grants: ["client_credentials"], scopes: ["products.manage"], secret: ServiceSecret);
+            OAuthFlows.RegisterClient(builder, 1, "third-party", consent: "Explicit", grants: ["authorization_code"], scopes: ["openid", "email"]);
+            OAuthFlows.RegisterClient(builder, 2, "service", consent: "Implicit", grants: ["client_credentials"], scopes: ["products.manage"], secret: ServiceSecret);
         });
     }
 
@@ -53,7 +51,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     [Fact]
     public async Task Authorize_WithoutSession_SendsToTheSpaLogin()
     {
-        var response = await NewClient().GetAsync(AuthorizeUrl("first-party", "openid", Pkce().Challenge), Token);
+        var response = await NewClient().GetAsync(OAuthFlows.AuthorizeUrl("first-party", "openid", OAuthFlows.Pkce().Challenge), Token);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         var location = response.Headers.Location!.OriginalString;
@@ -65,10 +63,10 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     public async Task CodeFlowWithPkce_IssuesTokens_UserInfo_AndRotatesRefreshTokens()
     {
         var (browser, userId) = await SignInAsync("code-flow@example.com");
-        var pkce = Pkce();
+        var pkce = OAuthFlows.Pkce();
 
-        var code = await AuthorizeCodeAsync(browser, AuthorizeUrl("first-party", "openid profile email offline_access", pkce.Challenge));
-        var tokens = await TokenAsync(new()
+        var code = await OAuthFlows.AuthorizeCodeAsync(browser, OAuthFlows.AuthorizeUrl("first-party", "openid profile email offline_access", pkce.Challenge));
+        var tokens = await OAuthFlows.TokenAsync(NewClient(), new()
         {
             ["grant_type"] = "authorization_code", ["code"] = code, ["redirect_uri"] = Callback,
             ["client_id"] = "first-party", ["code_verifier"] = pkce.Verifier,
@@ -80,7 +78,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
         Assert.Equal("code-flow@example.com", userInfo.GetProperty("email").GetString());
 
         var refreshToken = tokens.GetProperty("refresh_token").GetString();
-        var refreshed = await TokenAsync(new() { ["grant_type"] = "refresh_token", ["refresh_token"] = refreshToken!, ["client_id"] = "first-party" });
+        var refreshed = await OAuthFlows.TokenAsync(NewClient(), new() { ["grant_type"] = "refresh_token", ["refresh_token"] = refreshToken!, ["client_id"] = "first-party" });
         Assert.NotEqual(refreshToken, refreshed.GetProperty("refresh_token").GetString());
     }
 
@@ -88,12 +86,12 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     public async Task CodeExchange_WithWrongVerifier_IsRejected()
     {
         var (browser, _) = await SignInAsync("pkce@example.com");
-        var code = await AuthorizeCodeAsync(browser, AuthorizeUrl("first-party", "openid", Pkce().Challenge));
+        var code = await OAuthFlows.AuthorizeCodeAsync(browser, OAuthFlows.AuthorizeUrl("first-party", "openid", OAuthFlows.Pkce().Challenge));
 
-        var response = await PostTokenAsync(new()
+        var response = await OAuthFlows.PostTokenAsync(NewClient(), new()
         {
             ["grant_type"] = "authorization_code", ["code"] = code, ["redirect_uri"] = Callback,
-            ["client_id"] = "first-party", ["code_verifier"] = Pkce().Verifier,
+            ["client_id"] = "first-party", ["code_verifier"] = OAuthFlows.Pkce().Verifier,
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -104,7 +102,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     public async Task ExplicitConsent_IsAskedOnce_ThenRemembered()
     {
         var (browser, _) = await SignInAsync("consent@example.com");
-        var url = AuthorizeUrl("third-party", "openid email", Pkce().Challenge);
+        var url = OAuthFlows.AuthorizeUrl("third-party", "openid email", OAuthFlows.Pkce().Challenge);
 
         var first = await browser.GetAsync(url, Token);
         Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
@@ -130,7 +128,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     public async Task DeniedConsent_ReturnsAccessDeniedToTheClient()
     {
         var (browser, _) = await SignInAsync("deny@example.com");
-        var consentPage = (await browser.GetAsync(AuthorizeUrl("third-party", "openid", Pkce().Challenge), Token)).Headers.Location!.OriginalString;
+        var consentPage = (await browser.GetAsync(OAuthFlows.AuthorizeUrl("third-party", "openid", OAuthFlows.Pkce().Challenge), Token)).Headers.Location!.OriginalString;
         var parameters = QueryHelpers.ParseQuery(new Uri(new Uri("https://spa.test"), consentPage).Query)
             .ToDictionary(pair => pair.Key, pair => pair.Value.ToString());
         parameters["consent"] = "deny";
@@ -145,7 +143,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     public async Task UnregisteredRedirectUri_IsNotRedirectedTo()
     {
         var (browser, _) = await SignInAsync("redirect@example.com");
-        var url = AuthorizeUrl("first-party", "openid", Pkce().Challenge).Replace(Uri.EscapeDataString(Callback), Uri.EscapeDataString("https://evil.test/callback"), StringComparison.Ordinal);
+        var url = OAuthFlows.AuthorizeUrl("first-party", "openid", OAuthFlows.Pkce().Challenge).Replace(Uri.EscapeDataString(Callback), Uri.EscapeDataString("https://evil.test/callback"), StringComparison.Ordinal);
 
         var response = await browser.GetAsync(url, Token);
 
@@ -156,15 +154,15 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     [Fact]
     public async Task ClientCredentials_IssueAToken_OnlyForPermittedScopes_AndRightSecret()
     {
-        var granted = await PostTokenAsync(new()
+        var granted = await OAuthFlows.PostTokenAsync(NewClient(), new()
         {
             ["grant_type"] = "client_credentials", ["client_id"] = "service", ["client_secret"] = ServiceSecret, ["scope"] = "products.manage",
         });
-        var wrongSecret = await PostTokenAsync(new()
+        var wrongSecret = await OAuthFlows.PostTokenAsync(NewClient(), new()
         {
             ["grant_type"] = "client_credentials", ["client_id"] = "service", ["client_secret"] = "wrong", ["scope"] = "products.manage",
         });
-        var wrongScope = await PostTokenAsync(new()
+        var wrongScope = await OAuthFlows.PostTokenAsync(NewClient(), new()
         {
             ["grant_type"] = "client_credentials", ["client_id"] = "service", ["client_secret"] = ServiceSecret, ["scope"] = "authorization.manage",
         });
@@ -175,30 +173,6 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
-
-    private static void Client(
-        Microsoft.AspNetCore.Hosting.IWebHostBuilder builder, int index, string name, string consent, string[] grants, string[] scopes, string? secret = null)
-    {
-        var prefix = $"Authentication:OAuthServer:Clients:{index}:";
-        builder.UseSetting(prefix + "ClientId", name);
-        builder.UseSetting(prefix + "DisplayName", $"Test {name}");
-        builder.UseSetting(prefix + "ConsentType", consent);
-        builder.UseSetting(prefix + "RedirectUris:0", Callback);
-        for (var i = 0; i < grants.Length; i++)
-        {
-            builder.UseSetting($"{prefix}GrantTypes:{i}", grants[i]);
-        }
-
-        for (var i = 0; i < scopes.Length; i++)
-        {
-            builder.UseSetting($"{prefix}Scopes:{i}", scopes[i]);
-        }
-
-        if (secret is not null)
-        {
-            builder.UseSetting(prefix + "ClientSecret", secret);
-        }
-    }
 
     private HttpClient NewClient() =>
         _factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = TestUsers.Https.BaseAddress, AllowAutoRedirect = false });
@@ -212,32 +186,6 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
         return (browser, userId);
     }
 
-    private static string AuthorizeUrl(string clientId, string scope, string challenge) =>
-        $"/connect/authorize?client_id={clientId}&response_type=code&redirect_uri={Uri.EscapeDataString(Callback)}" +
-        $"&scope={Uri.EscapeDataString(scope)}&state=st-1&code_challenge={challenge}&code_challenge_method=S256";
-
-    private static async Task<string> AuthorizeCodeAsync(HttpClient browser, string url)
-    {
-        var response = await browser.GetAsync(url, Token);
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        var location = response.Headers.Location!;
-        Assert.StartsWith(Callback, location.AbsoluteUri, StringComparison.Ordinal);
-        var query = HttpUtility.ParseQueryString(location.Query);
-        Assert.Equal("st-1", query["state"]);
-        return query["code"]!;
-    }
-
-    private Task<HttpResponseMessage> PostTokenAsync(Dictionary<string, string> form) =>
-        NewClient().PostAsync("/connect/token", new FormUrlEncodedContent(form), Token);
-
-    private async Task<JsonElement> TokenAsync(Dictionary<string, string> form)
-    {
-        var response = await PostTokenAsync(form);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>(Token);
-        Assert.True(response.IsSuccessStatusCode, body.ToString());
-        return body;
-    }
-
     private async Task<JsonElement> UserInfoAsync(string accessToken)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, "/connect/userinfo");
@@ -246,12 +194,6 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(Token);
         Assert.True(response.IsSuccessStatusCode, body.ToString());
         return body;
-    }
-
-    private static (string Verifier, string Challenge) Pkce()
-    {
-        var verifier = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
-        return (verifier, WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier))));
     }
 
     private static string?[] Strings(JsonElement element, string property) =>

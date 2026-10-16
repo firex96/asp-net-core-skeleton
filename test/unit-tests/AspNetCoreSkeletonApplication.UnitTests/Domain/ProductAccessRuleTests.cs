@@ -16,4 +16,13 @@ public class ProductAccessRuleTests
     {
         Assert.Equal(expected, ProductAccessRule.CanDelete(status, createdBy, actorId, canManage));
     }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void CanDelete_ForANonUserPrincipal_NeedsManagePermission(bool canManage, bool expected)
+    {
+        // 사용자가 아닌 주체(클라이언트 토큰)는 자기 상품이 없다 — 시스템(0)이 만든 Draft 라도 권한이 있어야 한다.
+        Assert.Equal(expected, ProductAccessRule.CanDelete(ProductStatus.Draft, createdBy: 0, actorId: null, canManage));
+    }
 }

@@ -13,6 +13,9 @@ public static class ExternalLoginServiceCollectionExtensions
     public const string Kakao = "Kakao";
     public const string Naver = "Naver";
 
+    /// <summary>소셜 로그인 공급자 이름 — 다른 인증 스킴(쿠키 · 토큰)과 섞이지 않게 이 목록으로 거른다.</summary>
+    public static readonly IReadOnlyList<string> Providers = [Google, Kakao, Naver];
+
     /// <summary>
     /// 소셜 로그인 공급자. <c>Authentication:External:{Google|Kakao|Naver}</c> 섹션이 있는 공급자만 켠다 — 섹션이 있으면 <c>ClientId</c> ·
     /// <c>ClientSecret</c>(비밀값)는 필수다(없으면 기동하다 멈춘다). 섹션의 나머지 키는 핸들러 옵션에 그대로 묶인다 — 로컬은 엔드포인트

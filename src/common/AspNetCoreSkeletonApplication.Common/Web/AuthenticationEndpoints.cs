@@ -66,14 +66,19 @@ public static class AuthenticationEndpoints
     }
 
     /// <summary>현재 사용자와 그 실효 권한 — SPA 가 화면에서 쓸 수 있는 기능을 고를 때 쓴다(서버는 요청마다 다시 판정한다).</summary>
-    private static async Task<Ok<CurrentUserResponse>> MeAsync(
-        ClaimsPrincipal user, IPermissionEvaluator evaluator, CancellationToken cancellationToken)
+    /// 사용자가 없는 클라이언트 토큰이면 403 이다. 토큰이면 권한은 토큰 scope 와의 교집합이다.
+    private static async Task<Results<Ok<CurrentUserResponse>, ForbidHttpResult>> MeAsync(
+        ClaimsPrincipal user, RequestPermissions requestPermissions, CancellationToken cancellationToken)
     {
-        var id = UserClaims.IdOf(user) ?? throw new InvalidOperationException("로그인한 사용자에게 ID 클레임이 없다");
-        var permissions = await evaluator.ListPermissionsAsync(id, cancellationToken);
+        if (UserClaims.IdOf(user) is not { } id)
+        {
+            return TypedResults.Forbid();
+        }
+
+        var permissions = await requestPermissions.ListOfUserAsync(user, id, cancellationToken);
         return TypedResults.Ok(new CurrentUserResponse(
             id,
-            user.FindFirstValue(ClaimTypes.Email) ?? user.Identity!.Name!,
+            user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirstValue("email") ?? user.Identity!.Name!,
             permissions.Order(StringComparer.Ordinal).ToArray()));
     }
 

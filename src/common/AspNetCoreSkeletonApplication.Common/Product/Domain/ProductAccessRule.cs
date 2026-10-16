@@ -7,7 +7,10 @@ namespace AspNetCoreSkeletonApplication.Common.Product.Domain;
 /// </summary>
 public static class ProductAccessRule
 {
-    /// <summary>상품 관리 권한이 있으면 누구 것이든, 없으면 아직 판매 전(Draft)인 자기 상품만 지울 수 있다.</summary>
-    public static bool CanDelete(ProductStatus status, long createdBy, long actorId, bool canManageProducts) =>
+    /// <summary>
+    /// 상품 관리 권한이 있으면 누구 것이든, 없으면 아직 판매 전(Draft)인 자기 상품만 지울 수 있다.
+    /// <paramref name="actorId"/> 가 null 이면 사용자가 아닌 주체(클라이언트 토큰)다 — 자기 상품이 없다.
+    /// </summary>
+    public static bool CanDelete(ProductStatus status, long createdBy, long? actorId, bool canManageProducts) =>
         canManageProducts || (status == ProductStatus.Draft && createdBy == actorId);
 }

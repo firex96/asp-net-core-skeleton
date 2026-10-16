@@ -2,6 +2,7 @@ using System.Security.Claims;
 using AspNetCoreSkeletonApplication.Common.Contexts;
 using AspNetCoreSkeletonApplication.Common.Web;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace AspNetCoreSkeletonApplication.UnitTests.Web;
@@ -68,7 +69,8 @@ public class AuditorContextMiddlewareTests
                 seen = AuditorContext.Current;
                 return Task.CompletedTask;
             },
-            Options.Create(new AuditOptions { TrustUserHeader = trustUserHeader }));
+            Options.Create(new AuditOptions { TrustUserHeader = trustUserHeader }),
+            NullLogger<AuditorContextMiddleware>.Instance);
 
         await middleware.InvokeAsync(context);
         return seen;

@@ -1,7 +1,10 @@
 using System.Security.Cryptography.X509Certificates;
+using AspNetCoreSkeletonApplication.Common.Web.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpenIddict.Validation.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace AspNetCoreSkeletonApplication.Common.Web.OAuth;
@@ -54,6 +57,23 @@ public static class OAuthServerServiceCollectionExtensions
                 .EnableUserInfoEndpointPassthrough()
                 .EnableEndSessionEndpointPassthrough();
         });
+
+        // 이 서버가 발급한 토큰을 API 가 받는다 — Bearer 헤더가 있으면 토큰으로, 없으면 세션 쿠키로 인증한다(정책 스킴 하나가 고른다).
+        services.AddOpenIddict().AddValidation(options =>
+        {
+            options.UseLocalServer();
+            options.UseAspNetCore();
+        });
+        services.AddAuthentication(options =>
+            {
+                options.DefaultScheme = BearerAuthentication.SessionOrBearerScheme;
+                options.DefaultChallengeScheme = BearerAuthentication.SessionOrBearerScheme;
+                options.DefaultForbidScheme = BearerAuthentication.SessionOrBearerScheme;
+            })
+            .AddPolicyScheme(BearerAuthentication.SessionOrBearerScheme, "Session cookie or bearer token", options =>
+                options.ForwardDefaultSelector = context => BearerAuthentication.IsBearer(context.Request)
+                    ? OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme
+                    : IdentityConstants.ApplicationScheme);
 
         services.AddHostedService<OAuthClientSynchronizer>();
         return services;

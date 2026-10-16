@@ -452,6 +452,20 @@ curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
 
 - 다른 출처의 **브라우저 앱**이 토큰 엔드포인트를 직접 부르는 흐름(CORS)은 아직 없다 — 서버 · 네이티브 클라이언트를 전제로 한다.
 
+**Bearer 토큰으로 API 호출** — 같은 API 를 쿠키와 토큰이 함께 쓴다.
+
+- **인증 스킴은 정책 스킴 하나가 고른다**(`SessionOrBearer`): `Authorization: Bearer …` 가 있으면 OpenIddict 검증(이 서버가 발급한 토큰만), 없으면 세션 쿠키. 토큰이 틀리면 401.
+- **권한 판정은 규칙 하나**(`RequestPermissions` — 권한 정책 핸들러와 리소스 핸들러가 쓴다):
+
+| 주체 | 실효 권한 |
+|---|---|
+| 세션 쿠키 | 사용자의 그룹 · 역할 · 권한 |
+| 사용자 토큰(인가 코드) | 사용자의 권한 ∩ 토큰 scope — 관리자라도 받은 scope 밖은 못 쓴다 |
+| 클라이언트 토큰(클라이언트 자격 증명) | 토큰 scope 그대로 — 받을 수 있는 scope 는 클라이언트 등록이 정한다 |
+
+- **감사 주체** — 사용자 토큰은 그 사용자(`sub`), 클라이언트 토큰은 시스템(`0`)이고 어느 클라이언트였는지는 로그 scope `ClientId` 에 남는다. 클라이언트 토큰은 사용자가 아니므로 "자기 상품" 이 없고 `/api/auth/me` 는 403 이다.
+- **Fetch Metadata** 는 그대로다 — 서버 · 네이티브 클라이언트는 `Sec-Fetch-Site` 를 보내지 않으므로 막히지 않는다.
+
 ## 메일
 
 계정 메일(지금은 비밀번호 재설정)을 **SMTP(MailKit)** 로 보낸다 — `Common/Mail` 의 `IMailSender`(`SmtpMailSender`)와 Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.

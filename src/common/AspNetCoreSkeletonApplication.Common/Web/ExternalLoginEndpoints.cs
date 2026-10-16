@@ -43,9 +43,14 @@ public static class ExternalLoginEndpoints
     }
 
     private static async Task<Ok<ExternalProviderResponse[]>> ListProvidersAsync(SignInManager<ApplicationUser> signInManager) =>
-        TypedResults.Ok((await signInManager.GetExternalAuthenticationSchemesAsync())
+        TypedResults.Ok((await ProvidersAsync(signInManager))
             .Select(scheme => new ExternalProviderResponse(scheme.Name, scheme.DisplayName ?? scheme.Name))
             .ToArray());
+
+    /// <summary>켜진 소셜 공급자 — 등록된 인증 스킴 중 공급자 이름인 것만(쿠키 · 토큰 스킴은 빼고).</summary>
+    private static async Task<IEnumerable<AuthenticationScheme>> ProvidersAsync(SignInManager<ApplicationUser> signInManager) =>
+        (await signInManager.GetExternalAuthenticationSchemesAsync())
+            .Where(scheme => ExternalLoginServiceCollectionExtensions.Providers.Contains(scheme.Name));
 
     /// <summary>공급자 로그인 화면으로 보낸다. 끝나면 <paramref name="returnUrl"/>(같은 출처 경로만)로 돌아온다.</summary>
     private static async Task<IResult> StartLoginAsync(string provider, string? returnUrl, SignInManager<ApplicationUser> signInManager)
@@ -158,7 +163,7 @@ public static class ExternalLoginEndpoints
     }
 
     private static async Task<bool> IsProviderAsync(SignInManager<ApplicationUser> signInManager, string provider) =>
-        (await signInManager.GetExternalAuthenticationSchemesAsync()).Any(scheme => scheme.Name == provider);
+        (await ProvidersAsync(signInManager)).Any(scheme => scheme.Name == provider);
 
     /// <summary>같은 출처의 경로만 — 외부 주소로 보내는 열린 리다이렉트를 막는다.</summary>
     private static string SafeLocalPath(string? value) =>

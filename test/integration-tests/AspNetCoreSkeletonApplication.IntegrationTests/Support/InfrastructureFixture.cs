@@ -41,6 +41,8 @@ public sealed class InfrastructureFixture : IAsyncLifetime
     /// <summary>앱이 메일 링크에 쓰는 SPA 출처(테스트용 가짜 주소).</summary>
     public const string PublicOrigin = "https://spa.test";
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _generations = new();
+
     /// <summary>SQL Server 에 붙는 기본 연결 문자열(master).</summary>
     public string ConnectionString => _sqlServer.GetConnectionString();
 
@@ -59,7 +61,8 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Default", ConnectionStringFor(database));
         builder.UseSetting("ConnectionStrings:Redis", RedisConnectionString);
-        builder.UseSetting("Cache:KeyPrefix", $"{database}:");
+        // DB 를 새로 만들 때마다 캐시 접두사도 바꾼다 — 같은 ID(1, 2 …)의 옛 행이 캐시에 남아 새 DB 의 행처럼 보이지 않게.
+        builder.UseSetting("Cache:KeyPrefix", $"{database}:{_generations.GetValueOrDefault(database, "0")}:");
         builder.UseSetting("App:PublicOrigin", PublicOrigin);
         builder.UseSetting("Mail:Smtp:Host", _mailpit.Hostname);
         builder.UseSetting("Mail:Smtp:Port", _mailpit.GetMappedPublicPort(MailpitSmtpPort).ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -91,6 +94,7 @@ public sealed class InfrastructureFixture : IAsyncLifetime
             .Options);
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.MigrateAsync();
+        _generations[database] = Guid.NewGuid().ToString("N")[..8];
     }
 
     public async ValueTask InitializeAsync() =>

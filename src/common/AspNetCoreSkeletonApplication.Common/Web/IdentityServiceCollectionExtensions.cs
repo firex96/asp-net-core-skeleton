@@ -62,6 +62,7 @@ public static class IdentityServiceCollectionExtensions
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
         services.AddHttpContextAccessor();
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+        services.AddScoped<RequestPermissions>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         return services;

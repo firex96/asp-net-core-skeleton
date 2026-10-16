@@ -60,7 +60,8 @@ public class PermissionAuthorizationTests
     {
         var requirement = new PermissionRequirement("products.manage");
         var context = new AuthorizationHandlerContext([requirement], user, resource: null);
-        await new PermissionAuthorizationHandler(evaluator, new HttpContextAccessor()).HandleAsync(context);
+        var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
+        await new PermissionAuthorizationHandler(new RequestPermissions(evaluator, accessor), accessor).HandleAsync(context);
         return context;
     }
 
