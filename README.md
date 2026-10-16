@@ -381,13 +381,21 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 | `POST /api/auth/register` `{email, password}` | 201 — 로그인하지 않고 이메일 확인 링크를 메일로 보낸다. 비밀번호 10자 이상 · 대소문자 · 숫자 · 기호(Identity 기본). 어기면 400 `NOT_VALID_ERROR` |
 | `POST /api/auth/email/confirm` `{userId, code}` | 204 — 메일 링크(`{App:PublicOrigin}/confirm-email?userId=…&code=…`)의 값으로 이메일을 확인한다. 로그인시키지 않는다. 토큰이 틀렸거나 만료(2시간)됐으면 400 `INVALID_TOKEN_ERROR` |
 | `POST /api/auth/email/resend` `{email}` | 202 — 계정이 있든 없든, 이미 확인했든 같다. 확인 전 계정이면 링크를 다시 보낸다 |
-| `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드). 이메일을 확인하지 않은 계정은 비밀번호가 맞을 때만 403 `EMAIL_NOT_CONFIRMED_ERROR` |
+| `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드). 이메일을 확인하지 않은 계정은 비밀번호가 맞을 때만 403 `EMAIL_NOT_CONFIRMED_ERROR`. 2단계 인증을 켠 계정은 202 `{providers}` — 세션 쿠키는 두 번째 단계가 준다(기억한 브라우저면 바로 204) |
+| `POST /api/auth/login/2fa` `{provider, code, rememberBrowser}` | 2단계 인증의 두 번째 단계 — `provider` 는 `authenticator` · `email` · `recovery`. 204 + 쿠키, 틀리면 401(잠금 횟수를 센다), 기다리는 로그인이 없으면 401. `GET` 은 기다리는 로그인의 수단 `{providers}`, `POST /email` 은 메일 코드를 보낸다(202) |
+| `/api/account/two-factor` (세션 쿠키) | `GET` 상태 `{enabled, method, recoveryCodesLeft, browserRemembered}`. `POST /authenticator/setup`(새 키 · `otpauth://` URI · QR data URI) → `/authenticator/verify {code}`(켜고 복구 코드), `/email/enable`(메일 코드로 켜고 복구 코드), `/recovery-codes`(새로 받기), `/disable {password}`, `/forget-browser`. 이미 켜져 있는데 켜면 409 |
 | `POST /api/auth/logout` | 204, 쿠키 삭제 |
 | `POST /api/auth/password/forgot` `{email}` | 202 — 계정이 있든 없든 같다(가입 여부를 드러내지 않는다). 있으면 재설정 링크 메일을 보낸다 |
 | `POST /api/auth/password/reset` `{email, code, newPassword}` | 204. 토큰이 틀렸거나 만료 · 사용됐으면 400 `INVALID_TOKEN_ERROR`(AUTH002), 비밀번호 규칙 위반은 400 `NOT_VALID_ERROR` |
 | `GET /api/auth/me` | `{id, email, permissions}` — 실효 권한 코드(화면이 쓸 수 있는 기능을 고를 때 쓴다). 로그인하지 않았으면 401 |
 
 - **이메일을 확인해야 로그인한다**(`SignIn.RequireConfirmedEmail`) — 비밀번호 · 소셜 로그인 모두. Identity 는 비밀번호를 보기 전에 확인 여부로 거절하므로(계정이 있다는 것이 드러나고 실패 횟수도 세지 않는다), 로그인 엔드포인트가 확인 전 계정만 먼저 비밀번호를 확인한다 — 틀리면 다른 계정과 같은 401 이고 잠금 횟수도 센다. 이 기능 전에 가입한 계정은 마이그레이션 `ConfirmExistingEmails` 가 확인된 것으로 둔다. SPA 는 가입 뒤 확인 메일을 안내하고, 로그인 화면에서 "확인 메일 다시 받기" 를, `/confirm-email` 화면에서 확인을 한다.
+- **2단계 인증** (`Common/Web/TwoFactorEndpoints`, Identity 기본 기능) — 켠 계정은 비밀번호(또는 소셜 로그인) 다음에 확인 코드를 한 번 더 넣는다. 수단은 계정마다 하나다: 인증 앱(TOTP)을 등록했으면 인증 앱, 아니면 메일 코드(아웃박스로 보낸다). 인증 앱을 고른 계정에 메일 코드를 열어 두면 메일 계정 하나로 두 단계를 다 넘기 때문이다. 복구 코드 10개는 켤 때 한 번만 보여 주고 각각 한 번만 쓰인다. "이 브라우저 기억하기" 를 고르면 그 브라우저는 다음부터 묻지 않는다(`__Host-tfa-remember`). 틀린 코드도 잠금 횟수를 센다.
+  - 켜기(인증 앱 등록 · 메일 코드)는 꺼져 있을 때만 된다 — 등록하다 만 인증 앱 키가 로그인 수단이 되지 않게. 수단을 바꾸려면 끈 뒤에 다시 켠다. 끄려면 비밀번호를 다시 넣는다.
+  - 인증 앱 QR 코드는 서버가 SVG(QRCoder)로 그려 data URI 로 준다 — SPA 마다 QR 라이브러리를 두지 않는다.
+  - 두 번째 단계를 기다리는 사용자(`__Host-tfa`)와 기억한 브라우저 쿠키는 SameSite=Lax 다. 소셜 로그인 콜백은 공급자에서 돌아오는 cross-site 이동이라 Strict 면 기억한 브라우저 쿠키가 실리지 않는다. 소셜 로그인 뒤 두 번째 단계가 필요하면 `/login?step=two-factor` 로 보낸다.
+  - 관리 API(`/api/account/two-factor`)는 세션 쿠키로만 부른다 — Bearer 토큰으로는 계정 보안을 바꾸지 못한다.
+  - 토큰을 고쳐 쓰는 저장(복구 코드 · 인증 앱 키)은 `ApplicationUserStore` 가 추적 조회로 한다 — `AppDbContext` 의 NoTracking 기본값에서 Identity 기본 저장소는 값만 바꾼 토큰을 저장하지 못한다.
 - **쿠키** — `__Host-session`, HttpOnly · Secure · SameSite=Strict, 8시간(쓰면 연장). 로그인 페이지가 없으므로 인증이 필요하면 리다이렉트 대신 401, 권한이 없으면 403 을 ProblemDetails 로 돌려준다.
 - **여러 인스턴스** — 쿠키를 암호화하는 Data Protection 키를 Redis 에 둔다(`{Cache:KeyPrefix}data-protection-keys`). 어느 인스턴스가 만든 쿠키든 다른 인스턴스가 읽는다. 키는 Redis 에 평문으로 있으므로 Redis 접근을 앱으로 제한한다.
 - **감사** — 로그인한 요청은 사용자 ID(`NameIdentifier` claim)가 감사 주체가 된다(「추적 ID 와 감사」의 1순위).
@@ -477,7 +485,7 @@ curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
 
 ## 메일
 
-계정 메일(이메일 확인 · 비밀번호 재설정)은 **아웃박스**(`mail_outbox`)에 넣고, 백그라운드(`MailOutboxWorker`)가 **SMTP(MailKit)** 로 보낸다. `Common` 의 Mail 도메인이다 — `MailOutboxBizService`(넣기 · 때가 된 메일 보내기), `IMailOutboxEntityService`, 전송 `IMailClient`(`SmtpMailClient`), 재시도 규칙 `MailRetryPolicy`(Domain), Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
+계정 메일(이메일 확인 · 비밀번호 재설정 · 로그인 확인 코드)은 **아웃박스**(`mail_outbox`)에 넣고, 백그라운드(`MailOutboxWorker`)가 **SMTP(MailKit)** 로 보낸다. `Common` 의 Mail 도메인이다 — `MailOutboxBizService`(넣기 · 때가 된 메일 보내기), `IMailOutboxEntityService`, 전송 `IMailClient`(`SmtpMailClient`), 재시도 규칙 `MailRetryPolicy`(Domain), Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
 
 - **요청은 행만 넣고 끝난다** — 응답 시간이 SMTP 왕복에 묶이지 않아 가입 여부가 시간으로 드러나지 않고, SMTP 장애가 요청 실패가 되지 않는다.
 - **한 통은 한 곳만 보낸다** — 발송 루프는 인스턴스마다 하나씩 돌고, 때가 된 행을 `UPDLOCK · READPAST` 로 잡아 시도 횟수를 올린 뒤 `Mail:Outbox:Lease`(5분) 동안 다른 인스턴스가 다시 잡지 못하게 한다. SMTP 왕복은 트랜잭션 밖이다. 보낸 뒤 기록하기 전에 멈추면 기한이 지나 다시 보낸다 — **최소 한 번 전달**이다.

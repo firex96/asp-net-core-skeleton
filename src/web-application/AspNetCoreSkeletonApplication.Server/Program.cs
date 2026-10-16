@@ -56,6 +56,7 @@ app.UseAuditorContext();
 app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapSkeletonAuthEndpoints();
+app.MapSkeletonTwoFactorEndpoints();
 app.MapSkeletonExternalLoginEndpoints();
 app.MapSkeletonOAuthServerEndpoints();
 app.MapControllers();

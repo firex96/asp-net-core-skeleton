@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
 	ApiError,
+	completeTwoFactor,
 	confirmEmail,
 	externalLoginMessage,
 	forgotPassword,
 	getConsent,
 	getCurrentUser,
+	getTwoFactorChallenge,
 	isServerPath,
 	login,
 	logout,
@@ -13,6 +15,7 @@ import {
 	resendConfirmation,
 	resetPassword,
 	safeReturnUrl,
+	setupAuthenticator,
 	unlink
 } from './auth';
 
@@ -55,6 +58,38 @@ describe('login', () => {
 
 		expect(error).toBeInstanceOf(ApiError);
 		expect(error).toMatchObject({ status: 423, code: 'ACCOUNT_LOCKED_ERROR', message: 'locked' });
+	});
+});
+
+describe('two-factor sign-in', () => {
+	it('returns the second-step providers when the server answers 202', async () => {
+		const fetchFn = vi.fn(async () => Response.json({ providers: ['authenticator', 'recovery'] }, { status: 202 }));
+
+		expect(await login(user.email, 'Passw0rd!', fetchFn)).toEqual(['authenticator', 'recovery']);
+	});
+
+	it('treats a missing pending sign-in as null and posts the second step', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 401 }));
+		expect(await getTwoFactorChallenge(fetchFn)).toBeNull();
+
+		fetchFn.mockResolvedValue(new Response(null, { status: 204 }));
+		await completeTwoFactor('authenticator', '123456', true, fetchFn);
+
+		expect(fetchFn.mock.calls[1]?.[0]).toBe('/api/auth/login/2fa');
+		expect(fetchFn.mock.calls[1]?.[1]?.body).toBe(
+			JSON.stringify({ provider: 'authenticator', code: '123456', rememberBrowser: true })
+		);
+	});
+
+	it('reads the authenticator setup', async () => {
+		const setup = {
+			sharedKey: 'abcd efgh',
+			authenticatorUri: 'otpauth://totp/x',
+			qrCodeDataUri: 'data:image/svg+xml;base64,'
+		};
+		const fetchFn = vi.fn(async () => Response.json(setup));
+
+		expect(await setupAuthenticator(fetchFn)).toEqual(setup);
 	});
 });
 

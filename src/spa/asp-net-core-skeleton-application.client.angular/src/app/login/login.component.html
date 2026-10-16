@@ -1,74 +1,78 @@
-<main class="card">
-  <h1>{{ mode() === 'login' ? '로그인' : '회원가입' }}</h1>
-  <p class="lead">{{ mode() === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.' }}</p>
+@if (twoFactor(); as providers) {
+  <main class="card" appTwoFactorStep [providers]="providers" (done)="continue()" (restart)="restart()"></main>
+} @else {
+  <main class="card">
+    <h1>{{ mode() === 'login' ? '로그인' : '회원가입' }}</h1>
+    <p class="lead">{{ mode() === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.' }}</p>
 
-  @if (notice(); as notice) {
-    <p class="alert alert-info" role="status">{{ notice }}</p>
-  }
+    @if (notice(); as notice) {
+      <p class="alert alert-info" role="status">{{ notice }}</p>
+    }
 
-  <form class="form" (ngSubmit)="submit()">
-    <label class="field">
-      이메일
-      <input name="email" type="email" autocomplete="username" placeholder="name@example.com" required [(ngModel)]="email" />
-    </label>
-    <label class="field">
-      비밀번호
-      <input name="password" type="password" required
-             [attr.autocomplete]="mode() === 'login' ? 'current-password' : 'new-password'"
-             [(ngModel)]="password" />
-    </label>
-    @if (mode() === 'register') {
+    <form class="form" (ngSubmit)="submit()">
       <label class="field">
-        비밀번호 확인
-        <input name="confirmPassword" type="password" autocomplete="new-password" required [(ngModel)]="confirmPassword" />
+        이메일
+        <input name="email" type="email" autocomplete="username" placeholder="name@example.com" required [(ngModel)]="email" />
       </label>
-      <p class="hint">10자 이상, 영문 대문자 · 소문자와 숫자, 특수 문자를 섞어 주세요.</p>
+      <label class="field">
+        비밀번호
+        <input name="password" type="password" required
+               [attr.autocomplete]="mode() === 'login' ? 'current-password' : 'new-password'"
+               [(ngModel)]="password" />
+      </label>
+      @if (mode() === 'register') {
+        <label class="field">
+          비밀번호 확인
+          <input name="confirmPassword" type="password" autocomplete="new-password" required [(ngModel)]="confirmPassword" />
+        </label>
+        <p class="hint">10자 이상, 영문 대문자 · 소문자와 숫자, 특수 문자를 섞어 주세요.</p>
+      }
+
+      @if (error(); as error) {
+        <div class="alert alert-error" role="alert">
+          <p>{{ error.message }}</p>
+          @if (error.fieldErrors.length > 0) {
+            <ul>
+              @for (message of error.fieldErrors; track message) {
+                <li>{{ message }}</li>
+              }
+            </ul>
+          }
+          @if (error.code === 'EMAIL_NOT_CONFIRMED_ERROR') {
+            <p><button type="button" class="link-button" (click)="resend()">확인 메일 다시 받기</button></p>
+          }
+        </div>
+      }
+
+      <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">
+        {{ mode() === 'login' ? '로그인' : '가입하기' }}
+      </button>
+    </form>
+
+    @if (mode() === 'login') {
+      @if (providers().length > 0) {
+        <div class="divider">또는</div>
+        <div class="social">
+          @for (provider of providers(); track provider.name) {
+            <!-- ngNoForm — FormsModule 의 NgForm 이 브라우저 기본 제출을 막지 않게 한다(서버로 가는 진짜 폼 POST 다) -->
+            <form ngNoForm method="post" [attr.action]="externalLoginAction(provider.name)">
+              <button type="submit" [class]="'btn btn-block btn-' + provider.name.toLowerCase()">
+                {{ provider.displayName }}로 계속하기
+              </button>
+            </form>
+          }
+        </div>
+      }
+
+      <p class="links">
+        <a routerLink="/forgot-password">비밀번호를 잊으셨나요?</a>
+        <button type="button" class="link-button" (click)="toggleMode()">회원가입</button>
+      </p>
+    } @else {
+      <p class="links">
+        <span class="muted">이미 계정이 있나요?</span>
+        <button type="button" class="link-button" (click)="toggleMode()">로그인</button>
+      </p>
     }
-
-    @if (error(); as error) {
-      <div class="alert alert-error" role="alert">
-        <p>{{ error.message }}</p>
-        @if (error.fieldErrors.length > 0) {
-          <ul>
-            @for (message of error.fieldErrors; track message) {
-              <li>{{ message }}</li>
-            }
-          </ul>
-        }
-        @if (error.code === 'EMAIL_NOT_CONFIRMED_ERROR') {
-          <p><button type="button" class="link-button" (click)="resend()">확인 메일 다시 받기</button></p>
-        }
-      </div>
-    }
-
-    <button type="submit" class="btn btn-primary btn-block" [disabled]="busy()">
-      {{ mode() === 'login' ? '로그인' : '가입하기' }}
-    </button>
-  </form>
-
-  @if (mode() === 'login') {
-    @if (providers().length > 0) {
-      <div class="divider">또는</div>
-      <div class="social">
-        @for (provider of providers(); track provider.name) {
-          <!-- ngNoForm — FormsModule 의 NgForm 이 브라우저 기본 제출을 막지 않게 한다(서버로 가는 진짜 폼 POST 다) -->
-          <form ngNoForm method="post" [attr.action]="externalLoginAction(provider.name)">
-            <button type="submit" [class]="'btn btn-block btn-' + provider.name.toLowerCase()">
-              {{ provider.displayName }}로 계속하기
-            </button>
-          </form>
-        }
-      </div>
-    }
-
-    <p class="links">
-      <a routerLink="/forgot-password">비밀번호를 잊으셨나요?</a>
-      <button type="button" class="link-button" (click)="toggleMode()">회원가입</button>
-    </p>
-  } @else {
-    <p class="links">
-      <span class="muted">이미 계정이 있나요?</span>
-      <button type="button" class="link-button" (click)="toggleMode()">로그인</button>
-    </p>
-  }
-</main>
+  </main>
+}

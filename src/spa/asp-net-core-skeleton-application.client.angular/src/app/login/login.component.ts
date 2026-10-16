@@ -3,17 +3,19 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { ApiError, safeReturnUrl } from '../auth/api-error';
-import { AuthService, ExternalProvider } from '../auth/auth.service';
+import { AuthService, ExternalProvider, TwoFactorProvider } from '../auth/auth.service';
 import { externalLoginMessage, isServerPath } from '../auth/navigation';
+import { TwoFactorStepComponent } from '../two-factor/two-factor-step.component';
 
 /**
  * 로그인과 가입을 한 화면에서 전환한다. 로그인에 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은 서버 주소면
  * 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 가입하면 확인 메일 안내를 보이고 로그인 화면으로 돌아온다(이메일을 확인해야
- * 로그인할 수 있다). 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
+ * 로그인할 수 있다). 2단계 인증을 켠 계정은 두 번째 단계(TwoFactorStepComponent)를 거친다 — 소셜 로그인 뒤에는 서버가
+ * /login?step=two-factor 로 보낸다. 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
  */
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TwoFactorStepComponent],
   templateUrl: './login.component.html',
   changeDetection: ChangeDetectionStrategy.Eager
 })
@@ -27,6 +29,7 @@ export class LoginComponent implements OnInit {
   readonly busy = signal(false);
   readonly providers = signal<ExternalProvider[]>([]);
   readonly notice = signal<string | null>(null);
+  readonly twoFactor = signal<TwoFactorProvider[] | null>(null);
 
   email = '';
   password = '';
@@ -44,6 +47,13 @@ export class LoginComponent implements OnInit {
     if (user) {
       await this.continue();
       return;
+    }
+
+    if (query.get('step') === 'two-factor') {
+      this.twoFactor.set(await this.auth.twoFactorChallenge().catch(() => null));
+      if (!this.twoFactor()) {
+        this.notice.set('로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.');
+      }
     }
 
     this.providers.set(await this.auth.listProviders().catch(() => []));
@@ -70,8 +80,10 @@ export class LoginComponent implements OnInit {
     this.notice.set(null);
     try {
       if (this.mode() === 'login') {
-        await this.auth.login(this.email, this.password);
-        await this.continue();
+        this.twoFactor.set(await this.auth.login(this.email, this.password));
+        if (!this.twoFactor()) {
+          await this.continue();
+        }
       } else {
         await this.auth.register(this.email, this.password);
         this.mode.set('login');
@@ -86,6 +98,12 @@ export class LoginComponent implements OnInit {
     }
   }
 
+  restart() {
+    this.twoFactor.set(null);
+    this.password = '';
+    this.notice.set(null);
+  }
+
   async resend() {
     this.error.set(null);
     try {
@@ -96,7 +114,7 @@ export class LoginComponent implements OnInit {
     }
   }
 
-  private async continue() {
+  async continue() {
     const target = this.returnUrl;
     if (isServerPath(target)) {
       window.location.assign(target);

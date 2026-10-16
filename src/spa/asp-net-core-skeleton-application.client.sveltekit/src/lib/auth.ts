@@ -14,6 +14,22 @@ export interface ExternalLogin {
 	displayName: string;
 }
 
+/** 로그인 두 번째 단계의 수단 — 계정마다 인증 앱 또는 메일 코드 하나, 남은 복구 코드가 있으면 recovery 도. */
+export type TwoFactorProvider = 'authenticator' | 'email' | 'recovery';
+
+export interface TwoFactorStatus {
+	enabled: boolean;
+	method: 'authenticator' | 'email' | null;
+	recoveryCodesLeft: number;
+	browserRemembered: boolean;
+}
+
+export interface AuthenticatorSetup {
+	sharedKey: string;
+	authenticatorUri: string;
+	qrCodeDataUri: string;
+}
+
 export interface ConsentDetails {
 	clientId: string;
 	displayName: string;
@@ -80,8 +96,73 @@ export async function getCurrentUser(fetchFn: typeof fetch = fetch): Promise<Cur
 	return response.json();
 }
 
-export async function login(email: string, password: string, fetchFn: typeof fetch = fetch): Promise<void> {
-	await post(fetchFn, '/api/auth/login', { email, password });
+/** 로그인한다. 2단계 인증을 켠 계정이면 두 번째 단계의 수단을 돌려준다 — 아직 로그인 전이다. */
+export async function login(
+	email: string,
+	password: string,
+	fetchFn: typeof fetch = fetch
+): Promise<TwoFactorProvider[] | null> {
+	const response = await post(fetchFn, '/api/auth/login', { email, password });
+	return response.status === 202 ? ((await response.json()) as TwoFactorChallenge).providers : null;
+}
+
+/** 두 번째 단계를 기다리는 중이면 그 수단들(소셜 로그인 뒤 /login?step=two-factor 로 왔을 때). 아니면 null. */
+export async function getTwoFactorChallenge(fetchFn: typeof fetch = fetch): Promise<TwoFactorProvider[] | null> {
+	const response = await fetchFn('/api/auth/login/2fa');
+	if (response.status === 401) {
+		return null;
+	}
+	if (!response.ok) {
+		throw await ApiError.from(response);
+	}
+	return ((await response.json()) as TwoFactorChallenge).providers;
+}
+
+/** 로그인 확인 코드를 메일로 받는다(메일 코드를 쓰는 계정). */
+export async function sendTwoFactorEmail(fetchFn: typeof fetch = fetch): Promise<void> {
+	await post(fetchFn, '/api/auth/login/2fa/email');
+}
+
+/** 두 번째 단계 — 맞으면 로그인된다. rememberBrowser 면 이 브라우저에서는 다음부터 묻지 않는다. */
+export async function completeTwoFactor(
+	provider: TwoFactorProvider,
+	code: string,
+	rememberBrowser: boolean,
+	fetchFn: typeof fetch = fetch
+): Promise<void> {
+	await post(fetchFn, '/api/auth/login/2fa', { provider, code, rememberBrowser });
+}
+
+export function getTwoFactorStatus(fetchFn: typeof fetch = fetch): Promise<TwoFactorStatus> {
+	return get(fetchFn, '/api/account/two-factor');
+}
+
+/** 인증 앱 등록을 시작한다 — 새 키와 QR 코드. 코드를 확인해야 켜진다. */
+export function setupAuthenticator(fetchFn: typeof fetch = fetch): Promise<AuthenticatorSetup> {
+	return postJson(fetchFn, '/api/account/two-factor/authenticator/setup');
+}
+
+/** 인증 앱의 코드로 2단계 인증을 켠다. 복구 코드를 돌려준다(이때 한 번만 받는다). */
+export async function verifyAuthenticator(code: string, fetchFn: typeof fetch = fetch): Promise<string[]> {
+	return (await postJson<RecoveryCodes>(fetchFn, '/api/account/two-factor/authenticator/verify', { code })).recoveryCodes;
+}
+
+/** 메일 코드로 2단계 인증을 켠다. 복구 코드를 돌려준다. */
+export async function enableEmailTwoFactor(fetchFn: typeof fetch = fetch): Promise<string[]> {
+	return (await postJson<RecoveryCodes>(fetchFn, '/api/account/two-factor/email/enable')).recoveryCodes;
+}
+
+/** 복구 코드를 새로 받는다 — 전에 받은 코드는 더 쓰지 못한다. */
+export async function regenerateRecoveryCodes(fetchFn: typeof fetch = fetch): Promise<string[]> {
+	return (await postJson<RecoveryCodes>(fetchFn, '/api/account/two-factor/recovery-codes')).recoveryCodes;
+}
+
+export async function disableTwoFactor(password: string, fetchFn: typeof fetch = fetch): Promise<void> {
+	await post(fetchFn, '/api/account/two-factor/disable', { password });
+}
+
+export async function forgetBrowser(fetchFn: typeof fetch = fetch): Promise<void> {
+	await post(fetchFn, '/api/account/two-factor/forget-browser');
 }
 
 /** 계정을 만든다. 로그인하지 않는다 — 서버가 보낸 메일의 링크로 이메일을 확인해야 로그인할 수 있다. */
@@ -196,7 +277,7 @@ async function get<T>(fetchFn: typeof fetch, url: string): Promise<T> {
 	return response.json();
 }
 
-async function post(fetchFn: typeof fetch, url: string, body?: object): Promise<void> {
+async function post(fetchFn: typeof fetch, url: string, body?: object): Promise<Response> {
 	const response = await fetchFn(url, {
 		method: 'POST',
 		headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -205,4 +286,17 @@ async function post(fetchFn: typeof fetch, url: string, body?: object): Promise<
 	if (!response.ok) {
 		throw await ApiError.from(response);
 	}
+	return response;
+}
+
+async function postJson<T>(fetchFn: typeof fetch, url: string, body?: object): Promise<T> {
+	return (await post(fetchFn, url, body)).json();
+}
+
+interface TwoFactorChallenge {
+	providers: TwoFactorProvider[];
+}
+
+interface RecoveryCodes {
+	recoveryCodes: string[];
 }

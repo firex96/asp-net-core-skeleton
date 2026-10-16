@@ -13,8 +13,9 @@
 		type ExternalProvider
 	} from '#lib/auth.js';
 	import { refreshSession, session } from '#lib/session.svelte.js';
+	import TwoFactorSettings from '#lib/TwoFactorSettings.svelte';
 
-	// 내 계정 — 권한과 연결된 소셜 계정. 연결은 공급자마다 폼 POST 로 시작하고, 돌아오면 ?linked= · ?error= 로 결과를 받는다.
+	// 내 계정 — 권한, 2단계 인증, 연결된 소셜 계정. 연결은 공급자마다 폼 POST 로 시작하고, 돌아오면 ?linked= · ?error= 로 결과를 받는다.
 	let providers = $state<ExternalProvider[]>([]);
 	let logins = $state<ExternalLogin[]>([]);
 	let error = $state<ApiError | null>(null);
@@ -71,6 +72,8 @@
 				{/each}
 			</ul>
 		{/if}
+
+		<TwoFactorSettings />
 
 		<h2 class="section-title">연결된 계정</h2>
 		<p class="muted">연결해 두면 비밀번호 없이 그 계정으로 로그인할 수 있어요.</p>

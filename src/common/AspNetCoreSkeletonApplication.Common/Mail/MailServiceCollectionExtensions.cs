@@ -16,7 +16,8 @@ public static class MailServiceCollectionExtensions
         services.AddOptions<SmtpOptions>().BindConfiguration("Mail:Smtp").ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<MailOutboxOptions>().BindConfiguration("Mail:Outbox");
         services.AddSingleton<IMailClient, SmtpMailClient>();
-        services.AddScoped<IEmailSender<ApplicationUser>, IdentityEmailSender>();
+        services.AddScoped<IdentityEmailSender>();
+        services.AddScoped<IEmailSender<ApplicationUser>>(provider => provider.GetRequiredService<IdentityEmailSender>());
         services.AddHostedService<MailOutboxWorker>();
         return services;
     }

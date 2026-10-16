@@ -5,17 +5,21 @@
 	import {
 		ApiError,
 		externalLoginMessage,
+		getTwoFactorChallenge,
 		isServerPath,
 		listProviders,
 		resendConfirmation,
 		safeReturnUrl,
-		type ExternalProvider
+		type ExternalProvider,
+		type TwoFactorProvider
 	} from '#lib/auth.js';
+	import TwoFactorStep from '#lib/TwoFactorStep.svelte';
 	import { refreshSession, session, signIn, signUp } from '#lib/session.svelte.js';
 
 	// 로그인과 가입을 한 화면에서 전환한다. 로그인에 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
 	// 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 가입하면 확인 메일 안내를 보이고 로그인 화면으로 돌아온다
-	// (이메일을 확인해야 로그인할 수 있다). 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
+	// (이메일을 확인해야 로그인할 수 있다). 2단계 인증을 켠 계정은 두 번째 단계(TwoFactorStep)를 거친다 — 소셜 로그인 뒤에는
+	// 서버가 /login?step=two-factor 로 보낸다. 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
 	let mode = $state<'login' | 'register'>('login');
 	let email = $state('');
 	let password = $state('');
@@ -24,6 +28,7 @@
 	let busy = $state(false);
 	let providers = $state<ExternalProvider[]>([]);
 	let message = $state<string | null>(null);
+	let twoFactor = $state<TwoFactorProvider[] | null>(null);
 
 	const returnUrl = $derived(safeReturnUrl(page.url.searchParams.get('returnUrl')));
 	const notice = $derived(
@@ -38,6 +43,13 @@
 		if (user) {
 			await continueTo(returnUrl);
 			return;
+		}
+
+		if (page.url.searchParams.get('step') === 'two-factor') {
+			twoFactor = await getTwoFactorChallenge().catch(() => null);
+			if (!twoFactor) {
+				message = '로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.';
+			}
 		}
 
 		providers = await listProviders().catch(() => []);
@@ -70,8 +82,10 @@
 		message = null;
 		try {
 			if (mode === 'login') {
-				await signIn(email, password);
-				await continueTo(returnUrl);
+				twoFactor = await signIn(email, password);
+				if (!twoFactor) {
+					await continueTo(returnUrl);
+				}
 			} else {
 				await signUp(email, password);
 				mode = 'login';
@@ -86,6 +100,12 @@
 		}
 	}
 
+	function restart() {
+		twoFactor = null;
+		password = '';
+		message = null;
+	}
+
 	async function resend() {
 		error = null;
 		try {
@@ -98,10 +118,13 @@
 </script>
 
 <svelte:head>
-	<title>{mode === 'login' ? '로그인' : '회원가입'}</title>
+	<title>{twoFactor ? '2단계 인증' : mode === 'login' ? '로그인' : '회원가입'}</title>
 </svelte:head>
 
 <main class="card">
+	{#if twoFactor}
+		<TwoFactorStep providers={twoFactor} onDone={() => continueTo(returnUrl)} onRestart={restart} />
+	{:else}
 	<h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
 	<p class="lead">{mode === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.'}</p>
 
@@ -192,5 +215,6 @@
 			<span class="muted">이미 계정이 있나요?</span>
 			<button type="button" class="link-button" onclick={toggleMode}>로그인</button>
 		</p>
+	{/if}
 	{/if}
 </main>

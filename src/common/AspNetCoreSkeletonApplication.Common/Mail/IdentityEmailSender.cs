@@ -35,6 +35,15 @@ internal sealed class IdentityEmailSender(MailOutboxBizService outbox) : IEmailS
             CancellationToken.None);
     }
 
+    /// <summary>2단계 인증의 로그인 확인 코드 — Identity 의 <see cref="IEmailSender{TUser}"/> 에는 없는 메일이라 따로 둔다.</summary>
+    public Task SendSignInCodeAsync(string email, string code) =>
+        outbox.EnqueueAsync(new OutgoingMailDto(
+            email,
+            $"[{Product}] 로그인 확인 코드",
+            $"로그인을 마치려면 아래 확인 코드를 입력해 주세요. 코드는 몇 분 동안만 쓸 수 있어요.\n\n{code}\n\n로그인한 적이 없다면 비밀번호를 바꿔 주세요.",
+            $"<p>로그인을 마치려면 아래 확인 코드를 입력해 주세요. 코드는 몇 분 동안만 쓸 수 있어요.</p><p style=\"font-size:24px;letter-spacing:4px\"><strong>{code}</strong></p><p>로그인한 적이 없다면 비밀번호를 바꿔 주세요.</p>"),
+            CancellationToken.None);
+
     public Task SendPasswordResetCodeAsync(ApplicationUser user, string email, string resetCode) =>
         throw new NotSupportedException("재설정은 링크로만 보낸다");
 }

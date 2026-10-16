@@ -52,11 +52,12 @@ public static class AuthenticationEndpoints
     }
 
     /// <summary>
-    /// 틀린 이메일 · 비밀번호는 같은 401 이다(계정이 있는지 드러내지 않는다). 5번 틀리면 잠기고 423 이다.
+    /// 틀린 이메일 · 비밀번호는 같은 401 이다(계정이 있는지 드러내지 않는다). 5번 틀리면 잠기고 423 이다. 2단계 인증을 켠 계정은 202 와 두 번째 단계의
+    /// 수단(<see cref="TwoFactorEndpoints.TwoFactorChallengeResponse"/>)이고, 세션 쿠키는 <c>/api/auth/login/2fa</c> 가 준다(기억한 브라우저면 바로 204).
     /// 이메일을 확인하지 않은 계정은 비밀번호가 맞을 때만 403 <c>EMAIL_NOT_CONFIRMED_ERROR</c> 다 — Identity 는 비밀번호를 보기 전에
     /// 확인 여부로 거절하므로(계정 존재가 드러나고 실패 횟수도 세지 않는다) 그 경우만 여기서 먼저 판정한다.
     /// </summary>
-    private static async Task<Results<NoContent, ProblemHttpResult>> LoginAsync(
+    private static async Task<Results<NoContent, Accepted<TwoFactorEndpoints.TwoFactorChallengeResponse>, ProblemHttpResult>> LoginAsync(
         CredentialsRequest request, SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager)
     {
         var user = await userManager.FindByEmailAsync(request.Email);
@@ -69,6 +70,12 @@ public static class AuthenticationEndpoints
         if (result.Succeeded)
         {
             return TypedResults.NoContent();
+        }
+
+        if (result.RequiresTwoFactor)
+        {
+            return TypedResults.Accepted(
+                (string?)null, new TwoFactorEndpoints.TwoFactorChallengeResponse(await TwoFactorEndpoints.MethodsAsync(userManager, user!)));
         }
 
         return result.IsLockedOut ? Locked() : WrongCredentials();

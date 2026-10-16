@@ -12,6 +12,8 @@ namespace AspNetCoreSkeletonApplication.Common.Web;
 public static class IdentityServiceCollectionExtensions
 {
     public const string CookieName = "__Host-session";
+    public const string TwoFactorCookieName = "__Host-tfa";
+    public const string TwoFactorRememberCookieName = "__Host-tfa-remember";
 
     /// <summary>
     /// 로그인 — ASP.NET Core Identity(계정 · 비밀번호 해시 · 잠금) + 쿠키, 그리고 권한 인가. 같은 출처 SPA 가 호출하는 앱(Server)이 부른다.
@@ -19,6 +21,8 @@ public static class IdentityServiceCollectionExtensions
     /// <item>쿠키는 <c>__Host-</c> 이름, HttpOnly · Secure · SameSite=Strict. 로그인 페이지가 없으므로 인증 필요는 401, 권한 없음은 403 이다.</item>
     /// <item>계정 잠금 — 5번 틀리면 30분(형제 스켈레톤과 같은 값).</item>
     /// <item>이메일을 확인해야 로그인한다(<c>RequireConfirmedEmail</c>) — 비밀번호 · 소셜 로그인 모두.</item>
+    /// <item>2단계 인증 — 두 번째 단계를 기다리는 사용자(<c>__Host-tfa</c>)와 기억한 브라우저(<c>__Host-tfa-remember</c>) 쿠키는 SameSite=Lax 다.
+    /// 소셜 로그인 콜백은 공급자에서 돌아오는 cross-site 이동이라, Strict 면 기억한 브라우저 쿠키가 실리지 않는다.</item>
     /// <item>기본 정책은 로그인 필요(fallback). 권한은 <see cref="HasPermissionAttribute"/> 로 선언하고, 요청마다 그룹 · 역할 · 권한으로 판정한다
     /// (<see cref="PermissionAuthorizationHandler"/>). 역할을 Identity 에 두지 않는다 — 인가 도메인이 맡는다.</item>
     /// </list>
@@ -61,6 +65,9 @@ public static class IdentityServiceCollectionExtensions
             };
         });
 
+        services.Configure<CookieAuthenticationOptions>(IdentityConstants.TwoFactorUserIdScheme, options => SecureLax(options, TwoFactorCookieName));
+        services.Configure<CookieAuthenticationOptions>(IdentityConstants.TwoFactorRememberMeScheme, options => SecureLax(options, TwoFactorRememberCookieName));
+
         // 기본은 로그인 필요다 — 익명으로 열 엔드포인트는 [AllowAnonymous] · AllowAnonymous() 로 하나씩 연다(열어 두는 쪽을 명시한다).
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
@@ -70,6 +77,14 @@ public static class IdentityServiceCollectionExtensions
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         return services;
+    }
+
+    private static void SecureLax(CookieAuthenticationOptions options, string name)
+    {
+        options.Cookie.Name = name;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
     }
 
     // 본문은 UseStatusCodePages 가 ProblemDetails 로 채운다.

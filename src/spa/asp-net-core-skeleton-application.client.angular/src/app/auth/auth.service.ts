@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -18,6 +18,30 @@ export interface ExternalProvider {
 export interface ExternalLogin {
   provider: string;
   displayName: string;
+}
+
+/** 로그인 두 번째 단계의 수단 — 계정마다 인증 앱 또는 메일 코드 하나, 남은 복구 코드가 있으면 recovery 도. */
+export type TwoFactorProvider = 'authenticator' | 'email' | 'recovery';
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  method: 'authenticator' | 'email' | null;
+  recoveryCodesLeft: number;
+  browserRemembered: boolean;
+}
+
+export interface AuthenticatorSetup {
+  sharedKey: string;
+  authenticatorUri: string;
+  qrCodeDataUri: string;
+}
+
+interface TwoFactorChallenge {
+  providers: TwoFactorProvider[];
+}
+
+interface RecoveryCodes {
+  recoveryCodes: string[];
 }
 
 export interface ConsentDetails {
@@ -51,9 +75,70 @@ export class AuthService {
     }
   }
 
-  async login(email: string, password: string): Promise<CurrentUser | null> {
-    await this.post('/api/auth/login', { email, password });
-    return this.refresh();
+  /** 로그인한다. 2단계 인증을 켠 계정이면 두 번째 단계의 수단을 돌려주고 로그인 상태는 그대로 둔다(두 번째 단계는 completeTwoFactor). */
+  async login(email: string, password: string): Promise<TwoFactorProvider[] | null> {
+    const response = await this.postForResponse<TwoFactorChallenge>('/api/auth/login', { email, password });
+    if (response.status === 202) {
+      return response.body?.providers ?? [];
+    }
+
+    await this.refresh();
+    return null;
+  }
+
+  /** 두 번째 단계를 기다리는 중이면 그 수단들(소셜 로그인 뒤 /login?step=two-factor 로 왔을 때). 아니면 null. */
+  async twoFactorChallenge(): Promise<TwoFactorProvider[] | null> {
+    try {
+      return (await firstValueFrom(this.http.get<TwoFactorChallenge>('/api/auth/login/2fa'))).providers;
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 401) {
+        return null;
+      }
+      throw ApiError.from(error);
+    }
+  }
+
+  /** 로그인 확인 코드를 메일로 받는다(메일 코드를 쓰는 계정). */
+  sendTwoFactorEmail(): Promise<void> {
+    return this.post('/api/auth/login/2fa/email');
+  }
+
+  /** 두 번째 단계 — 맞으면 로그인된다. rememberBrowser 면 이 브라우저에서는 다음부터 묻지 않는다. */
+  async completeTwoFactor(provider: TwoFactorProvider, code: string, rememberBrowser: boolean): Promise<void> {
+    await this.post('/api/auth/login/2fa', { provider, code, rememberBrowser });
+    await this.refresh();
+  }
+
+  twoFactorStatus(): Promise<TwoFactorStatus> {
+    return this.get<TwoFactorStatus>('/api/account/two-factor');
+  }
+
+  /** 인증 앱 등록을 시작한다 — 새 키와 QR 코드. 코드를 확인해야 켜진다. */
+  async setupAuthenticator(): Promise<AuthenticatorSetup> {
+    return (await this.postForResponse<AuthenticatorSetup>('/api/account/two-factor/authenticator/setup')).body!;
+  }
+
+  /** 인증 앱의 코드로 2단계 인증을 켠다. 복구 코드를 돌려준다(이때 한 번만 받는다). */
+  async verifyAuthenticator(code: string): Promise<string[]> {
+    return (await this.postForResponse<RecoveryCodes>('/api/account/two-factor/authenticator/verify', { code })).body!.recoveryCodes;
+  }
+
+  /** 메일 코드로 2단계 인증을 켠다. 복구 코드를 돌려준다. */
+  async enableEmailTwoFactor(): Promise<string[]> {
+    return (await this.postForResponse<RecoveryCodes>('/api/account/two-factor/email/enable')).body!.recoveryCodes;
+  }
+
+  /** 복구 코드를 새로 받는다 — 전에 받은 코드는 더 쓰지 못한다. */
+  async regenerateRecoveryCodes(): Promise<string[]> {
+    return (await this.postForResponse<RecoveryCodes>('/api/account/two-factor/recovery-codes')).body!.recoveryCodes;
+  }
+
+  disableTwoFactor(password: string): Promise<void> {
+    return this.post('/api/account/two-factor/disable', { password });
+  }
+
+  forgetBrowser(): Promise<void> {
+    return this.post('/api/account/two-factor/forget-browser');
   }
 
   /** 계정을 만든다. 로그인하지 않는다 — 서버가 보낸 메일의 링크로 이메일을 확인해야 로그인할 수 있다. */
@@ -114,8 +199,12 @@ export class AuthService {
   }
 
   private async post(url: string, body?: object): Promise<void> {
+    await this.postForResponse(url, body);
+  }
+
+  private async postForResponse<T>(url: string, body?: object): Promise<HttpResponse<T>> {
     try {
-      await firstValueFrom(this.http.post(url, body ?? null));
+      return await firstValueFrom(this.http.post<T>(url, body ?? null, { observe: 'response' }));
     } catch (error) {
       throw ApiError.from(error);
     }

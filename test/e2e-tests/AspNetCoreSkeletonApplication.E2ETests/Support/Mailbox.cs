@@ -39,5 +39,26 @@ public sealed class Mailbox(Uri mailpitApi) : IDisposable
         throw new TimeoutException($"{email} 에게 {path} 링크가 든 메일이 오지 않았다");
     }
 
+    /// <summary><paramref name="email"/> 에게 온 최신 로그인 확인 코드(6자리). 메일이 올 때까지 잠시 기다린다.</summary>
+    public async Task<string> WaitForSignInCodeAsync(string email)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var query = Uri.EscapeDataString($"to:\"{email}\" subject:\"로그인 확인 코드\"");
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={query}", cancellationToken);
+            if (search.GetProperty("messages").GetArrayLength() > 0)
+            {
+                var id = search.GetProperty("messages")[0].GetProperty("ID").GetString();
+                var message = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/message/{id}", cancellationToken);
+                return System.Text.RegularExpressions.Regex.Match(message.GetProperty("Text").GetString()!, @"\b\d{6}\b").Value;
+            }
+
+            await Task.Delay(200, cancellationToken);
+        }
+
+        throw new TimeoutException($"{email} 에게 로그인 확인 코드가 오지 않았다");
+    }
+
     public void Dispose() => _mailpit.Dispose();
 }

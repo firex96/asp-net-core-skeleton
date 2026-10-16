@@ -136,6 +136,22 @@ public class ExternalLoginTests(InfrastructureFixture infrastructure) : IAsyncLi
     }
 
     [Fact]
+    public async Task TwoFactorAccount_GoesToTheSecondStep_AfterSocialLogin()
+    {
+        var (owner, _) = await SignInWithPasswordAsync("social-two-factor@example.com");
+        await RoundTripAsync(owner, "/api/auth/external/Naver/link");
+        (await owner.PostAsync("/api/account/two-factor/email/enable", null, Token)).EnsureSuccessStatusCode();
+
+        var browser = NewClient();
+        var landing = await RoundTripAsync(browser, "/api/auth/external/Naver/login?returnUrl=%2Fproducts");
+
+        Assert.Equal("/login?step=two-factor&returnUrl=%2Fproducts", landing);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser.GetAsync("/api/auth/me", Token)).StatusCode);
+        var pending = await browser.GetFromJsonAsync<JsonElement>("/api/auth/login/2fa", Token);
+        Assert.Equal("email", pending.GetProperty("providers")[0].GetString());
+    }
+
+    [Fact]
     public async Task UnknownProvider_Is404()
     {
         var response = await NewClient().PostAsync("/api/auth/external/Facebook/login", null, Token);

@@ -7,9 +7,20 @@ export function useSession() {
     return user.value
   }
 
-  async function signIn(email: string, password: string): Promise<CurrentUser | null> {
-    await login(email, password)
-    return refresh()
+  /** 로그인한다. 2단계 인증이 필요하면 그 수단들을 돌려주고 로그인 상태는 그대로 둔다(두 번째 단계는 finishTwoFactor). */
+  async function signIn(email: string, password: string): Promise<TwoFactorProvider[] | null> {
+    const providers = await login(email, password)
+    if (providers) {
+      return providers
+    }
+
+    await refresh()
+    return null
+  }
+
+  async function finishTwoFactor(provider: TwoFactorProvider, code: string, rememberBrowser: boolean): Promise<void> {
+    await completeTwoFactor(provider, code, rememberBrowser)
+    await refresh()
   }
 
   /** 가입만 한다 — 이메일을 확인한 뒤에 로그인한다. */
@@ -22,5 +33,5 @@ export function useSession() {
     user.value = null
   }
 
-  return { user, refresh, signIn, signUp, signOut }
+  return { user, refresh, signIn, finishTwoFactor, signUp, signOut }
 }

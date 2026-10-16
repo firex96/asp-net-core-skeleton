@@ -4,13 +4,15 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ApiError } from '../auth/api-error';
 import { AuthService, ExternalLogin, ExternalProvider } from '../auth/auth.service';
 import { externalLoginMessage, providerName } from '../auth/navigation';
+import { TwoFactorSettingsComponent } from '../two-factor/two-factor-settings.component';
 
 /**
- * 내 계정 — 권한과 연결된 소셜 계정. 연결은 공급자마다 폼 POST 로 시작하고, 공급자에서 돌아오면 <c>?linked=</c> · <c>?error=</c> 로 결과를 받는다.
+ * 내 계정 — 권한, 2단계 인증, 연결된 소셜 계정. 연결은 공급자마다 폼 POST 로 시작하고, 공급자에서 돌아오면 <c>?linked=</c> · <c>?error=</c> 로 결과를 받는다.
  * 로그인하지 않았으면 로그인 화면으로 보낸다.
  */
 @Component({
   selector: 'app-account',
+  imports: [TwoFactorSettingsComponent],
   template: `
     <main class="card card-wide">
       <h1>내 계정</h1>
@@ -27,6 +29,8 @@ import { externalLoginMessage, providerName } from '../auth/navigation';
             }
           </ul>
         }
+
+        <app-two-factor-settings />
 
         <h2 class="section-title">연결된 계정</h2>
         <p class="muted">연결해 두면 비밀번호 없이 그 계정으로 로그인할 수 있어요.</p>

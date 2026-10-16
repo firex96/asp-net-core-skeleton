@@ -39,8 +39,43 @@ describe('AuthService', () => {
     await new Promise(resolve => setTimeout(resolve));
     httpMock.expectOne('/api/auth/me').flush(user);
 
-    expect(await result).toEqual(user);
+    expect(await result).toBeNull();
     expect(service.user()).toEqual(user);
+  });
+
+  it('returns the second-step providers without signing in when the server answers 202', async () => {
+    const result = service.login(user.email, 'Passw0rd!');
+    httpMock.expectOne('/api/auth/login').flush({ providers: ['authenticator', 'recovery'] }, { status: 202, statusText: 'Accepted' });
+
+    expect(await result).toEqual(['authenticator', 'recovery']);
+    httpMock.expectNone('/api/auth/me');
+  });
+
+  it('completes the second step and then loads the current user', async () => {
+    const result = service.completeTwoFactor('email', '123456', true);
+    const request = httpMock.expectOne('/api/auth/login/2fa');
+    expect(request.request.body).toEqual({ provider: 'email', code: '123456', rememberBrowser: true });
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await new Promise(resolve => setTimeout(resolve));
+    httpMock.expectOne('/api/auth/me').flush(user);
+    await result;
+
+    expect(service.user()).toEqual(user);
+  });
+
+  it('treats a missing pending sign-in as null', async () => {
+    const result = service.twoFactorChallenge();
+    httpMock.expectOne('/api/auth/login/2fa').flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(await result).toBeNull();
+  });
+
+  it('reads the authenticator setup', async () => {
+    const setup = { sharedKey: 'abcd efgh', authenticatorUri: 'otpauth://totp/x', qrCodeDataUri: 'data:image/svg+xml;base64,' };
+    const result = service.setupAuthenticator();
+    httpMock.expectOne('/api/account/two-factor/authenticator/setup').flush(setup);
+
+    expect(await result).toEqual(setup);
   });
 
   it('turns a problem response into ApiError with the server message', async () => {

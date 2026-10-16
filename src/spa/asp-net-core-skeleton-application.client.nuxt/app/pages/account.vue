@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 내 계정 — 권한과 연결된 소셜 계정. 연결은 공급자마다 폼 POST 로 시작하고, 돌아오면 ?linked= · ?error= 로 결과를 받는다.
+// 내 계정 — 권한, 2단계 인증, 연결된 소셜 계정. 연결은 공급자마다 폼 POST 로 시작하고, 돌아오면 ?linked= · ?error= 로 결과를 받는다.
 const session = useSession()
 const route = useRoute()
 const providers = ref<ExternalProvider[]>([])
@@ -65,6 +65,8 @@ async function remove(provider: string) {
           <code>{{ permission }}</code>
         </li>
       </ul>
+
+      <TwoFactorSettings />
 
       <h2 class="section-title">
         연결된 계정

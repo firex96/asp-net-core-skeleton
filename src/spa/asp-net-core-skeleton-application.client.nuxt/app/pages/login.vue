@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // 로그인과 가입을 한 화면에서 전환한다. 로그인에 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
 // 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 가입하면 확인 메일 안내를 보이고 로그인 화면으로 돌아온다
-// (이메일을 확인해야 로그인할 수 있다). 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
+// (이메일을 확인해야 로그인할 수 있다). 2단계 인증을 켠 계정은 두 번째 단계(TwoFactorStep)를 거친다 — 소셜 로그인 뒤에는
+// 서버가 /login?step=two-factor 로 보낸다. 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
 const session = useSession()
 const route = useRoute()
 
@@ -13,9 +14,10 @@ const error = ref<ApiError | null>(null)
 const busy = ref(false)
 const providers = ref<ExternalProvider[]>([])
 const message = ref<string | null>(null)
+const twoFactor = ref<TwoFactorProvider[] | null>(null)
 
 const returnUrl = computed(() => safeReturnUrl(typeof route.query.returnUrl === 'string' ? route.query.returnUrl : null))
-const title = computed(() => (mode.value === 'login' ? '로그인' : '회원가입'))
+const title = computed(() => (twoFactor.value ? '2단계 인증' : mode.value === 'login' ? '로그인' : '회원가입'))
 const notice = computed(() =>
   externalLoginMessage(queryValue('error'), queryValue('provider'))
   ?? (queryValue('reset') === 'done' ? '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.' : null),
@@ -48,6 +50,13 @@ onMounted(async () => {
     return
   }
 
+  if (queryValue('step') === 'two-factor') {
+    twoFactor.value = await getTwoFactorChallenge().catch(() => null)
+    if (!twoFactor.value) {
+      message.value = '로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.'
+    }
+  }
+
   providers.value = await listProviders().catch(() => [])
 })
 
@@ -68,8 +77,10 @@ async function submit() {
   message.value = null
   try {
     if (mode.value === 'login') {
-      await session.signIn(email.value, password.value)
-      await continueTo(returnUrl.value)
+      twoFactor.value = await session.signIn(email.value, password.value)
+      if (!twoFactor.value) {
+        await continueTo(returnUrl.value)
+      }
     }
     else {
       await session.signUp(email.value, password.value)
@@ -87,6 +98,12 @@ async function submit() {
   }
 }
 
+function restart() {
+  twoFactor.value = null
+  password.value = ''
+  message.value = null
+}
+
 async function resend() {
   error.value = null
   try {
@@ -100,7 +117,10 @@ async function resend() {
 </script>
 
 <template>
-  <main class="card">
+  <main v-if="twoFactor" class="card">
+    <TwoFactorStep :providers="twoFactor" @done="continueTo(returnUrl)" @restart="restart" />
+  </main>
+  <main v-else class="card">
     <h1>{{ title }}</h1>
     <p class="lead">
       {{ mode === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.' }}

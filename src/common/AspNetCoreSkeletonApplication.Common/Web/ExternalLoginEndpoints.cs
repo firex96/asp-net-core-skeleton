@@ -98,10 +98,17 @@ public static class ExternalLoginEndpoints
             return TypedResults.Redirect(await LinkAsync(userManager, userId, info));
         }
 
-        var result = await signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: true);
+        // 2단계 인증을 켠 계정은 소셜 로그인 뒤에도 두 번째 단계를 거친다(기억한 브라우저면 바로 로그인).
+        var result = await signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: false);
+        var returnUrl = SafeLocalPath(properties.Items.TryGetValue(ReturnUrlKey, out var requested) ? requested : null);
         if (result.Succeeded)
         {
-            return TypedResults.Redirect(SafeLocalPath(properties.Items.TryGetValue(ReturnUrlKey, out var returnUrl) ? returnUrl : null));
+            return TypedResults.Redirect(returnUrl);
+        }
+
+        if (result.RequiresTwoFactor)
+        {
+            return TypedResults.Redirect($"/login?step=two-factor&returnUrl={Uri.EscapeDataString(returnUrl)}");
         }
 
         // NotAllowed — 연결은 됐지만 이메일을 확인하지 않은 계정(RequireConfirmedEmail).
