@@ -204,7 +204,7 @@ EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백
 규칙 (예외 없음):
 
 - **캐시는 EntityService 에서만**, `HybridCache` 를 직접 쓰지 않고 `EntityCache` 를 거친다(주입 허용 목록이 강제한다).
-- 키는 `{엔티티}:{id}` · `{엔티티}:list`, 태그는 `{엔티티}`. **캐시하는 엔티티의 모든 변경 메서드는 그 태그 전체를 무효화한다** — 키를 골라 지우다 빠뜨리는 일이 없다(형제 스켈레톤의 `ProductIdList` 처럼 무효화가 없는 캐시가 생기지 않는다).
+- 키는 `{엔티티}:{id}` · `{엔티티}:list` · 조건이 붙은 목록은 `{엔티티}:list:{조건}`(`user_group_member:list:user:7`), 태그는 `{엔티티}` — 엔티티 이름은 테이블 이름과 같다. **캐시하는 엔티티의 모든 변경 메서드는 그 태그 전체를 무효화한다** — 키를 골라 지우다 빠뜨리는 일이 없다(형제 스켈레톤의 `ProductIdList` 처럼 무효화가 없는 캐시가 생기지 않는다).
 - **없는 값은 캐시하지 않는다.** `EntityCache.FindOrLoadAsync` 가 null 결과를 캐시에 넣지 않는다.
 - **무효화는 커밋 뒤에.** 트랜잭션 안에서 부른 무효화는 모아 두었다가 `IMainTransaction` 이 커밋한 직후에 실행하고, 롤백되면 버린다. 커밋 전에 지우면 그 사이 다른 요청이 옛 값을 다시 캐시해 만료까지 남는다.
 
@@ -373,26 +373,31 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 | `POST /api/auth/register` `{email, password}` | 201. 비밀번호 10자 이상 · 대소문자 · 숫자 · 기호(Identity 기본). 어기면 400 `NOT_VALID_ERROR` |
 | `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드) |
 | `POST /api/auth/logout` | 204, 쿠키 삭제 |
-| `GET /api/auth/me` | `{id, email, roles}`. 로그인하지 않았으면 401 |
+| `GET /api/auth/me` | `{id, email, permissions}` — 실효 권한 코드(화면이 쓸 수 있는 기능을 고를 때 쓴다). 로그인하지 않았으면 401 |
 
 - **쿠키** — `__Host-session`, HttpOnly · Secure · SameSite=Strict, 8시간(쓰면 연장). 로그인 페이지가 없으므로 인증이 필요하면 리다이렉트 대신 401, 권한이 없으면 403 을 ProblemDetails 로 돌려준다.
 - **여러 인스턴스** — 쿠키를 암호화하는 Data Protection 키를 Redis 에 둔다(`{Cache:KeyPrefix}data-protection-keys`). 어느 인스턴스가 만든 쿠키든 다른 인스턴스가 읽는다. 키는 Redis 에 평문으로 있으므로 Redis 접근을 앱으로 제한한다.
 - **감사** — 로그인한 요청은 사용자 ID(`NameIdentifier` claim)가 감사 주체가 된다(「추적 ID 와 감사」의 1순위).
-- **계정 테이블** — Identity 정본 스키마를 `identity_` 접두사로 둔다(`identity_user`, `identity_role`, `identity_user_role` …). 프레임워크 소유라 업무 테이블 규칙(FOREIGN KEY 금지 · `BaseEntity`)의 대상이 아니다. 업무 데이터는 이 테이블에 칼럼을 더하지 않고, 사용자 ID 로 가리키는 별도 엔티티에 둔다.
-- **역할** — `Administrator` 가 시드돼 있다. 관리자 지정은 가입한 뒤 SQL 로 한다(관리 API 는 두지 않는다).
+- **계정 테이블** — Identity 정본 스키마를 `identity_` 접두사로 둔다(`identity_user`, `identity_user_login` …). 역할 테이블은 없다 — 역할은 인가 도메인이 맡는다. 프레임워크 소유라 업무 테이블 규칙(FOREIGN KEY 금지 · `BaseEntity`)의 대상이 아니다. 업무 데이터는 이 테이블에 칼럼을 더하지 않고, 사용자 ID 로 가리키는 별도 엔티티에 둔다.
 
-**인가** (예외 없음)
+**인가** (예외 없음) — **사용자 → 그룹 → 역할 → 권한 코드**
 
 - **기본은 로그인 필요다**(fallback 정책). 익명으로 열 엔드포인트는 하나씩 연다 — 컨트롤러 · 액션의 `[AllowAnonymous]`, 엔드포인트의 `.AllowAnonymous()`. Server 에서 열린 것: WeatherForecast, Product 조회(목록 · 단건 · 상태 이력), `/health`, OpenAPI · Scalar, SPA 정적 파일 · fallback, `/api/auth/register` · `login`.
-- **역할이 아니라 정책으로** 인가한다 — `[Authorize(Policy = Policies.Administrator)]`. 역할 문자열(`Roles = "…"`)은 컨트롤러에 쓰지 않는다(`AuthorizationConventionTests`). Product 의 상태 변경 · 삭제가 관리자 정책이다.
+- **권한 코드로 선언한다** — `[HasPermission(Permissions.Products.Manage)]`. 코드는 `Common/Authorization/Permissions` 카탈로그 하나가 정본이고(`{대상}.{동작}` 소문자), 카탈로그 밖 코드와 역할 문자열(`Roles = "…"`)은 규약 테스트가 막는다(`AuthorizationConventionTests`). 지금 코드: `products.manage`(상품 상태 변경 · 삭제), `authorization.manage`(그룹 · 역할 · 권한 관리).
+- **사용자에게 역할을 직접 주지 않는다.** 사용자는 그룹(`user_group_member`)에 속하고, 그룹이 역할(`user_group_role`)을, 역할이 권한 코드(`role_permission`)를 갖는다. 실효 권한은 그 합집합이다(`EffectivePermissions`).
+- **판정은 요청마다 서버가 한다** — 쿠키에 굳은 클레임을 쓰지 않는다. 조회 셋(사용자의 그룹, 그룹-역할, 역할-권한)은 캐시되고, 바뀌면 태그 무효화가 백플레인으로 모든 인스턴스에 곧바로 닿는다 — 권한을 빼면 다음 요청부터 403 이다.
+- **판정의 입구는 `IPermissionEvaluator` 하나다.** 권한 정책 핸들러가 이것만 부른다. 그룹 · 역할 · 권한의 변경은 인가 도메인의 BizService(`UserGroupBizService` · `RoleBizService`)에서만 일어난다(도메인 경계 규약). 그래서 판정 방식을 ReBAC(OpenFGA 등)으로 바꿀 때 바꿀 곳은 평가기 구현과 이 두 BizService 의 관계 동기화다. 권한으로 목록을 거르는 조회는 두지 않는다 — 필요해지면 평가기에 목록 판정을 더해 그것만 쓴다.
+- **관리 API** (`authorization.manage`) — `/api/authorization/groups`(CRUD, `/{id}/members/{userId}` · `/{id}/roles/{roleId}` 는 PUT 추가 · DELETE 제거, 멱등), `/api/authorization/roles`(CRUD, 권한은 집합째 보낸다), `/api/authorization/permissions`(카탈로그). **마지막 `authorization.manage` 보유자를 없애는 변경은 409** 로 되돌린다 — 운영자가 스스로를 잠그지 않는다. 카탈로그 밖 코드는 400.
+- **시드** — 마이그레이션 `AddAuthorizationGroups` 가 그룹 `Administrators` 와 역할 `Administrator`(모든 권한)를 만든다. 첫 관리자는 가입한 뒤 SQL 로 그룹에 넣는다(아래). 그다음부터는 관리 API 로 한다.
 
 **CSRF** — 쿠키가 SameSite=Strict 이고, 그 위에 **Fetch Metadata** 를 한 번 더 본다: 브라우저가 붙이는 `Sec-Fetch-Site` 가 `cross-site` 인 변경 요청(POST · PUT · PATCH · DELETE)은 403(`FetchMetadataMiddleware`, `UseSkeletonWeb` 에 들어 있다). antiforgery 토큰을 주고받지 않으므로 SPA 코드는 바꿀 것이 없다. 헤더가 없는 요청(서버 간 호출)은 막지 않는다.
 
 ```sql
-INSERT INTO identity_user_role (UserId, RoleId)
-SELECT u.Id, r.Id FROM identity_user AS u CROSS JOIN identity_role AS r
-WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADMINISTRATOR';
--- 역할은 다음 로그인부터 쿠키에 실린다
+-- 첫 관리자 지정 — 다음 요청부터 반영된다(권한은 쿠키가 아니라 요청마다 판정한다). 이미 떠 있는 앱의 캐시는 최대 Cache:Expiration 뒤에 바뀐다
+INSERT INTO user_group_member (UserGroupId, UserId, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt)
+SELECT g.Id, u.Id, 0, SYSUTCDATETIME(), 0, SYSUTCDATETIME()
+FROM identity_user AS u CROSS JOIN user_group AS g
+WHERE u.NormalizedEmail = UPPER('admin@example.com') AND g.Name = 'Administrators' AND g.DeletedAt IS NULL;
 ```
 
 ## 아키텍처 선택
@@ -479,7 +484,7 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADM
 | Model · Dto 는 기본값 없는 `sealed record`, 매퍼는 static, 엔티티에 navigation 없음 | `DeclarationConventionTests` |
 | Domain 은 Dto · 열거형 · 에러 · System 만 참조 (시그니처 수준) | `DeclarationConventionTests` |
 | 열거형 멤버마다 중복 없는 외부 코드 | `DeclarationConventionTests` |
-| 컨트롤러는 역할 문자열이 아니라 정책으로 인가 | `AuthorizationConventionTests` |
+| 컨트롤러는 역할 문자열이 아니라 `[HasPermission]` 으로, 코드는 카탈로그 상수만 | `AuthorizationConventionTests` |
 | 계층 네임스페이스는 도메인 아래, 공통 기반 영역에는 abstract 기반 타입만, 다른 도메인의 영속 계층 참조 금지 | `DomainConventionTests` |
 | 테이블 이름은 클래스 이름의 snake_case(프레임워크는 접두사), 예약어 금지 | `TableNamingConventionTests` (EF 모델 검사) |
 

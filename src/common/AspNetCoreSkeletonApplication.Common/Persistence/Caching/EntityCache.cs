@@ -10,7 +10,7 @@ namespace AspNetCoreSkeletonApplication.Common.Persistence.Caching;
 /// <item><b>무효화는 커밋 뒤에.</b> 트랜잭션 안에서 무효화하면 커밋 전에 다른 요청이 옛 값을 다시 캐시할 수 있다. 그래서 트랜잭션 안의 무효화는
 /// 모아 두었다가 <c>MainTransaction</c> 이 커밋한 직후에 실행하고, 롤백되면 버린다. 트랜잭션 밖이면 바로 실행한다.</item>
 /// </list>
-/// 키는 <c>{엔티티}:{id}</c> · <c>{엔티티}:list</c>, 태그는 <c>{엔티티}</c> 다. 캐시하는 엔티티의 모든 변경 메서드는 그 태그 전체를 무효화한다.
+/// 키는 <c>{엔티티}:{id}</c> · <c>{엔티티}:list</c> · <c>{엔티티}:list:{조건}</c>, 태그는 <c>{엔티티}</c>(테이블 이름) 다. 캐시하는 엔티티의 모든 변경 메서드는 그 태그 전체를 무효화한다.
 /// </summary>
 internal sealed class EntityCache(HybridCache cache, AppDbContext dbContext)
 {

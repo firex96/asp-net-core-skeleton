@@ -1,3 +1,4 @@
+using AspNetCoreSkeletonApplication.Common.Authorization.Services.Biz;
 using AspNetCoreSkeletonApplication.Common.Diagnostics;
 using AspNetCoreSkeletonApplication.Common.Persistence;
 using AspNetCoreSkeletonApplication.Common.Persistence.Caching;
@@ -64,6 +65,8 @@ public static class CommonServiceCollectionExtensions
             .AddDbContextCheck<AppDbContext>();
 
         services.AddLayeredServices(typeof(CommonServiceCollectionExtensions).Assembly);
+        // 권한 판정의 입구 — 구현을 바꿀 때(예: ReBAC) 이 줄만 바꾼다.
+        services.AddScoped<IPermissionEvaluator>(serviceProvider => serviceProvider.GetRequiredService<PermissionBizService>());
 
         return services;
     }

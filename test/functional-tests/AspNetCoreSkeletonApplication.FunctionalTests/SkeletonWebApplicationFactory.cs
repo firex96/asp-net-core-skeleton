@@ -1,15 +1,17 @@
+using AspNetCoreSkeletonApplication.Common.Authorization.Services.Biz;
 using AspNetCoreSkeletonApplication.FunctionalTests.Support;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests;
 
 /// <summary>
 /// 비밀값 출처 없이(Testing 환경) 앱을 띄운다. DB · Redis 에는 붙지 않으므로 연결 문자열은 형식만 맞춘 값이다.
-/// 인증은 <see cref="TestAuthenticationHandler"/>(<c>X-Test-User</c> 헤더)로 바꾼다 — 인가 규칙은 앱과 같다.
+/// 인증은 <see cref="TestAuthenticationHandler"/>(<c>X-Test-User</c> 헤더)로, 권한 판정은 <see cref="ClaimsPermissionEvaluator"/> 로 바꾼다 — 인가 규칙은 앱과 같다.
 /// </summary>
 public class SkeletonWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -21,6 +23,8 @@ public class SkeletonWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("OpenApi:Enabled", "true");
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IPermissionEvaluator>();
+            services.AddScoped<IPermissionEvaluator, ClaimsPermissionEvaluator>();
             services.AddAuthentication()
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.SchemeName, null);
             services.PostConfigure<AuthenticationOptions>(options =>

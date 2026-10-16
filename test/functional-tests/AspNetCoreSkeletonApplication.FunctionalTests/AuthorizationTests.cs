@@ -5,7 +5,8 @@ using AspNetCoreSkeletonApplication.FunctionalTests.Support;
 namespace AspNetCoreSkeletonApplication.FunctionalTests;
 
 /// <summary>
-/// 인가 규칙 — 기본은 로그인 필요, 조회는 익명으로 열었고, 상태 변경 · 삭제는 관리자 정책. cross-site 변경 요청은 로그인했어도 403.
+/// 인가 규칙 — 기본은 로그인 필요, 조회는 익명으로 열었고, 상태 변경 · 삭제는 권한 <c>products.manage</c>,
+/// 인가 관리 API 는 <c>authorization.manage</c>. cross-site 변경 요청은 로그인했어도 403.
 /// </summary>
 public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFixture<ProductWebApplicationFactory>
 {
@@ -22,30 +23,59 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
     }
 
     [Fact]
-    public async Task User_CanCreateButNotChangeStatusOrDelete()
+    public async Task User_CanCreateButNotChangeStatus()
     {
         var client = ClientAs("7");
-        var created = await client.PostAsJsonAsync("/api/products", new { name = "Mine", price = 1 }, TestContext.Current.CancellationToken);
-        var id = (await created.Content.ReadFromJsonAsync<IdOnly>(TestContext.Current.CancellationToken))!.Id;
+        var id = await CreateAsync(client, "Mine");
 
         var status = await client.PutAsJsonAsync($"/api/products/{id}/status", new { status = "OnSale" }, TestContext.Current.CancellationToken);
-        var delete = await client.DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, status.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
 
     [Fact]
-    public async Task Administrator_CanChangeStatus()
+    public async Task Manager_CanChangeStatus()
     {
-        var client = ClientAs("1;Administrator");
-        var created = await client.PostAsJsonAsync("/api/products", new { name = "Admin", price = 1 }, TestContext.Current.CancellationToken);
-        var id = (await created.Content.ReadFromJsonAsync<IdOnly>(TestContext.Current.CancellationToken))!.Id;
+        var client = ClientAs("1;products.manage");
+        var id = await CreateAsync(client, "Managed");
 
         var status = await client.PutAsJsonAsync($"/api/products/{id}/status", new { status = "OnSale" }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, status.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_NeedsProductManagePermission()
+    {
+        var id = await CreateAsync(ClientAs("7"), "Mine");
+
+        var byUser = await ClientAs("7").DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
+        var byManager = await ClientAs("1;products.manage").DeleteAsync($"/api/products/{id}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, byUser.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, byManager.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/api/authorization/groups")]
+    [InlineData("/api/authorization/roles")]
+    [InlineData("/api/authorization/permissions")]
+    public async Task AuthorizationManagement_NeedsItsPermission(string path)
+    {
+        var anonymous = await factory.CreateClient().GetAsync(path, TestContext.Current.CancellationToken);
+        var user = await ClientAs("7;products.manage").GetAsync(path, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, user.StatusCode);
+    }
+
+    [Fact]
+    public async Task PermissionCatalog_ListsEveryCode()
+    {
+        var catalog = await ClientAs("1;authorization.manage")
+            .GetFromJsonAsync<IReadOnlyList<CodeOnly>>("/api/authorization/permissions", TestContext.Current.CancellationToken);
+
+        Assert.Equal(["products.manage", "authorization.manage"], catalog!.Select(permission => permission.Code));
     }
 
     [Theory]
@@ -68,5 +98,14 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
         return client;
     }
 
+    private static async Task<long> CreateAsync(HttpClient client, string name)
+    {
+        var created = await client.PostAsJsonAsync("/api/products", new { name, price = 1 }, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return (await created.Content.ReadFromJsonAsync<IdOnly>(TestContext.Current.CancellationToken))!.Id;
+    }
+
     private sealed record IdOnly(long Id);
+
+    private sealed record CodeOnly(string Code);
 }

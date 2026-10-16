@@ -11,7 +11,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [Fact]
     public async Task Create_Returns201WithLocationAndDraftStatus()
     {
-        var response = await AdministratorClient().PostAsJsonAsync(
+        var response = await ManagerClient().PostAsJsonAsync(
             "/api/products", new { name = "Keyboard", price = 49000 }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -23,7 +23,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [Fact]
     public async Task Get_Missing_Is404ProblemDetails()
     {
-        var response = await AdministratorClient().GetAsync("/api/products/999999", TestContext.Current.CancellationToken);
+        var response = await ManagerClient().GetAsync("/api/products/999999", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("NOT_FOUND_ERROR", (await ReadJsonAsync(response)).GetProperty("code").GetString());
@@ -35,7 +35,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [InlineData("""{"name": "Keyboard", "price": -1}""")]
     public async Task Create_InvalidBody_Is400NotValid(string body)
     {
-        var response = await AdministratorClient().PostAsync(
+        var response = await ManagerClient().PostAsync(
             "/api/products", new StringContent(body, System.Text.Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -45,7 +45,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [Fact]
     public async Task ChangeStatus_FollowsDomainRule()
     {
-        var client = AdministratorClient();
+        var client = ManagerClient();
         var created = await ReadJsonAsync(await client.PostAsJsonAsync(
             "/api/products", new { name = "Mouse", price = 19000 }, TestContext.Current.CancellationToken));
         var id = created.GetProperty("id").GetInt64();
@@ -64,7 +64,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [Fact]
     public async Task StatusHistory_RecordsOnlyAppliedChanges()
     {
-        var client = AdministratorClient();
+        var client = ManagerClient();
         var id = (await ReadJsonAsync(await client.PostAsJsonAsync(
             "/api/products", new { name = "Stand", price = 29000 }, TestContext.Current.CancellationToken))).GetProperty("id").GetInt64();
 
@@ -80,7 +80,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [Fact]
     public async Task Delete_Is204ThenGetIs404()
     {
-        var client = AdministratorClient();
+        var client = ManagerClient();
         var id = (await ReadJsonAsync(await client.PostAsJsonAsync(
             "/api/products", new { name = "Tray", price = 5000 }, TestContext.Current.CancellationToken))).GetProperty("id").GetInt64();
 
@@ -96,7 +96,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [Fact]
     public async Task StatusHistory_MissingProduct_Is404()
     {
-        var response = await AdministratorClient().GetAsync("/api/products/777777/status-history", TestContext.Current.CancellationToken);
+        var response = await ManagerClient().GetAsync("/api/products/777777/status-history", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -104,7 +104,7 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
     [Fact]
     public async Task Response_DoesNotExposeAuditorIds()
     {
-        var response = await AdministratorClient().PostAsJsonAsync(
+        var response = await ManagerClient().PostAsJsonAsync(
             "/api/products", new { name = "Pad", price = 9000 }, TestContext.Current.CancellationToken);
 
         var product = await ReadJsonAsync(response);
@@ -112,10 +112,10 @@ public class ProductApiTests(ProductWebApplicationFactory factory) : IClassFixtu
         Assert.True(product.TryGetProperty("createdAt", out _));
     }
 
-    private HttpClient AdministratorClient()
+    private HttpClient ManagerClient()
     {
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthenticationHandler.HeaderName, "1;Administrator");
+        client.DefaultRequestHeaders.Add(TestAuthenticationHandler.HeaderName, "1;products.manage");
         return client;
     }
 

@@ -12,7 +12,7 @@ builder.AddSecretSource<Program>();
 builder.Services.AddCommon();
 builder.Services.AddLayeredServices(typeof(Program).Assembly);
 builder.Services.AddSkeletonWeb();
-// 로그인 — Identity + 쿠키(같은 출처 SPA). README 「인증」
+// 로그인 — Identity + 쿠키(같은 출처 SPA), 권한 인가(그룹 · 역할 · 권한). README 「인증」 · 「인가」
 builder.Services.AddSkeletonIdentity();
 
 // 외부 API 클라이언트 — 구성 바인딩 · 재시도 · 추적 ID 전파 · 실패 → ApiCallException

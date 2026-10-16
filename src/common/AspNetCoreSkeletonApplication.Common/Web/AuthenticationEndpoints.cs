@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using AspNetCoreSkeletonApplication.Common.Authorization.Services.Biz;
 using AspNetCoreSkeletonApplication.Common.Persistence.Identity;
+using AspNetCoreSkeletonApplication.Common.Web.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -20,7 +22,7 @@ public static class AuthenticationEndpoints
         auth.MapPost("/register", RegisterAsync).AllowAnonymous();
         auth.MapPost("/login", LoginAsync).AllowAnonymous();
         auth.MapPost("/logout", LogoutAsync).RequireAuthorization();
-        auth.MapGet("/me", Me).RequireAuthorization();
+        auth.MapGet("/me", MeAsync).RequireAuthorization();
         return endpoints;
     }
 
@@ -57,13 +59,19 @@ public static class AuthenticationEndpoints
         return TypedResults.NoContent();
     }
 
-    private static Ok<CurrentUserResponse> Me(ClaimsPrincipal user) =>
-        TypedResults.Ok(new CurrentUserResponse(
-            long.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!, System.Globalization.CultureInfo.InvariantCulture),
+    /// <summary>현재 사용자와 그 실효 권한 — SPA 가 화면에서 쓸 수 있는 기능을 고를 때 쓴다(서버는 요청마다 다시 판정한다).</summary>
+    private static async Task<Ok<CurrentUserResponse>> MeAsync(
+        ClaimsPrincipal user, IPermissionEvaluator evaluator, CancellationToken cancellationToken)
+    {
+        var id = UserClaims.IdOf(user) ?? throw new InvalidOperationException("로그인한 사용자에게 ID 클레임이 없다");
+        var permissions = await evaluator.ListPermissionsAsync(id, cancellationToken);
+        return TypedResults.Ok(new CurrentUserResponse(
+            id,
             user.FindFirstValue(ClaimTypes.Email) ?? user.Identity!.Name!,
-            user.FindAll(ClaimTypes.Role).Select(claim => claim.Value).ToArray()));
+            permissions.Order(StringComparer.Ordinal).ToArray()));
+    }
 
     public sealed record CredentialsRequest(string Email, string Password);
 
-    public sealed record CurrentUserResponse(long Id, string Email, IReadOnlyList<string> Roles);
+    public sealed record CurrentUserResponse(long Id, string Email, IReadOnlyList<string> Permissions);
 }

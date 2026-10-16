@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using AspNetCoreSkeletonApplication.Common.Constants;
+using AspNetCoreSkeletonApplication.Common.Authorization.Services.Biz;
 using AspNetCoreSkeletonApplication.Common.Persistence.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -13,6 +13,9 @@ internal static class TestUsers
 {
     public const string Password = "Passw0rd!-long";
 
+    /// <summary>마이그레이션 <c>AddAuthorizationGroups</c> 가 시드한 관리자 그룹.</summary>
+    public const string AdministratorsGroup = "Administrators";
+
     public static readonly WebApplicationFactoryClientOptions Https = new() { BaseAddress = new Uri("https://localhost") };
 
     public static async Task<(HttpClient Client, long UserId)> SignInAsync(
@@ -24,10 +27,13 @@ internal static class TestUsers
 
         if (administrator)
         {
+            // 마이그레이션이 시드한 Administrators 그룹(역할 Administrator — 모든 권한)에 넣는다. BizService 를 거쳐 캐시도 무효화된다.
             using var scope = factory.Services.CreateScope();
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var user = await users.FindByEmailAsync(email) ?? throw new InvalidOperationException($"{email} 가 없다");
-            Assert.True((await users.AddToRoleAsync(user, Roles.Administrator)).Succeeded);
+            var groups = scope.ServiceProvider.GetRequiredService<UserGroupBizService>();
+            var administrators = (await groups.ListAsync(cancellationToken)).Single(group => group.Name == AdministratorsGroup);
+            await groups.AddMemberAsync(administrators.Id, user.Id, cancellationToken);
         }
 
         (await client.PostAsJsonAsync("/api/auth/login", new { email, password = Password }, cancellationToken)).EnsureSuccessStatusCode();
