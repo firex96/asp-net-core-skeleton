@@ -15,6 +15,8 @@ public static partial class ProductModelMapper
 
     public static partial ProductCreateDto ToDto(this ProductCreateModel model);
 
+    public static partial ProductViewerDto ToDto(this ProductViewerModel model);
+
     /// <summary>상품 ID 는 경로에 있고, 감사 주체 ID 는 내보내지 않는다.</summary>
     [MapperIgnoreSource(nameof(ProductStatusHistoryDto.ProductId))]
     [MapperIgnoreSource(nameof(ProductStatusHistoryDto.CreatedBy))]

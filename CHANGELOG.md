@@ -50,6 +50,7 @@
 - 게이트웨이 뒤 내부 API 앱 `InternalApi` — Server 와 같은 Common 을 쓰고 SPA 를 서빙하지 않는다. 템플릿 선택지 `--internalApi`(기본 true)
 
 ### Changed
+- 판매 전(Draft) 상품은 작성자와 `products.manage` 보유자만 본다 — 상품 목록에서 빠지고, 단건 · 상태 이력 · 삭제는 404(남의 Draft 삭제는 403 → 404). 권한은 컨트롤러가 권한 정책으로 판정하고(Bearer 토큰은 scope 교집합), 규칙은 Domain `ProductAccessRule.CanView`. 정책 이름 도우미 `HasPermissionAttribute.PolicyNameOf`. InternalApi · Batch 는 그대로 모두 본다
 - 메일 전송을 Mail 도메인의 클라이언트 계층으로 — `IMailSender` · `SmtpMailSender` → `IMailClient` · `SmtpMailClient`(`Mail.Clients`), `OutgoingMail` → `OutgoingMailDto`. Identity 계정 메일(`IdentityEmailSender`)은 아웃박스에 넣는다
 - SPA 세 개의 화면을 다듬었다 — 의존성 없는 공통 CSS(카드형 계정 화면, 상단 바, 버튼 · 입력, 공급자 색 소셜 버튼, 알림, 라이트 · 다크), 화면 문구를 자연스러운 한국어로(`lang="ko"`, 화면별 제목), 검증 오류는 같은 문장을 한 번만, 로그인 화면에서는 상단 로그인 버튼을 숨긴다
 - 사용자에게 보이는 서버 문구를 자연스러운 한국어로 — 로그인 실패 · 잠금 · 재설정 링크 · 마지막 로그인 수단 메시지, 비밀번호 규칙 · 이메일 중복 같은 Identity 오류(`KoreanIdentityErrorDescriber`, 코드는 그대로), 재설정 메일, 동의 화면의 scope · 권한 설명, 소셜 공급자 표시 이름(카카오 · 네이버)

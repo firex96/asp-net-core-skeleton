@@ -1,3 +1,4 @@
+using AspNetCoreSkeletonApplication.Common.Errors;
 using AspNetCoreSkeletonApplication.Common.Product.Domain;
 using AspNetCoreSkeletonApplication.Common.Product.Dtos;
 using AspNetCoreSkeletonApplication.Common.Product.Enums;
@@ -16,11 +17,30 @@ public class ProductBizService(
     IProductStatusHistoryEntityService statusHistoryEntityService,
     IMainTransaction transaction)
 {
+    /// <summary>보는 사람과 무관하게 읽는다 — 게이트웨이 뒤 내부 API(InternalApi) · 배치가 쓴다.</summary>
     public Task<ProductDto> GetAsync(long id, CancellationToken cancellationToken) =>
         productEntityService.GetAsync(id, cancellationToken);
 
-    public Task<IReadOnlyList<ProductDto>> ListAsync(CancellationToken cancellationToken) =>
-        productEntityService.ListAsync(cancellationToken);
+    /// <summary>
+    /// <paramref name="viewer"/> 가 볼 수 있는 상품 하나(<see cref="ProductAccessRule.CanView"/>). 볼 수 없으면 없는 상품과 같은 404 다 —
+    /// 남의 판매 전 상품이 있다는 것도 드러내지 않는다.
+    /// </summary>
+    public async Task<ProductDto> GetVisibleAsync(long id, ProductViewerDto viewer, CancellationToken cancellationToken)
+    {
+        var product = await productEntityService.GetAsync(id, cancellationToken);
+        return ProductAccessRule.CanView(product.Status, product.CreatedBy, viewer.ActorId, viewer.CanManageProducts)
+            ? product
+            : throw new ItemNotFoundException($"상품 {id} 가 없다");
+    }
+
+    /// <summary>
+    /// <paramref name="viewer"/> 가 볼 수 있는 상품 목록. 목록은 페이지 없이 통째로 캐시돼 있어, 캐시된 목록에 Domain 규칙을 그대로 적용한다 —
+    /// 규칙을 SQL 조건으로 한 번 더 쓰지 않는다. 목록에 페이지가 생기면 이 거르기를 쿼리로 옮긴다.
+    /// </summary>
+    public async Task<IReadOnlyList<ProductDto>> ListAsync(ProductViewerDto viewer, CancellationToken cancellationToken) =>
+        (await productEntityService.ListAsync(cancellationToken))
+        .Where(product => ProductAccessRule.CanView(product.Status, product.CreatedBy, viewer.ActorId, viewer.CanManageProducts))
+        .ToList();
 
     public Task<ProductDto> CreateAsync(ProductCreateDto product, CancellationToken cancellationToken) =>
         transaction.ExecuteAsync(
@@ -80,10 +100,11 @@ public class ProductBizService(
         return changed;
     }
 
-    /// <summary>상품이 없으면 404 — 빈 목록으로 "없는 상품" 과 "이력 없는 상품" 을 구분할 수 없게 하지 않는다.</summary>
-    public async Task<IReadOnlyList<ProductStatusHistoryDto>> ListStatusHistoryAsync(long id, CancellationToken cancellationToken)
+    /// <summary>상품이 없거나 볼 수 없으면 404 — 빈 목록으로 "없는 상품" 과 "이력 없는 상품" 을 구분할 수 없게 하지 않는다.</summary>
+    public async Task<IReadOnlyList<ProductStatusHistoryDto>> ListStatusHistoryAsync(
+        long id, ProductViewerDto viewer, CancellationToken cancellationToken)
     {
-        await productEntityService.GetAsync(id, cancellationToken);
+        await GetVisibleAsync(id, viewer, cancellationToken);
         return await statusHistoryEntityService.ListByProductAsync(id, cancellationToken);
     }
 }

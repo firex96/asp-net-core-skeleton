@@ -35,7 +35,7 @@ public class ProductApiTests(InfrastructureFixture infrastructure) : IAsyncLifet
         var (user, _) = await TestUsers.SignInAsync(_factory, "creator@example.com", administrator: false);
 
         var id = await CreateAsync(user, "Keyboard", 49000.50m);
-        var fetched = await ReadJsonAsync(await _factory.CreateClient().GetAsync($"/api/products/{id}", TestContext.Current.CancellationToken));
+        var fetched = await ReadJsonAsync(await user.GetAsync($"/api/products/{id}", TestContext.Current.CancellationToken)); // 판매 전이라 작성자가 읽는다
 
         Assert.Equal("Keyboard", fetched.GetProperty("name").GetString());
         Assert.Equal(49000.50m, fetched.GetProperty("price").GetDecimal());

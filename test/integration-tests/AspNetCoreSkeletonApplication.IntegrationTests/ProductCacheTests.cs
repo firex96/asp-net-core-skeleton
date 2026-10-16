@@ -63,13 +63,15 @@ public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLif
     [Fact]
     public async Task AnotherInstance_ReadsTheSameEntryFromRedis()
     {
+        // 판매 전 상품이라 작성자 · 관리자만 본다 — 둘째 인스턴스에서는 관리자로 읽는다.
         var (client, _) = await TestUsers.SignInAsync(_first, "cache-shared@example.com", administrator: false);
+        var (secondManager, _) = await TestUsers.SignInAsync(_second, "cache-shared-manager@example.com", administrator: true);
         var id = await CreateAsync(client, "Shared");
-        Assert.Equal("Shared", await GetNameAsync(_first.CreateClient(), id)); // 첫 인스턴스가 L1 · L2 에 넣는다
+        Assert.Equal("Shared", await GetNameAsync(client, id)); // 첫 인스턴스가 L1 · L2 에 넣는다
 
         await RenameBehindTheCacheAsync(id, "ChangedInDb");
 
-        Assert.Equal("Shared", await GetNameAsync(_second.CreateClient(), id)); // 둘째 인스턴스는 L1 이 비어 있어 Redis 에서 읽는다
+        Assert.Equal("Shared", await GetNameAsync(secondManager, id)); // 둘째 인스턴스는 L1 이 비어 있어 Redis 에서 읽는다
     }
 
     [Fact]

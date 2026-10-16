@@ -13,4 +13,11 @@ public static class ProductAccessRule
     /// </summary>
     public static bool CanDelete(ProductStatus status, long createdBy, long? actorId, bool canManageProducts) =>
         canManageProducts || (status == ProductStatus.Draft && createdBy == actorId);
+
+    /// <summary>
+    /// 판매 전(Draft) 상품은 작성자와 상품 관리 권한 보유자만 본다 — 아직 공개하지 않은 상품이다. 판매 중 · 판매 종료는 누구나 본다.
+    /// <paramref name="actorId"/> 가 null 이면 익명이거나 사용자가 아닌 주체다.
+    /// </summary>
+    public static bool CanView(ProductStatus status, long createdBy, long? actorId, bool canManageProducts) =>
+        status != ProductStatus.Draft || canManageProducts || createdBy == actorId;
 }

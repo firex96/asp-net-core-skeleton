@@ -54,7 +54,26 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
         var deleteTheirs = await ClientAs("7").DeleteAsync($"/api/products/{theirs}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteMine.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, deleteTheirs.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleteTheirs.StatusCode); // 남의 Draft 는 보이지도 않는다
+    }
+
+    [Fact]
+    public async Task Draft_IsVisibleOnlyToItsCreatorAndManagers()
+    {
+        var draft = await CreateAsync(ClientAs("7"), "Unreleased");
+        var onSale = await CreateAsync(ClientAs("7"), "Released");
+        await ClientAs("1;products.manage").PutAsJsonAsync($"/api/products/{onSale}/status", new { status = "OnSale" }, TestContext.Current.CancellationToken);
+
+        var anonymous = factory.CreateClient();
+        Assert.DoesNotContain(draft, await IdsAsync(anonymous));
+        Assert.Contains(onSale, await IdsAsync(anonymous));
+        Assert.Equal(HttpStatusCode.NotFound, (await anonymous.GetAsync($"/api/products/{draft}", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await anonymous.GetAsync($"/api/products/{draft}/status-history", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await ClientAs("8").GetAsync($"/api/products/{draft}", TestContext.Current.CancellationToken)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await ClientAs("7").GetAsync($"/api/products/{draft}", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Contains(draft, await IdsAsync(ClientAs("7")));
+        Assert.Contains(draft, await IdsAsync(ClientAs("1;products.manage")));
     }
 
     [Fact]
@@ -129,6 +148,9 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
         Assert.Equal("invalid_request", body!.Error);
         Assert.False(string.IsNullOrEmpty(body.ErrorDescription));
     }
+
+    private static async Task<long[]> IdsAsync(HttpClient client) =>
+        [.. (await client.GetFromJsonAsync<IdOnly[]>("/api/products", TestContext.Current.CancellationToken))!.Select(product => product.Id)];
 
     private HttpClient ClientAs(string user)
     {

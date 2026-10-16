@@ -30,6 +30,28 @@ public class ProductBizServiceTests
     }
 
     [Fact]
+    public async Task GetVisible_SomeoneElsesDraft_IsNotFound_ButAManagerSeesIt()
+    {
+        _entityService.GetAsync(1, Arg.Any<CancellationToken>()).Returns(Product(1, ProductStatus.Draft));
+
+        await Assert.ThrowsAsync<ItemNotFoundException>(() =>
+            CreateBizService().GetVisibleAsync(1, new ProductViewerDto(7, CanManageProducts: false), TestContext.Current.CancellationToken));
+        var managed = await CreateBizService().GetVisibleAsync(1, new ProductViewerDto(7, CanManageProducts: true), TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, managed.Id);
+    }
+
+    [Fact]
+    public async Task List_LeavesOutDraftsTheViewerCannotSee()
+    {
+        _entityService.ListAsync(Arg.Any<CancellationToken>()).Returns([Product(1, ProductStatus.Draft), Product(2, ProductStatus.OnSale)]);
+
+        var anonymous = await CreateBizService().ListAsync(new ProductViewerDto(null, CanManageProducts: false), TestContext.Current.CancellationToken);
+
+        Assert.Equal([2L], anonymous.Select(product => product.Id));
+    }
+
+    [Fact]
     public async Task ChangeStatus_Allowed_UpdatesInsideTransaction()
     {
         _entityService.GetAsync(1, Arg.Any<CancellationToken>()).Returns(Product(1, ProductStatus.Draft));

@@ -76,6 +76,19 @@ public class BearerApiTests(InfrastructureFixture infrastructure) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task UserToken_SeesOthersDrafts_OnlyWithTheManageScope()
+    {
+        var (browser, _) = await SignInAsync("draft-admin@example.com", administrator: true);
+        var draftId = await CreateProductAsCookieUserAsync("draft-maker@example.com");
+        var narrow = await OAuthFlows.UserAccessTokenAsync(browser, NewClient(), "app", "openid email");
+        var managing = await OAuthFlows.UserAccessTokenAsync(browser, NewClient(), "app", "openid products.manage");
+
+        // 관리자라도 토큰 scope 에 products.manage 가 없으면 남의 판매 전 상품은 없는 것과 같다.
+        Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(HttpMethod.Get, $"/api/products/{draftId}", narrow)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(HttpMethod.Get, $"/api/products/{draftId}", managing)).StatusCode);
+    }
+
+    [Fact]
     public async Task UserToken_WithTheScope_ActsAsTheUser()
     {
         var (browser, adminId) = await SignInAsync("acting-admin@example.com", administrator: true);
