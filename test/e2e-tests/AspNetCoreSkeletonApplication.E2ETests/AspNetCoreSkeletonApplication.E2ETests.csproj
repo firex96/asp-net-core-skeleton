@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 브라우저 테스트 — Docker · Node 필요. SPA 를 빌드해 Server(Kestrel)로 서빙하고 Playwright(Chromium)로 화면을 조작한다 -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Testcontainers.Redis" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\web-application\AspNetCoreSkeletonApplication.Server\AspNetCoreSkeletonApplication.Server.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 컨테이너(SQL Server · Redis · Mailpit · mock OAuth)는 통합 테스트와 같은 구성을 쓴다 -->
+    <Compile Include="..\..\integration-tests\AspNetCoreSkeletonApplication.IntegrationTests\Support\InfrastructureFixture.cs" Link="Support\InfrastructureFixture.cs" />
+    <None Include="..\..\..\docker\mock-oauth2-server.json" Link="mock-oauth2-server.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

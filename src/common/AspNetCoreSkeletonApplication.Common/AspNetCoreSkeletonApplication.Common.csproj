@@ -55,5 +55,6 @@
     <InternalsVisibleTo Include="AspNetCoreSkeletonApplication.UnitTests" />
     <InternalsVisibleTo Include="AspNetCoreSkeletonApplication.FunctionalTests" />
     <InternalsVisibleTo Include="AspNetCoreSkeletonApplication.IntegrationTests" />
+    <InternalsVisibleTo Include="AspNetCoreSkeletonApplication.E2ETests" />
   </ItemGroup>
 </Project>

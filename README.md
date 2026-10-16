@@ -1,12 +1,12 @@
 # ASP.NET Core + SPA Skeleton
 
-**ASP.NET Core Web API 와 SPA 를 한 솔루션으로 시작할 때 쓰는 템플릿이다.** .NET 10 백엔드, 프론트엔드 선택지(Angular · SvelteKit · Nuxt), 레이어 구조, 테스트 3분류, 클라우드별 비밀값 출처 프로파일(Local · Aws · Azure · Gcp)이 이미 배선돼 있다.
+**ASP.NET Core Web API 와 SPA 를 한 솔루션으로 시작할 때 쓰는 템플릿이다.** .NET 10 백엔드, 프론트엔드 선택지(Angular · SvelteKit · Nuxt), 레이어 구조, 의존으로 나눈 테스트 4분류(단위 · 기능 · 통합 · 브라우저), 클라우드별 비밀값 출처 프로파일(Local · Aws · Azure · Gcp)이 이미 배선돼 있다.
 
 이 문서는 **이 스켈레톤으로 새 프로젝트를 만드는 사람**을 대상으로 한다. 위에서부터 읽고 「시작하기」를 따라 하면 새 프로젝트가 뜬다.
 
 ## 형제 스켈레톤
 
-같은 원칙(프로파일은 비밀값 출처만 고른다, 테스트 3분류)을 쓰는 Spring 스켈레톤이 셋 있다. 백엔드 언어와 용도에 맞춰 고른다.
+같은 원칙(프로파일은 비밀값 출처만 고른다, 테스트는 의존으로 나눈다)을 쓰는 Spring 스켈레톤이 셋 있다. 백엔드 언어와 용도에 맞춰 고른다.
 
 | 스켈레톤 | 쓰는 곳 |
 |---|---|
@@ -22,7 +22,7 @@
 | .NET SDK / ASP.NET Core | 10.0.400 / 10.0 (`global.json`) |
 | EF Core (SQL Server) | 10.0.13 |
 | OpenAPI 문서 · UI | `Microsoft.AspNetCore.OpenApi` · Scalar |
-| 테스트 | xUnit v3 + Microsoft.Testing.Platform, Testcontainers |
+| 테스트 | xUnit v3 + Microsoft.Testing.Platform, Testcontainers, Playwright for .NET 1.63 (Chromium) |
 | Node.js | 24 (각 SPA `package.json` 의 `volta.node`) |
 | Angular | 22.2 (Vitest) |
 | SvelteKit / Svelte | 3.0 / 5 (adapter-static) |
@@ -41,7 +41,7 @@
 ```bash
 dotnet --version        # 10.0.400 이상
 node --version          # 24.15 이상 (Angular 22 CLI 요구) — Volta 를 쓰면 package.json 의 고정 버전이 자동으로 잡힌다
-docker info             # 로컬 실행(docker compose)과 통합 테스트(Testcontainers)에 쓴다
+docker info             # 로컬 실행(docker compose)과 통합 · 브라우저 테스트(Testcontainers)에 쓴다
 dotnet dev-certs https --trust   # 개발 인증서 신뢰 — SPA dev 서버도 이 인증서로 HTTPS 를 연다
 ```
 
@@ -132,6 +132,7 @@ test/
   unit-tests/         UnitTests        외부 의존 없음
   functional-tests/   FunctionalTests  WebApplicationFactory 로 HTTP 호출, DB 불필요
   integration-tests/  IntegrationTests Docker 필요 (Testcontainers SQL Server · LocalStack)
+  e2e-tests/          E2ETests         Docker · Node 필요 — SPA 를 빌드해 Playwright(Chromium)로 화면을 조작
 ```
 
 **프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 의존은 앱(`Server` · `InternalApi` · `Batch`) → `Common` 한 방향이고, 앱끼리는 서로 참조하지 않는다.
@@ -587,18 +588,20 @@ curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
 
 ## 테스트
 
-테스트 프로젝트가 셋이고 **성격이 다르다.** 새 테스트를 어디에 둘지는 「무엇에 의존하는가」로 정한다. 공통 설정은 `test/Directory.Build.props`, 러너는 `global.json` 의 Microsoft.Testing.Platform 이다.
+테스트 프로젝트가 넷이고 **성격이 다르다.** 새 테스트를 어디에 둘지는 「무엇에 의존하는가」로 정한다. 공통 설정은 `test/Directory.Build.props`, 러너는 `global.json` 의 Microsoft.Testing.Platform 이다.
 
 | 프로젝트 | 의존 | 도구 |
 |---|---|---|
 | `UnitTests` | 없음 | xUnit v3 |
 | `FunctionalTests` | 없음 — 앱을 메모리에 띄우고 DB 에는 붙지 않는다 | `WebApplicationFactory` |
 | `IntegrationTests` | **Docker** | Testcontainers (SQL Server · Redis · Mailpit · mock OAuth · LocalStack) |
+| `E2ETests` | **Docker · Node** — 브라우저 화면 흐름 | Playwright for .NET (Chromium) + 통합 테스트와 같은 컨테이너 |
 
 ```bash
-dotnet test --solution AspNetCoreSkeletonApplication.slnx                       # 전부 — Docker 필요
+dotnet test --solution AspNetCoreSkeletonApplication.slnx                       # 전부 — Docker · Node 필요
 dotnet test --project test/unit-tests/AspNetCoreSkeletonApplication.UnitTests  # 하나만
 dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.IntegrationTests -- --filter-class "*HealthCheckTests"  # 클래스만
+dotnet test --project test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests -- --filter-class "*AccountTests"     # 브라우저 시나리오만
 ```
 
 **대역 원칙** — 계층마다 하나로 정해져 있다.
@@ -612,6 +615,15 @@ dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.Integ
 | EntityService · 트랜잭션 · 감사 필드 | 대역 없음 — SQL Server 컨테이너에 마이그레이션을 적용해 HTTP 로 끝까지 | `IntegrationTests` |
 
 DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server · Redis · Mailpit · mock OAuth 컨테이너는 `[Collection(InfrastructureCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름과 캐시 키 접두사를 달리한다 — 앱은 `InfrastructureFixture.ConfigureApp(builder, "<데이터베이스>")` 한 줄로 붙인다.
+
+**브라우저 테스트(`E2ETests`)** 는 운영과 같은 모양으로 띄운다 — SPA 를 `npm run build` 로 정적 빌드하고(의존성이 없으면 먼저 `npm ci`), 그 출력을 웹 루트로 Server 를 Kestrel 의 실제 HTTPS 포트에 띄워 같은 출처로 서빙한다. dev 서버 · 프록시를 거치지 않는다.
+
+- **SPA 마다 같은 시나리오** — 대상 SPA 는 `src/spa` 의 esproj 로 찾고 출력 폴더는 esproj 의 `BuildOutputFolder` 를 읽는다. 템플릿에서 SPA 하나만 고르면 그 하나만 돈다. 세 SPA 는 같은 문구 · 같은 접근성 구조(라벨로 감싼 입력, 역할 있는 버튼 · 안내)라 선택자를 함께 쓴다 — 화면 문구를 바꾸면 테스트도 같이 고친다.
+- **한 벌을 함께 쓴다** — 컨테이너 · Chromium · SPA 별 서버(DB `e2e_{SPA}`)는 어셈블리 fixture(`E2EFixture`)가 한 번 띄우고, 테스트는 매번 새 브라우저 컨텍스트(쿠키 없음)를 연다. 서버를 함께 쓰므로 이메일은 테스트마다 새로 만든다(`NewEmail`).
+- **인증서** — fixture 가 localhost 자체 서명 인증서를 만들고 브라우저는 인증서 오류를 무시한다. 개발 인증서를 신뢰하지 않은 CI 에서도 `__Host-` 쿠키가 그대로 동작한다.
+- **Chromium** 은 fixture 가 처음 실행할 때 받는다(`Microsoft.Playwright.Program.Main(["install", "chromium"])`).
+- **실패하면** Playwright 트레이스가 `bin/…/playwright-traces/<테스트>.zip` 에 남는다 — `pwsh bin/Debug/net10.0/playwright.ps1 show-trace <파일>` 또는 `npx playwright show-trace <파일>` 로 화면 · 네트워크를 단계별로 본다.
+- 화면 밖에서 준비할 것(가입만 해 두기, 토큰 교환)은 `SpaServer.CreateApiClient()` 로 API 를 직접 부른다. 메일 링크는 `Mailbox.WaitForLinkAsync` 가 Mailpit 에서 꺼낸다.
 
 SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 `npm test -- --watch=false` 로 단발 실행)다. 타입 검사는 SvelteKit · Nuxt 에서 `npm run check`.
 

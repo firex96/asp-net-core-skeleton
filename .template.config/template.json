@@ -11,7 +11,7 @@
   ],
   "identity": "AspNetCoreSpaSkeleton",
   "name": "ASP.NET Core + SPA Skeleton",
-  "description": "ASP.NET Core Web API + SPA(Angular · SvelteKit · Nuxt) 스켈레톤. 공유 라이브러리(Common)와 앱(Server · InternalApi · Batch)으로 나눈 레이어드 구조, 클라우드별 비밀값 출처 프로파일(Local · Aws · Azure · Gcp), 테스트 3분류가 배선돼 있다.",
+  "description": "ASP.NET Core Web API + SPA(Angular · SvelteKit · Nuxt) 스켈레톤. 공유 라이브러리(Common)와 앱(Server · InternalApi · Batch)으로 나눈 레이어드 구조, 클라우드별 비밀값 출처 프로파일(Local · Aws · Azure · Gcp), 테스트 4분류(단위 · 기능 · 통합 · 브라우저)가 배선돼 있다.",
   "shortName": "aspnet-spa-skeleton",
   "sourceName": "AspNetCoreSkeletonApplication",
   "preferNameDirectory": true,

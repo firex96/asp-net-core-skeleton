@@ -10,10 +10,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 빌드 (SPA esproj 포함 — 각 SPA 에 node_modules 가 있어야 한다)
 dotnet build AspNetCoreSkeletonApplication.slnx
 
-# 테스트 — IntegrationTests 는 Docker 필요
+# 테스트 — IntegrationTests 는 Docker, E2ETests 는 Docker · Node 필요
 dotnet test --solution AspNetCoreSkeletonApplication.slnx
 dotnet test --project test/unit-tests/AspNetCoreSkeletonApplication.UnitTests
 dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.IntegrationTests -- --filter-class "*HealthCheckTests"
+dotnet test --project test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests   # 브라우저 — Docker · Node 필요, SPA 를 빌드한다
 
 # 로컬 실행 — Local 프로파일 + SpaProxy (SPA 는 SpaClient 로 고른다, 기본 angular)
 docker compose up -d
@@ -48,7 +49,7 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend angular --internalApi 
 - **필수 값은 폴백 없이 엄격하게.** 빠진 비밀은 기동 실패로 드러나야 한다(`GetRequiredConnectionString` 참고). 빈 문자열 기본값을 두지 않는다.
 - **패키지 버전은 `Directory.Packages.props` 에만.** csproj 의 `PackageReference` 에 `Version` 을 적지 않는다. 테스트 공통 설정은 `test/Directory.Build.props`.
 - **규약 테스트를 지킨다.** `UnitTests/Conventions/` 가 실패하면 규약 쪽이 아니라 코드를 고친다. 새 앱을 더하면 `ConventionScan` 의 어셈블리 목록에 넣는다.
-- **새 테스트는 의존으로 위치를 정한다.** 외부 의존 없음 → `UnitTests`, HTTP 파이프라인(DB 없음) → `FunctionalTests`, Docker(DB·클라우드 에뮬레이터) → `IntegrationTests`.
+- **새 테스트는 의존으로 위치를 정한다.** 외부 의존 없음 → `UnitTests`, HTTP 파이프라인(DB 없음) → `FunctionalTests`, Docker(DB·클라우드 에뮬레이터) → `IntegrationTests`, 브라우저 화면 흐름 → `E2ETests`(세 SPA 공통 시나리오 — 화면 문구를 바꾸면 함께 고친다).
 - **템플릿 조건 주석을 깨지 않는다.** 서버 csproj · 테스트 csproj · slnx 의 `<!--#if (frontend == …) -->` · `<!--#if (internalApi) -->` · `<!--#if (batch) -->` 는 `dotnet new` 용이다. InternalApi · Batch 전용 테스트는 각 테스트 프로젝트의 `InternalApi/` · `Batch/` 폴더에 둔다(템플릿이 폴더째 뺀다). 레포 원본에서는 그냥 주석이므로 첫 분기(angular)가 기본값이 되도록 순서를 지킨다.
 - 이름은 `AspNetCoreSkeletonApplication`(PascalCase)과 `asp-net-core-skeleton-application`(kebab-case) 두 형태로만 쓴다 — 템플릿이 이 두 문자열을 치환한다.
 - C# 은 file-scoped namespace, 생성자 주입은 primary constructor 를 쓴다. 들여쓰기는 `.editorconfig`.

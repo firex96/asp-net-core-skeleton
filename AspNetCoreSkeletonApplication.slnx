@@ -37,6 +37,9 @@
     <Project Path="src/web-application/AspNetCoreSkeletonApplication.Server/AspNetCoreSkeletonApplication.Server.csproj" />
   </Folder>
   <Folder Name="/test/" />
+  <Folder Name="/test/E2E Tests/">
+    <Project Path="test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests/AspNetCoreSkeletonApplication.E2ETests.csproj" />
+  </Folder>
   <Folder Name="/test/Functional Tests/">
     <Project Path="test/functional-tests/AspNetCoreSkeletonApplication.FunctionalTests/AspNetCoreSkeletonApplication.FunctionalTests.csproj" />
   </Folder>

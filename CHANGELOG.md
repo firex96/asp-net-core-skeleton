@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 브라우저 테스트 `E2ETests`(Playwright for .NET 1.63, Chromium) — SPA 를 정적 빌드해 Server(Kestrel, 자체 서명 HTTPS)로 같은 출처 서빙, SPA 마다 같은 시나리오: 가입 검증 · 가입 · 로그아웃, 5회 실패 잠금, 메일 링크로 비밀번호 재설정, 소셜 계정 연결 · 로그인 · 끊기, OAuth 인가 코드(로그인 · 동의 화면 → 토큰). 실패하면 Playwright 트레이스를 남긴다
 - SPA 세 개의 계정 화면 — 비밀번호 찾기 · 재설정(메일 링크), 내 계정(권한, 소셜 계정 연결 · 끊기), OAuth 동의(같은 authorize 요청을 허용 · 거부로 POST), 로그인 화면의 소셜 버튼(폼 POST)과 결과 안내, 로그인 뒤 `/connect/…` 로 돌아갈 때는 브라우저 이동. dev 서버가 `/connect` · `/.well-known` 도 프록시하고, Nuxt 프록시는 Host 를 바꾸지 않는다
 - SPA 세 개의 로그인 화면 — `/login`(로그인 · 가입 전환, ProblemDetails 오류 · 검증 메시지, 잠금 안내), 상단 바의 로그인 상태 · 로그아웃, `returnUrl` 은 같은 출처 경로만. dev 서버가 `/api` 도 백엔드로 프록시한다. 인증 모듈 단위 테스트(Angular `AuthService`, SvelteKit · Nuxt `auth.ts`)
 - Batch Job `PruneOAuthTokenJob` — OAuth 서버의 만료 · 폐기 토큰과 쓰이지 않는 동의를 매일 정리(보관 `RetentionDays` 14일, OpenIddict 정리 규칙). Common OAuth 도메인(`OAuthTokenBizService` · `IOAuthTokenEntityService`), EntityService 주입 허용 목록에 OpenIddict 관리자
