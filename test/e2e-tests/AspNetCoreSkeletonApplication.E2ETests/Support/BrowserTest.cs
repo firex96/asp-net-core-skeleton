@@ -95,6 +95,10 @@ public abstract class BrowserTest(E2EFixture fixture) : IAsyncDisposable
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// 트레이스 파일 이름 — 영문자 · 숫자 · <c>.</c> · <c>-</c> · <c>_</c> 만 남긴다. 테스트 이름의 따옴표 · 괄호는 Windows 파일 이름과
+    /// GitHub Actions 아티팩트 경로에서 거절된다(<c>(spa: "sveltekit")</c>).
+    /// </summary>
     private static string FileName(string? name) =>
-        string.Concat((name ?? "test").Select(character => Path.GetInvalidFileNameChars().Contains(character) || character == ' ' ? '_' : character));
+        string.Concat((name ?? "test").Select(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '_' ? character : '_'));
 }
