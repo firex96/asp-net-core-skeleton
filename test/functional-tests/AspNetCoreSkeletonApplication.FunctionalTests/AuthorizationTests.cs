@@ -105,6 +105,24 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
         Assert.Equal(expected, response.StatusCode);
     }
 
+    [Fact]
+    public async Task FetchMetadata_AnswersOAuthEndpointsInTheOAuthErrorFormat()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/connect/token")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "client_credentials" }),
+        };
+        request.Headers.Add("Sec-Fetch-Site", "cross-site");
+
+        var response = await factory.CreateClient().SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadFromJsonAsync<OAuthError>(TestContext.Current.CancellationToken);
+        Assert.Equal("invalid_request", body!.Error);
+        Assert.False(string.IsNullOrEmpty(body.ErrorDescription));
+    }
+
     private HttpClient ClientAs(string user)
     {
         var client = factory.CreateClient();
@@ -122,4 +140,8 @@ public class AuthorizationTests(ProductWebApplicationFactory factory) : IClassFi
     private sealed record IdOnly(long Id);
 
     private sealed record CodeOnly(string Code);
+
+    private sealed record OAuthError(
+        [property: System.Text.Json.Serialization.JsonPropertyName("error")] string Error,
+        [property: System.Text.Json.Serialization.JsonPropertyName("error_description")] string ErrorDescription);
 }

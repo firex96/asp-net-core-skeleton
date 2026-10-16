@@ -430,7 +430,7 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 - 콜백은 공급자에서 돌아오는 cross-site 이동이라 SameSite=Strict 세션 쿠키가 실리지 않는다. 그래서 연결할 사용자 ID 는 시작할 때 보호된 state 에 담아 둔다. 콜백 뒤 SPA 는 same-origin 요청으로 `/api/auth/me` 를 읽으므로 세션 쿠키가 실린다.
 - **로컬 · 테스트는 mock 서버로** — docker compose 의 `mock-oauth`(`ghcr.io/navikt/mock-oauth2-server`, http://localhost:8090)가 issuer 하나씩(`/google` · `/kakao` · `/naver`)으로 세 공급자를 흉내 내고, 로그인 화면 없이 고정된 사용자로 돌아온다(`docker/mock-oauth2-server.json` — Kakao 의 `kakao_account`, Naver 의 `response` 모양까지). 통합 테스트도 같은 파일로 컨테이너를 띄워 실제 핸들러로 왕복한다.
 
-**CSRF** — 쿠키가 SameSite=Strict 이고, 그 위에 **Fetch Metadata** 를 한 번 더 본다: 브라우저가 붙이는 `Sec-Fetch-Site` 가 `cross-site` 인 변경 요청(POST · PUT · PATCH · DELETE)은 403(`FetchMetadataMiddleware`, `UseSkeletonWeb` 에 들어 있다). antiforgery 토큰을 주고받지 않으므로 SPA 코드는 바꿀 것이 없다. 헤더가 없는 요청(서버 간 호출)은 막지 않는다.
+**CSRF** — 쿠키가 SameSite=Strict 이고, 그 위에 **Fetch Metadata** 를 한 번 더 본다: 브라우저가 붙이는 `Sec-Fetch-Site` 가 `cross-site` 인 변경 요청(POST · PUT · PATCH · DELETE)은 403(`FetchMetadataMiddleware`, `UseSkeletonWeb` 에 들어 있다). OAuth 엔드포인트(`/connect/*`)는 OAuth 클라이언트가 읽는 형식인 400 `{"error":"invalid_request","error_description":…}` 로 답한다. antiforgery 토큰을 주고받지 않으므로 SPA 코드는 바꿀 것이 없다. 헤더가 없는 요청(서버 간 호출)은 막지 않는다.
 
 ```sql
 -- 첫 관리자 지정 — 다음 요청부터 반영된다(권한은 쿠키가 아니라 요청마다 판정한다). 이미 떠 있는 앱의 캐시는 최대 Cache:Expiration 뒤에 바뀐다
