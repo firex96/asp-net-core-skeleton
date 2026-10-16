@@ -476,3 +476,30 @@ ul.codes {
 .list + .form {
   margin-top: 1rem;
 }
+
+/* 관리 화면 */
+.subsection-title {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 0.95rem;
+}
+
+fieldset.permissions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+fieldset.permissions legend {
+  padding: 0 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.list .button-row {
+  flex: none;
+  margin-top: 0;
+}

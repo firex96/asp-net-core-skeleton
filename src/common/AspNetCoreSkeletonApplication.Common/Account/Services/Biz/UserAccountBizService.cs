@@ -1,5 +1,6 @@
 using AspNetCoreSkeletonApplication.Common.Account.Dtos;
 using AspNetCoreSkeletonApplication.Common.Account.Persistence.Services;
+using AspNetCoreSkeletonApplication.Common.Errors;
 
 namespace AspNetCoreSkeletonApplication.Common.Account.Services.Biz;
 
@@ -11,4 +12,9 @@ public class UserAccountBizService(IUserAccountEntityService userAccountEntitySe
 
     public Task<IReadOnlyList<UserAccountDto>> ListByIdsAsync(IReadOnlyCollection<long> ids, CancellationToken cancellationToken) =>
         userAccountEntityService.ListByIdsAsync(ids, cancellationToken);
+
+    /// <summary>관리 화면이 이메일로 사람을 찾는다(그룹에 넣기). 없으면 <c>ItemNotFoundException</c>(404).</summary>
+    public async Task<UserAccountDto> GetByEmailAsync(string email, CancellationToken cancellationToken) =>
+        await userAccountEntityService.FindByEmailAsync(email, cancellationToken)
+        ?? throw new ItemNotFoundException("그 이메일로 가입한 사용자가 없어요.");
 }

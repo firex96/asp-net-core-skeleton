@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using AspNetCoreSkeletonApplication.Common.Authorization.Services.Biz;
 using AspNetCoreSkeletonApplication.Common.Persistence.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,17 @@ public abstract class BrowserTest(E2EFixture fixture) : IAsyncDisposable
         {
             throw new InvalidOperationException($"{email} 를 확인하지 못했다");
         }
+    }
+
+    /// <summary>마이그레이션이 시드한 Administrators 그룹(모든 권한)에 넣는다 — 관리 화면을 쓸 사람을 준비할 때.</summary>
+    protected static async Task GrantAdministratorAsync(SpaServer server, string email)
+    {
+        using var scope = server.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>().FindByEmailAsync(email)
+                   ?? throw new InvalidOperationException($"{email} 가 없다");
+        var groups = scope.ServiceProvider.GetRequiredService<UserGroupBizService>();
+        var administrators = (await groups.ListAsync(TestContext.Current.CancellationToken)).Single(group => group.Name == "Administrators");
+        await groups.AddMemberAsync(administrators.Id, user.Id, TestContext.Current.CancellationToken);
     }
 
     protected static async Task LogInAsync(IPage page, string email, string password)

@@ -9,4 +9,7 @@ public interface IUserAccountEntityService
     Task<UserAccountDto> GetAsync(long id, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<UserAccountDto>> ListByIdsAsync(IReadOnlyCollection<long> ids, CancellationToken cancellationToken);
+
+    /// <summary>이메일이 정확히 같은 계정(대소문자는 가리지 않는다 — Identity 의 정규화 이메일로 찾는다). 없으면 null.</summary>
+    Task<UserAccountDto?> FindByEmailAsync(string email, CancellationToken cancellationToken);
 }

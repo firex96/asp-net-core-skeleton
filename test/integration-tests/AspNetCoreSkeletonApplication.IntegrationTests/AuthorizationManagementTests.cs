@@ -107,6 +107,24 @@ public class AuthorizationManagementTests(InfrastructureFixture infrastructure) 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
+    [Fact]
+    public async Task UserLookup_FindsByExactEmail_ForManagersOnly()
+    {
+        var (admin, _) = await TestUsers.SignInAsync(_factory, "lookup-admin@example.com", administrator: true);
+        var (member, memberId) = await TestUsers.SignInAsync(_factory, "lookup-member@example.com", administrator: false);
+
+        var found = await admin.GetFromJsonAsync<JsonElement>("/api/authorization/users?email=LOOKUP-member%40example.com", Token);
+        var unknown = await admin.GetAsync("/api/authorization/users?email=nobody%40example.com", Token);
+        var partial = await admin.GetAsync("/api/authorization/users?email=lookup", Token);
+        var forbidden = await member.GetAsync("/api/authorization/users?email=lookup-admin%40example.com", Token);
+
+        Assert.Equal(memberId, found.GetProperty("id").GetInt64());
+        Assert.Equal("lookup-member@example.com", found.GetProperty("email").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, partial.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+    }
+
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private static async Task<long> CreateProductAsync(HttpClient client) =>

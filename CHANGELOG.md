@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 관리 화면 — SPA 세 개의 `/admin`: 그룹(만들기 · 고치기 · 지우기, 이메일로 구성원 넣기 · 빼기, 역할 지정), 역할(만들기 · 고치기 · 지우기, 권한 체크박스). 상단 바의 "관리" 링크는 `authorization.manage` 가 있을 때만. 사용자 찾기 API `GET /api/authorization/users?email=`(정확히 일치, Account 도메인 `GetByEmailAsync`). E2E: 관리자가 만든 그룹 · 역할의 권한이 구성원에게 닿는다
 - 패스키로 비밀번호 없이 로그인 — .NET 10 Identity 내장 WebAuthn(`/api/auth/passkey/options` · `login`, 관리 `/api/account/passkeys`), RP ID 는 `App:PublicOrigin` 의 호스트, 패스키는 2단계 인증을 건너뛴다. 저장 `identity_user_passkey`(Identity 스키마 3판 — `AddCommon` 이 모든 앱에 같은 판을 정한다, 마이그레이션 `AddPasskeys`). 마지막 로그인 수단 검사에 패스키를 센다. SPA 세 개: `webauthn` 모듈, 로그인 화면의 "패스키로 로그인", 내 계정의 「패스키」 절. E2E 는 Playwright 가상 인증기로 등록 · 로그인
 - 2단계 인증 — 인증 앱(TOTP, 서버가 그린 QR 코드) 또는 메일 코드, 복구 코드 10개(1회용), "이 브라우저 기억하기". 로그인은 202 `{providers}` 뒤 `POST /api/auth/login/2fa`, 소셜 로그인도 두 번째 단계를 거친다(`/login?step=two-factor`). 관리 `/api/account/two-factor`(세션 쿠키만) — 켜기는 꺼져 있을 때만, 끄기는 비밀번호 재확인. 쿠키 `__Host-tfa` · `__Host-tfa-remember`(SameSite=Lax). SPA 세 개: 로그인의 두 번째 단계 화면, 내 계정의 「2단계 인증」 절. 패키지 QRCoder 1.8
 - 이메일 확인 — 이메일을 확인해야 로그인한다(`RequireConfirmedEmail`, 비밀번호 · 소셜). 가입은 로그인하지 않고 확인 링크를 메일로 보낸다(`{App:PublicOrigin}/confirm-email?userId=…&code=…`, 2시간). `POST /api/auth/email/confirm`(틀리면 400 `INVALID_TOKEN_ERROR`) · `resend`(항상 202). 확인 전 계정은 비밀번호가 맞을 때만 403 `EMAIL_NOT_CONFIRMED_ERROR`(AUTH006) — 틀리면 같은 401 이고 잠금 횟수도 센다. 기존 계정은 마이그레이션 `ConfirmExistingEmails` 가 확인된 것으로 둔다. SPA 세 개: 가입 뒤 확인 메일 안내, 로그인 화면의 "확인 메일 다시 받기", `/confirm-email` 화면

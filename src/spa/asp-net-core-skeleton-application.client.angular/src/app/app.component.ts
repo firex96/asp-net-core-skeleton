@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
+import { MANAGE_PERMISSION } from './admin/admin.service';
 import { AuthService } from './auth/auth.service';
 
 @Component({
@@ -11,6 +12,7 @@ import { AuthService } from './auth/auth.service';
 })
 export class AppComponent implements OnInit {
   readonly auth = inject(AuthService);
+  readonly managePermission = MANAGE_PERMISSION;
   private readonly router = inject(Router);
 
   ngOnInit() {

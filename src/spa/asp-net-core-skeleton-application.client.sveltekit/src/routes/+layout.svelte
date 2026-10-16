@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import '../app.css';
 	import favicon from '#lib/assets/favicon.svg';
+	import { MANAGE_PERMISSION } from '#lib/admin.js';
 	import { refreshSession, session, signOut } from '#lib/session.svelte.js';
 	import type { LayoutProps } from './$types';
 
@@ -34,6 +35,9 @@
 	<a href="/" class="brand">AspNetCoreSkeletonApplication</a>
 	<nav class="nav">
 		{#if session.user}
+			{#if session.user.permissions.includes(MANAGE_PERMISSION)}
+				<a href="/admin">관리</a>
+			{/if}
 			<a href="/account">{session.user.email}</a>
 			<button type="button" class="btn btn-small" onclick={logOut}>로그아웃</button>
 		{:else if session.user === null && page.url.pathname !== '/login'}

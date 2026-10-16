@@ -28,6 +28,9 @@ async function logOut() {
       </NuxtLink>
       <nav class="nav">
         <template v-if="session.user.value">
+          <NuxtLink v-if="session.user.value.permissions.includes(MANAGE_PERMISSION)" to="/admin">
+            관리
+          </NuxtLink>
           <NuxtLink to="/account">
             {{ session.user.value.email }}
           </NuxtLink>

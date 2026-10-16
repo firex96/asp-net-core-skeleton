@@ -2,6 +2,9 @@
   <a routerLink="/" class="brand">AspNetCoreSkeletonApplication</a>
   <nav class="nav">
     @if (auth.user(); as user) {
+      @if (user.permissions.includes(managePermission)) {
+        <a routerLink="/admin">관리</a>
+      }
       <a routerLink="/account">{{ user.email }}</a>
       <button type="button" class="btn btn-small" (click)="logout()">로그아웃</button>
     } @else if (auth.user() === null && !onLoginPage) {

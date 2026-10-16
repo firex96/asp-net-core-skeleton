@@ -15,4 +15,11 @@ internal sealed class UserAccountEntityService(AppDbContext dbContext) : IUserAc
 
     public async Task<IReadOnlyList<UserAccountDto>> ListByIdsAsync(IReadOnlyCollection<long> ids, CancellationToken cancellationToken) =>
         await dbContext.Users.Where(user => ids.Contains(user.Id)).OrderBy(user => user.Id).ProjectToDto().ToListAsync(cancellationToken);
+
+    public async Task<UserAccountDto?> FindByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        // Identity 의 UpperInvariantLookupNormalizer 와 같은 정규화
+        var normalized = email.Trim().Normalize().ToUpperInvariant();
+        return await dbContext.Users.Where(user => user.NormalizedEmail == normalized).ProjectToDto().SingleOrDefaultAsync(cancellationToken);
+    }
 }

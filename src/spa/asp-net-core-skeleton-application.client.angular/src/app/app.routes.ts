@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { AccountComponent } from './account/account.component';
+import { AdminComponent } from './admin/admin.component';
 import { ConfirmEmailComponent } from './confirm-email/confirm-email.component';
 import { ConsentComponent } from './consent/consent.component';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password.component';
@@ -16,5 +17,6 @@ export const routes: Routes = [
   { path: 'confirm-email', component: ConfirmEmailComponent, title: '이메일 확인' },
   { path: 'account', component: AccountComponent, title: '내 계정' },
   { path: 'consent', component: ConsentComponent, title: '접근 허용' },
+  { path: 'admin', component: AdminComponent, title: '권한 관리' },
   { path: '**', redirectTo: '' }
 ];
