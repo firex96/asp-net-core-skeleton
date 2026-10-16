@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- SPA 세 개의 로그인 화면 — `/login`(로그인 · 가입 전환, ProblemDetails 오류 · 검증 메시지, 잠금 안내), 상단 바의 로그인 상태 · 로그아웃, `returnUrl` 은 같은 출처 경로만. dev 서버가 `/api` 도 백엔드로 프록시한다. 인증 모듈 단위 테스트(Angular `AuthService`, SvelteKit · Nuxt `auth.ts`)
 - Batch Job `PruneOAuthTokenJob` — OAuth 서버의 만료 · 폐기 토큰과 쓰이지 않는 동의를 매일 정리(보관 `RetentionDays` 14일, OpenIddict 정리 규칙). Common OAuth 도메인(`OAuthTokenBizService` · `IOAuthTokenEntityService`), EntityService 주입 허용 목록에 OpenIddict 관리자
 - Bearer 토큰으로 API 호출 — 정책 스킴(`SessionOrBearer`)이 Bearer 헤더면 OpenIddict 검증, 아니면 세션 쿠키. 권한은 `RequestPermissions` 한 곳에서 — 사용자 토큰은 사용자 권한 ∩ scope, 클라이언트 토큰은 scope. 감사 주체는 사용자 토큰이면 그 사용자, 클라이언트 토큰이면 시스템(로그 scope `ClientId`). `/api/auth/me` 는 토큰이면 scope 와의 교집합, 클라이언트 토큰이면 403
 - OAuth 2.0 인가 서버 + OpenID Connect(OpenIddict 7.7) — `/connect/authorize`(PKCE 필수, 로그인은 SPA 화면, Explicit 동의는 SPA `/consent` 와 영구 authorization) · `token`(인가 코드 · 리프레시 회전 · 클라이언트 자격 증명) · `userinfo` · `endsession`, 탐색 문서, `GET /api/oauth/consent`. scope 는 OIDC 표준과 권한 코드 카탈로그. 클라이언트는 구성(`Authentication:OAuthServer:Clients`)으로 기동할 때 동기화, 키는 `KeySource`(Certificates · Ephemeral). 저장소 `oauth_*`(마이그레이션 `AddOAuthServer`)

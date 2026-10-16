@@ -1,0 +1,41 @@
+<h1>{{ mode() === 'login' ? 'Log in' : 'Create account' }}</h1>
+
+<form (ngSubmit)="submit()">
+  <label>
+    Email
+    <input name="email" type="email" autocomplete="username" required [(ngModel)]="email" />
+  </label>
+  <label>
+    Password
+    <input name="password" type="password" required
+           [attr.autocomplete]="mode() === 'login' ? 'current-password' : 'new-password'"
+           [(ngModel)]="password" />
+  </label>
+  @if (mode() === 'register') {
+    <label>
+      Confirm password
+      <input name="confirmPassword" type="password" autocomplete="new-password" required [(ngModel)]="confirmPassword" />
+    </label>
+  }
+
+  @if (error(); as error) {
+    <div class="error" role="alert">
+      <p>{{ error.message }}</p>
+      @if (error.fieldErrors.length > 0) {
+        <ul>
+          @for (message of error.fieldErrors; track message) {
+            <li>{{ message }}</li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  <button type="submit" [disabled]="busy()">{{ mode() === 'login' ? 'Log in' : 'Create account' }}</button>
+</form>
+
+<p>
+  <button type="button" class="link" (click)="toggleMode()">
+    {{ mode() === 'login' ? 'Need an account? Create one' : 'Already have an account? Log in' }}
+  </button>
+</p>

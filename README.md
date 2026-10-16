@@ -84,7 +84,7 @@ SpaClient=nuxt dotnet run --launch-profile https   # 환경 변수로도 된다
 
 SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Choose` 에서 해당 `When` 과 `AspNetCoreSkeletonApplication.slnx` 의 해당 `Project` 를 지운다. 기본값이 지운 SPA 였다면 `SpaClient` 기본값도 바꾼다.
 
-세 SPA 는 같은 예제(`/weatherforecast` 표)를 같은 방식으로 붙인다 — dev 서버는 `dotnet dev-certs` 인증서로 HTTPS 를 열고, `/weatherforecast` 를 ASP.NET Core 로 프록시한다(`ASPNETCORE_HTTPS_PORT` · `ASPNETCORE_URLS` 로 대상 결정).
+세 SPA 는 같은 예제(`/weatherforecast` 표)와 같은 로그인 화면(`/login` — 로그인 · 가입, 상단 바의 로그인 상태 · 로그아웃)을 같은 방식으로 붙인다 — dev 서버는 `dotnet dev-certs` 인증서로 HTTPS 를 열고, `/weatherforecast` · `/api` 를 ASP.NET Core 로 프록시한다(`ASPNETCORE_HTTPS_PORT` · `ASPNETCORE_URLS` 로 대상 결정). API 를 dev 서버 출처로 프록시하므로 세션 쿠키가 SPA 와 같은 출처에 저장되고, Fetch Metadata 검사도 same-origin 으로 통과한다. 로그인 상태는 `/api/auth/me` 로만 확인한다(쿠키는 HttpOnly 라 JS 가 읽지 않는다).
 
 ### 4. 비밀값 출처를 고른다
 

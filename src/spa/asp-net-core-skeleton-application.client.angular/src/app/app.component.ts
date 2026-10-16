@@ -1,36 +1,29 @@
-import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
-interface WeatherForecast {
-  date: string;
-  temperatureC: number;
-  temperatureF: number;
-  summary: string;
-}
+import { AuthService } from './auth/auth.service';
 
 @Component({
   selector: 'app-root',
+  imports: [RouterLink, RouterOutlet],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.component.css'
 })
 export class AppComponent implements OnInit {
-  private readonly http = inject(HttpClient);
-
-  public forecasts?: WeatherForecast[];
+  readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
   ngOnInit() {
-    this.getForecasts();
+    this.auth.refresh().catch(error => console.error(error));
   }
 
-  getForecasts() {
-    this.http.get<WeatherForecast[]>('/weatherforecast').subscribe({
-      next: (result) => {
-        this.forecasts = result;
-      },
-      error: (error) => {
-        console.error(error);
-      }
-    });
+  get loginQueryParams() {
+    return this.router.url.startsWith('/login') ? {} : { returnUrl: this.router.url };
+  }
+
+  async logout() {
+    await this.auth.logout();
+    await this.router.navigateByUrl('/');
   }
 }

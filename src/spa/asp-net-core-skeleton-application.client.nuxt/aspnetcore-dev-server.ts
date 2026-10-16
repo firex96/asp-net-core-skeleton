@@ -6,7 +6,7 @@ import { env } from 'node:process'
 
 const certificateName = 'asp-net-core-skeleton-application.client.nuxt'
 const port = 61196
-const apiPaths = ['/weatherforecast']
+const apiPaths = ['/weatherforecast', '/api']
 
 export function aspNetCoreDevServer() {
   const baseFolder
