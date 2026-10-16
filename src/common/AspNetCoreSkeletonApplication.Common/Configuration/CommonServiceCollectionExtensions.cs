@@ -63,6 +63,12 @@ public static class CommonServiceCollectionExtensions
             .AsHybridCache();
         services.AddScoped<EntityCache>();
 
+        // OAuth 서버(OpenIddict)의 저장소 관리자 — 서버는 Server 가, 만료 토큰 정리는 Batch 가 쓴다. README 「OAuth 서버」
+        services.AddOpenIddict().AddCore(options => options
+            .UseEntityFrameworkCore()
+            .UseDbContext<AppDbContext>()
+            .ReplaceDefaultEntities<long>());
+
         // 현재 시각은 TimeProvider 로만 읽는다 — 테스트에서 FakeTimeProvider 로 바꿔 끼운다.
         services.TryAddSingleton(TimeProvider.System);
 

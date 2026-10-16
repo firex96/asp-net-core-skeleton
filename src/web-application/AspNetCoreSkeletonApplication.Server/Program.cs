@@ -1,6 +1,7 @@
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Mail;
 using AspNetCoreSkeletonApplication.Common.Web;
+using AspNetCoreSkeletonApplication.Common.Web.OAuth;
 using AspNetCoreSkeletonApplication.Server.Example.Clients;
 using AspNetCoreSkeletonApplication.Server.Product.Authorization;
 using Microsoft.AspNetCore.Authorization;
@@ -19,6 +20,8 @@ builder.Services.AddSkeletonWeb();
 builder.Services.AddSkeletonIdentity();
 // 소셜 로그인 — 구성에 섹션이 있는 공급자만(Google · Kakao · Naver). README 「인증」
 builder.Services.AddSkeletonExternalLogins(builder.Configuration);
+// OAuth 인가 서버 + OIDC — 외부 클라이언트에 토큰을 발급한다. README 「OAuth 서버」
+builder.Services.AddSkeletonOAuthServer(builder.Configuration);
 // 계정 메일(비밀번호 재설정) — SMTP. README 「메일」
 builder.Services.AddSkeletonMail();
 // 리소스 기반 인가 — 데이터에 따라 갈리는 판정(작성자 본인 등)
@@ -54,6 +57,7 @@ app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapSkeletonAuthEndpoints();
 app.MapSkeletonExternalLoginEndpoints();
+app.MapSkeletonOAuthServerEndpoints();
 app.MapControllers();
 
 app.MapFallbackToFile("/index.html").AllowAnonymous();

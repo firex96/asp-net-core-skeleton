@@ -2,6 +2,7 @@ using AspNetCoreSkeletonApplication.Common.Authorization.Persistence.Entities;
 using AspNetCoreSkeletonApplication.Common.Persistence.Conventions;
 using AspNetCoreSkeletonApplication.Common.Product.Persistence.Entities;
 using AspNetCoreSkeletonApplication.Common.Persistence.Identity;
+using AspNetCoreSkeletonApplication.Common.Persistence.OAuth;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,6 +35,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly)
             .ConfigureIdentityTables()
+            .ConfigureOAuthTables()
             .UseStringEnumCodes()
             .UseSoftDeleteFilter();
     }

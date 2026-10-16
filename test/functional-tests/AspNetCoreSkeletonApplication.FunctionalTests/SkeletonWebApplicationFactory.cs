@@ -28,6 +28,7 @@ public class SkeletonWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Mail:Smtp:Username", "unused");
         builder.UseSetting("Mail:Smtp:Password", "unused");
         builder.UseSetting("Mail:Smtp:From", "no-reply@spa.test");
+        builder.UseSetting("Authentication:OAuthServer:KeySource", "Ephemeral");
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IPermissionEvaluator>();

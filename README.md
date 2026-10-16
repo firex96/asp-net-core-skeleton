@@ -423,6 +423,35 @@ FROM identity_user AS u CROSS JOIN user_group AS g
 WHERE u.NormalizedEmail = UPPER('admin@example.com') AND g.Name = 'Administrators' AND g.DeletedAt IS NULL;
 ```
 
+## OAuth 서버
+
+Server 는 **OAuth 2.0 인가 서버 + OpenID Connect**(OpenIddict)이기도 하다 — 다른 앱(모바일 · 파트너 서버 · 자사 도구)이 사용자 동의를 받아 이 API 를 부를 토큰을 발급한다. 같은 출처 SPA 는 지금처럼 쿠키를 쓴다.
+
+| 엔드포인트 | 하는 일 |
+|---|---|
+| `/.well-known/openid-configuration` · JWKS | 탐색 문서 — 실제로 지원하는 것만 싣는다(응답 타입 `code`, grant 셋) |
+| `/connect/authorize` | 인가 코드 발급. **PKCE 필수**. 로그인이 없으면 SPA `/login?returnUrl=…` 로, 동의가 필요하면 SPA `/consent?…` 로 보낸다 |
+| `/connect/token` | 인가 코드 · 리프레시 토큰(쓸 때마다 회전) · 클라이언트 자격 증명 |
+| `/connect/userinfo` | `sub`, scope 에 따라 `email` · `name` |
+| `/connect/endsession` | 로그아웃(등록한 `post_logout_redirect_uri` 로만 돌아간다) |
+| `GET /api/oauth/consent?client_id=&scope=` | 동의 화면이 보여 줄 클라이언트 이름 · scope 설명(로그인 필요) |
+
+- **로그인은 SPA 화면이 한다.** authorize 는 세션 쿠키로만 로그인을 확인한다. 공급자에서 돌아오는 첫 요청은 cross-site 라 SameSite=Strict 쿠키가 없으므로 SPA 로그인 화면으로 가고, SPA 는 이미 로그인돼 있으면 곧바로 같은 authorize 주소로 다시 이동한다(same-site 이동이라 쿠키가 실린다). 쿠키 정책을 느슨하게(Lax) 바꾸지 않는다.
+- **동의** — 클라이언트의 `ConsentType` 이 `Explicit` 이면 SPA `/consent` 가 묻고, 같은 요청을 `consent=accept|deny` 와 함께 `/connect/authorize` 로 POST 한다. 허락은 영구 authorization 으로 저장해 다시 묻지 않는다. `Implicit`(자사 클라이언트)은 묻지 않는다.
+- **scope = 권한** — scope 는 OIDC 표준 넷(`openid` · `profile` · `email` · `offline_access`)과 **권한 코드 카탈로그 전부**다. 클라이언트는 등록된 scope 만 요청할 수 있다.
+- **클라이언트는 구성으로 등록한다** — `Authentication:OAuthServer:Clients[]`(`ClientId`, `ClientSecret`(있으면 기밀 클라이언트 — 비밀값), `DisplayName`, `ConsentType`, `GrantTypes`, `RedirectUris`, `PostLogoutRedirectUris`, `Scopes`). 기동할 때 저장소와 맞춘다(만들거나 고친다). 구성에서 빠진 클라이언트는 지우지 않는다. 클라이언트 자격 증명을 쓰는 클라이언트는 비밀이 필수다.
+- **키** — `Authentication:OAuthServer:KeySource`(기본값 없음). `Certificates` 는 서명 · 암호화 X.509 인증서 둘(`SigningCertificate` · `EncryptionCertificate`, PKCS#12 base64, 비밀값)로 모든 인스턴스가 같은 키를 쓴다. `Ephemeral` 은 기동할 때마다 새 키라 **로컬 · 테스트 전용**이다(재기동하면 토큰이 무효, 인스턴스끼리 서로의 토큰을 못 읽는다). 액세스 토큰은 암호화된 JWT 다 — 이 서버만 읽는다.
+- **issuer 는 `App:PublicOrigin`** — 사용자가 여는 출처와 같다(로컬은 SPA dev 서버 출처).
+- **저장소** — `oauth_application` · `oauth_authorization` · `oauth_scope` · `oauth_token`(마이그레이션 `AddOAuthServer`, 프레임워크 테이블).
+- **로컬 샘플 클라이언트** — `sample-app`(공개, 인가 코드 + PKCE, 동의 화면, redirect `http://localhost:8091/callback` — 아무것도 듣지 않으므로 주소창에서 `code` 를 읽는다), `sample-service`(기밀, 클라이언트 자격 증명). 예:
+
+```bash
+curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
+  -d client_id=sample-service -d client_secret=local-sample-service-secret -d scope=products.manage
+```
+
+- 다른 출처의 **브라우저 앱**이 토큰 엔드포인트를 직접 부르는 흐름(CORS)은 아직 없다 — 서버 · 네이티브 클라이언트를 전제로 한다.
+
 ## 메일
 
 계정 메일(지금은 비밀번호 재설정)을 **SMTP(MailKit)** 로 보낸다 — `Common/Mail` 의 `IMailSender`(`SmtpMailSender`)와 Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
@@ -582,7 +611,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | `Azure` | Azure Key Vault — 볼트의 모든 비밀 | `Azure:KeyVault:Endpoint`, `DefaultAzureCredential` |
 | `Gcp` | GCP Secret Manager — `Gcp:SecretManager:Secrets` 에 적은 비밀 | `Gcp:SecretManager:ProjectId`, Application Default Credentials |
 
-저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Server 는 SMTP 비밀번호 `Mail:Smtp:Password` 와 켠 소셜 공급자의 `Authentication:External:{공급자}:ClientSecret` 이, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 와 대시보드 비밀번호 `Batch:Dashboard:Password` 가 더 있다**(Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` · `Batch--Dashboard--Password`, 켠 공급자의 `Authentication--External--{공급자}--ClientSecret` 을 추가한다 — 목록의 비밀이 없으면 기동하다 멈추므로 켠 것만 적는다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
+저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Server 는 SMTP 비밀번호 `Mail:Smtp:Password`, 켠 소셜 공급자의 `Authentication:External:{공급자}:ClientSecret`, OAuth 서버 인증서 `Authentication:OAuthServer:SigningCertificate` · `EncryptionCertificate` 와 기밀 클라이언트의 `Authentication:OAuthServer:Clients:{n}:ClientSecret` 이, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 와 대시보드 비밀번호 `Batch:Dashboard:Password` 가 더 있다**(Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` · `Batch--Dashboard--Password`, 켠 공급자의 `Authentication--External--{공급자}--ClientSecret` 을 추가한다 — 목록의 비밀이 없으면 기동하다 멈추므로 켠 것만 적는다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
 
 ### 키 이름 대응
 
@@ -593,7 +622,7 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | Azure Key Vault · GCP Secret Manager 비밀 이름 | `:` → `--` | `ConnectionStrings--Default` |
 | AWS Secrets Manager JSON 비밀의 키 | 구성 키 그대로 | `{"ConnectionStrings:Default": "…"}` |
 
-Server 는 비밀이 아니어도 배포마다 꼭 정해야 하는 값이 있다 — `App:PublicOrigin`(사용자가 여는 SPA 출처, 메일 링크에 쓴다), `Mail:Smtp:Host` · `Username` · `From`. 기본값이 없어 빠지면 기동할 때 키 이름을 담아 멈춘다.
+Server 는 비밀이 아니어도 배포마다 꼭 정해야 하는 값이 있다 — `App:PublicOrigin`(사용자가 여는 SPA 출처, 메일 링크와 OAuth issuer 에 쓴다), `Mail:Smtp:Host` · `Username` · `From`, `Authentication:OAuthServer:KeySource`. 기본값이 없어 빠지면 기동할 때 키 이름을 담아 멈춘다.
 
 비밀이 아닌 환경별 값은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — SMTP 포트 · 보안 `Mail:Smtp:Port`(587) · `Security`(`StartTls`), 외부 API 주소 `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`, 감사 헤더 신뢰 `Audit:TrustUserHeader` ← `Audit__TrustUserHeader`, 느린 쿼리 · 요청 임계값 `Diagnostics:*`.
 

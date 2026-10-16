@@ -67,6 +67,7 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         builder.UseSetting("Mail:Smtp:Username", "test");
         builder.UseSetting("Mail:Smtp:Password", "test");
         builder.UseSetting("Mail:Smtp:From", "no-reply@spa.test");
+        builder.UseSetting("Authentication:OAuthServer:KeySource", "Ephemeral");
         foreach (var provider in new[] { "Google", "Kakao", "Naver" })
         {
             var issuer = $"http://{_mockOAuth.Hostname}:{_mockOAuth.GetMappedPublicPort(MockOAuthPort)}/{provider.ToLowerInvariant()}";
