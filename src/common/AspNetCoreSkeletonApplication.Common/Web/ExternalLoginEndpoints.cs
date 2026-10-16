@@ -155,7 +155,7 @@ public static class ExternalLoginEndpoints
 
         if (logins.Count == 1 && !await userManager.HasPasswordAsync(user))
         {
-            throw new LastLoginMethodException("마지막 로그인 수단은 끊을 수 없다 — 비밀번호를 정하거나 다른 계정을 먼저 연결한다");
+            throw new LastLoginMethodException("로그인할 방법이 이것 하나뿐이라 연결을 끊을 수 없어요. 비밀번호를 정하거나 다른 계정을 먼저 연결해 주세요.");
         }
 
         await userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);

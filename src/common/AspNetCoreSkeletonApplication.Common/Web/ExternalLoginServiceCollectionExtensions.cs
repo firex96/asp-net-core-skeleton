@@ -8,7 +8,7 @@ namespace AspNetCoreSkeletonApplication.Common.Web;
 
 public static class ExternalLoginServiceCollectionExtensions
 {
-    /// <summary>구성 섹션 이름 = 인증 스킴 이름 = SPA 가 보는 공급자 이름.</summary>
+    /// <summary>구성 섹션 이름 = 인증 스킴 이름 = SPA 가 보는 공급자 이름. 화면에 보이는 이름(카카오 · 네이버)은 등록할 때 따로 준다.</summary>
     public const string Google = "Google";
     public const string Kakao = "Kakao";
     public const string Naver = "Naver";
@@ -33,7 +33,7 @@ public static class ExternalLoginServiceCollectionExtensions
 
         if (Enabled(external, Kakao) is { } kakao)
         {
-            authentication.AddKakaoTalk(Kakao, Kakao, options =>
+            authentication.AddKakaoTalk(Kakao, "카카오", options =>
             {
                 Configure(options, kakao, Kakao);
                 options.Scope.Add("account_email");
@@ -42,7 +42,7 @@ public static class ExternalLoginServiceCollectionExtensions
 
         if (Enabled(external, Naver) is { } naver)
         {
-            authentication.AddNaver(Naver, Naver, options => Configure(options, naver, Naver));
+            authentication.AddNaver(Naver, "네이버", options => Configure(options, naver, Naver));
         }
 
         return services;

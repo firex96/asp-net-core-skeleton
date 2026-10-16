@@ -23,8 +23,8 @@ public static class Permissions
 
     public static readonly IReadOnlyList<PermissionDto> All =
     [
-        new(Products.Manage, "상품 상태 변경과 다른 사용자의 상품 삭제"),
-        new(Authorization.Manage, "사용자 그룹 · 역할 · 권한 관리"),
+        new(Products.Manage, "상품 상태를 바꾸고, 다른 사람이 올린 상품도 삭제"),
+        new(Authorization.Manage, "사용자 그룹과 역할, 권한 관리"),
     ];
 
     public static bool Exists(string code) => All.Any(permission => permission.Code == code);

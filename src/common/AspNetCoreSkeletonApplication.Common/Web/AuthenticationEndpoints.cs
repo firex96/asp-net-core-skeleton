@@ -55,8 +55,8 @@ public static class AuthenticationEndpoints
         }
 
         return result.IsLockedOut
-            ? TypedResults.Problem(statusCode: StatusCodes.Status423Locked, detail: "로그인을 여러 번 실패해 계정이 잠겼다. 잠시 뒤에 다시 시도한다")
-            : TypedResults.Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "이메일 또는 비밀번호가 맞지 않는다");
+            ? TypedResults.Problem(statusCode: StatusCodes.Status423Locked, detail: "로그인에 여러 번 실패해서 계정이 잠겼어요. 30분 뒤에 다시 시도하거나 비밀번호를 재설정해 주세요.")
+            : TypedResults.Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "이메일 또는 비밀번호가 맞지 않아요.");
     }
 
     private static async Task<NoContent> LogoutAsync(SignInManager<ApplicationUser> signInManager)
@@ -140,7 +140,7 @@ public static class AuthenticationEndpoints
     }
 
     private static InvalidTokenException InvalidResetToken() =>
-        new("재설정 링크가 맞지 않거나 만료됐다. 비밀번호 찾기를 다시 요청한다");
+        new("재설정 링크가 맞지 않거나 이미 만료됐어요. 비밀번호 찾기를 다시 해 주세요.");
 
     public sealed record CredentialsRequest(string Email, string Password);
 

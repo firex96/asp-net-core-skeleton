@@ -34,7 +34,8 @@ public static class IdentityServiceCollectionExtensions
             })
             .AddEntityFrameworkStores<AppDbContext>()
             .AddSignInManager()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddErrorDescriber<KoreanIdentityErrorDescriber>();
 
         // 비밀번호 재설정 토큰은 2시간. 재설정이 보안 스탬프를 바꾸므로 토큰은 한 번만 쓰이고, 다른 기기의 세션도 1분 안에 끊긴다.
         services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(2));

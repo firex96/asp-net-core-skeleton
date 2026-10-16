@@ -11,10 +11,10 @@ public static class OAuthScopes
 {
     public static readonly IReadOnlyDictionary<string, string> Standard = new Dictionary<string, string>
     {
-        [OpenIddictConstants.Scopes.OpenId] = "로그인한 사용자 식별",
-        [OpenIddictConstants.Scopes.Profile] = "이름",
-        [OpenIddictConstants.Scopes.Email] = "이메일 주소",
-        [OpenIddictConstants.Scopes.OfflineAccess] = "로그아웃해도 계속 접근(리프레시 토큰)",
+        [OpenIddictConstants.Scopes.OpenId] = "회원님이 누구인지 확인",
+        [OpenIddictConstants.Scopes.Profile] = "이름 보기",
+        [OpenIddictConstants.Scopes.Email] = "이메일 주소 보기",
+        [OpenIddictConstants.Scopes.OfflineAccess] = "앱을 쓰지 않는 동안에도 계속 접근",
     };
 
     public static IEnumerable<string> All => Standard.Keys.Concat(Permissions.All.Select(permission => permission.Code));
