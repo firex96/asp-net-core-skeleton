@@ -216,6 +216,7 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
 
         Assert.StartsWith(Callback, denied.Headers.Location!.AbsoluteUri, StringComparison.Ordinal);
         Assert.Equal("access_denied", HttpUtility.ParseQueryString(denied.Headers.Location.Query)["error"]);
+        Assert.Equal("사용자가 접근을 허용하지 않았어요.", HttpUtility.ParseQueryString(denied.Headers.Location.Query)["error_description"]);
     }
 
     [Fact]

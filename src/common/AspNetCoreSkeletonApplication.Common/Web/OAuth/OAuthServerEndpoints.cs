@@ -77,7 +77,7 @@ public static class OAuthServerEndpoints
         if (user is null || !await signInManager.CanSignInAsync(user))
         {
             return request.HasPromptValue(PromptValues.None)
-                ? Forbid(OpenIddictConstants.Errors.LoginRequired, "로그인이 필요하다")
+                ? Forbid(OpenIddictConstants.Errors.LoginRequired, "로그인이 필요해요.")
                 : TypedResults.Redirect($"/login?returnUrl={Uri.EscapeDataString(AuthorizeUrlOf(request))}");
         }
 
@@ -92,7 +92,7 @@ public static class OAuthServerEndpoints
         var decision = HttpMethods.IsPost(context.Request.Method) ? context.Request.Form["consent"].ToString() : string.Empty;
         if (decision == "deny")
         {
-            return Forbid(OpenIddictConstants.Errors.AccessDenied, "사용자가 허락하지 않았다");
+            return Forbid(OpenIddictConstants.Errors.AccessDenied, "사용자가 접근을 허용하지 않았어요.");
         }
 
         var needsConsent = decision != "accept"
@@ -101,7 +101,7 @@ public static class OAuthServerEndpoints
         if (needsConsent)
         {
             return request.HasPromptValue(PromptValues.None)
-                ? Forbid(OpenIddictConstants.Errors.ConsentRequired, "동의가 필요하다")
+                ? Forbid(OpenIddictConstants.Errors.ConsentRequired, "사용자의 동의가 필요해요.")
                 : TypedResults.Redirect($"/consent?{QueryOf(request)}");
         }
 
@@ -129,14 +129,14 @@ public static class OAuthServerEndpoints
 
         if (!request.IsAuthorizationCodeGrantType() && !request.IsRefreshTokenGrantType())
         {
-            return Forbid(OpenIddictConstants.Errors.UnsupportedGrantType, "지원하지 않는 grant_type 이다");
+            return Forbid(OpenIddictConstants.Errors.UnsupportedGrantType, "지원하지 않는 grant_type 이에요.");
         }
 
         var granted = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         var user = granted.Principal?.GetClaim(Claims.Subject) is { } subject ? await userManager.FindByIdAsync(subject) : null;
         if (user is null || !await signInManager.CanSignInAsync(user) || await userManager.IsLockedOutAsync(user))
         {
-            return Forbid(OpenIddictConstants.Errors.InvalidGrant, "이 토큰으로는 더 이상 로그인할 수 없다");
+            return Forbid(OpenIddictConstants.Errors.InvalidGrant, "이 토큰으로는 더 이상 로그인할 수 없어요.");
         }
 
         // 사용자 정보는 지금 값으로 다시 싣는다(이메일이 바뀌었을 수 있다). scope · 동의는 처음 받은 그대로다.
