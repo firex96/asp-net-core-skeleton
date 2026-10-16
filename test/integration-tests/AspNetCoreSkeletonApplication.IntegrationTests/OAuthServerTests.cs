@@ -122,6 +122,11 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
         var userInfo = await UserInfoAsync(tokens.GetProperty("access_token").GetString()!);
         Assert.Equal(userId.ToString(System.Globalization.CultureInfo.InvariantCulture), userInfo.GetProperty("sub").GetString());
         Assert.Equal("code-flow@example.com", userInfo.GetProperty("email").GetString());
+        Assert.True(userInfo.GetProperty("email_verified").GetBoolean());
+        var idToken = tokens.GetProperty("id_token").GetString()!;
+        var idClaims = JsonDocument.Parse(Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlDecode(idToken.Split('.')[1])).RootElement;
+        Assert.Equal("code-flow@example.com", idClaims.GetProperty("email").GetString());
+        Assert.True(idClaims.GetProperty("email_verified").GetBoolean());
 
         var refreshToken = tokens.GetProperty("refresh_token").GetString();
         var refreshed = await OAuthFlows.TokenAsync(NewClient(), new() { ["grant_type"] = "refresh_token", ["refresh_token"] = refreshToken!, ["client_id"] = "first-party" });

@@ -179,18 +179,22 @@ public static class OAuthServerEndpoints
         return TypedResults.Ok(new ConsentResponse(client_id, await applicationManager.GetDisplayNameAsync(application) ?? client_id, scopes));
     }
 
-    /// <summary>토큰에 실을 사용자 정보. 대상: 주체는 access · id 토큰, 이메일 · 이름은 그 scope 를 받았을 때 둘 다.</summary>
+    /// <summary>
+    /// 토큰에 실을 사용자 정보. 대상: 주체는 access · id 토큰, 이메일(+ <c>email_verified</c>) · 이름은 그 scope 를 받았을 때 둘 다.
+    /// 로그인하려면 이메일을 확인해야 하므로(<c>RequireConfirmedEmail</c>) 토큰을 받는 사용자의 <c>email_verified</c> 는 true 다.
+    /// </summary>
     private static async Task<ClaimsIdentity> IdentityOfAsync(UserManager<ApplicationUser> userManager, ApplicationUser user, IEnumerable<string> scopes)
     {
         var identity = new ClaimsIdentity(TokenValidationAuthenticationType, Claims.Name, Claims.Role);
         identity.SetClaim(Claims.Subject, user.Id.ToString(CultureInfo.InvariantCulture))
             .SetClaim(Claims.Email, await userManager.GetEmailAsync(user))
+            .SetClaim(Claims.EmailVerified, await userManager.IsEmailConfirmedAsync(user))
             .SetClaim(Claims.Name, await userManager.GetUserNameAsync(user));
         identity.SetScopes(scopes);
         identity.SetDestinations(claim => claim.Type switch
         {
             Claims.Subject => [Destinations.AccessToken, Destinations.IdentityToken],
-            Claims.Email when identity.HasScope(Scopes.Email) => [Destinations.AccessToken, Destinations.IdentityToken],
+            Claims.Email or Claims.EmailVerified when identity.HasScope(Scopes.Email) => [Destinations.AccessToken, Destinations.IdentityToken],
             Claims.Name when identity.HasScope(Scopes.Profile) => [Destinations.AccessToken, Destinations.IdentityToken],
             _ => [],
         });
