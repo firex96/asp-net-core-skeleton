@@ -174,7 +174,7 @@ ASPNETCORE_ENVIRONMENT=Local dotnet ef migrations add <이름> \
 | MappingService (`.Services.Mapping`) | 화면용 변환 전부 — 파생 값, 포맷, 여러 BizService 결과 조합. 트랜잭션 없음 | BizService, `IOptions<>`, `TimeProvider` |
 | BizService (`.Services.Biz`) | 조회·저장·트랜잭션·호출 순서. 업무 판단은 Domain 을 불러 얻는다. 변경 메서드는 **항상** `IMainTransaction.ExecuteAsync` 안에서 돈다 | `I~EntityService`, `IMainTransaction`, `~Client`, 다른 BizService, `IOptions<>`, `TimeProvider` |
 | Domain (`.Domain`) | 업무 값 계산과 상태 전이 판단 전부. EF 를 모르는 순수 클래스, DI 대상이 아니다 | — (Dto · 열거형 · 에러 · System 만 참조) |
-| EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현하고, 구현은 `internal` 이다. 조회는 기본 NoTracking, 바꿀 때만 `AsTracking()`. 캐시는 여기서만 | `AppDbContext`, `EntityCache` |
+| EntityService (`.Persistence.Services`) | Entity 하나의 CRUD. 밖으로는 Dto 만 주고받는다. 모두 `I~EntityService` 를 구현하고, 구현은 `internal` 이다. 조회는 기본 NoTracking, 바꿀 때만 `AsTracking()`. 캐시는 여기서만 | `AppDbContext`, `EntityCache`, OpenIddict 관리자(`IOpenIddictTokenManager` · `IOpenIddictAuthorizationManager` — OAuth 저장소는 OpenIddict 가 소유한다) |
 | 매퍼 (`.Mappers`, `.Persistence.Mappers`) | 필드를 기계적으로 옮긴다. 계산하지 않는다. `static partial` (Mapperly) | — |
 
 모든 계층은 `ILogger<>` 를 더 받을 수 있다. 이 표의 주입 허용 목록은 규약 테스트가 강제한다 — 「코딩 규약」 참고. 타입은 셋으로 나눈다 — **Model**(HTTP 입출력, `.Models`), **Dto**(계층 사이 전달, `.Dtos`), **Entity**(DB 매핑, `internal`). Model 과 Dto 는 데이터만 담는 `sealed record` 다.
@@ -318,6 +318,8 @@ EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백
 3. 페이지마다 `IMainTransaction` 하나로, 웹의 상태 변경과 **같은 경로**(Domain 판단 → 변경 → 상태 이력)로 바꾼다. 감사 주체는 시스템(`0`), 캐시 무효화는 커밋 뒤.
 
 **멱등** — 처리한 상품은 조회 조건(Draft)에서 빠지므로 다시 실행하면 대상이 0건이다. `DiscontinueStaleDraftJobTests` 가 Quartz 로 두 번 실행해 1회차 결과 · 2회차 0건 · 데이터 스냅샷 동일 · 실행 이력 성공 2건을 확인한다. 새 Job 도 같은 모양으로 — 처리 완료 상태를 데이터에 남기고, 조회 조건이 그것을 걸러야 한다.
+
+**`PruneOAuthTokenJob`** (매일 03:30) — OAuth 서버가 쌓은 토큰 · 동의 중 더 쓸 수 없는 것(만료 · 폐기 · 사용됨, 토큰 없는 일회성 동의)을 지운다. 만들어진 지 `Batch:Jobs:PruneOAuthTokenJob:RetentionDays`(14일) 지난 것만 — 지울지는 OpenIddict 의 정리 규칙을 그대로 쓴다(`OAuthTokenBizService` → `IOAuthTokenEntityService`). 지운 것은 대상에서 빠지므로 다시 실행해도 같다(`PruneOAuthTokenJobTests`). Batch 를 빼고 만든 템플릿(`--batch false`)에는 이 정리가 없다 — 토큰 테이블이 계속 자라므로 다른 스케줄러에서 `OAuthTokenBizService.PruneAsync` 를 부른다.
 
 **수동 실행 — 웹훅** `POST /api/jobs/{Job 이름}/trigger`
 

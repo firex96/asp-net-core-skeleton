@@ -75,7 +75,8 @@ public class LayeringConventionTests
                                 || (name.EndsWith("BizService", StringComparison.Ordinal) && ConventionScan.LayerOf(dependency) == Layer.BizService)
                                 || IsGenericOf(dependency, typeof(IOptions<>))
                                 || dependency == typeof(TimeProvider),
-            Layer.EntityService => name is "AppDbContext" or "EntityCache",
+            // OpenIddict 관리자 — OAuth 서버 저장소는 OpenIddict 가 소유한다(정리 규칙을 다시 구현하지 않는다).
+            Layer.EntityService => name is "AppDbContext" or "EntityCache" or "IOpenIddictTokenManager" or "IOpenIddictAuthorizationManager",
             _ => false,
         };
     }

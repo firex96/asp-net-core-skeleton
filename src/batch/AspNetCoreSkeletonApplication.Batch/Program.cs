@@ -1,4 +1,5 @@
 using AspNetCoreSkeletonApplication.Batch.Configuration;
+using AspNetCoreSkeletonApplication.Batch.OAuth.Jobs;
 using AspNetCoreSkeletonApplication.Batch.Product.Jobs;
 using AspNetCoreSkeletonApplication.Batch.Scheduling;
 using AspNetCoreSkeletonApplication.Batch.Security;
@@ -28,9 +29,14 @@ public class Program
 
         // 스케줄할 Job — 스케줄은 Batch:Jobs:{Job 클래스 이름} 구성이 정한다.
         builder.Services.AddBatchScheduler(builder.Configuration, jobs => jobs
-            .Add<DiscontinueStaleDraftJob>());
+            .Add<DiscontinueStaleDraftJob>()
+            .Add<PruneOAuthTokenJob>());
         builder.Services.AddOptions<DiscontinueStaleDraftJobOptions>()
             .BindConfiguration(BatchSchedulerExtensions.SectionOf(nameof(DiscontinueStaleDraftJob)))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddOptions<PruneOAuthTokenJobOptions>()
+            .BindConfiguration(BatchSchedulerExtensions.SectionOf(nameof(PruneOAuthTokenJob)))
             .ValidateDataAnnotations()
             .ValidateOnStart();
 

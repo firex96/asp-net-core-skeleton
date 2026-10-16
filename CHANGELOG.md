@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- Batch Job `PruneOAuthTokenJob` — OAuth 서버의 만료 · 폐기 토큰과 쓰이지 않는 동의를 매일 정리(보관 `RetentionDays` 14일, OpenIddict 정리 규칙). Common OAuth 도메인(`OAuthTokenBizService` · `IOAuthTokenEntityService`), EntityService 주입 허용 목록에 OpenIddict 관리자
 - Bearer 토큰으로 API 호출 — 정책 스킴(`SessionOrBearer`)이 Bearer 헤더면 OpenIddict 검증, 아니면 세션 쿠키. 권한은 `RequestPermissions` 한 곳에서 — 사용자 토큰은 사용자 권한 ∩ scope, 클라이언트 토큰은 scope. 감사 주체는 사용자 토큰이면 그 사용자, 클라이언트 토큰이면 시스템(로그 scope `ClientId`). `/api/auth/me` 는 토큰이면 scope 와의 교집합, 클라이언트 토큰이면 403
 - OAuth 2.0 인가 서버 + OpenID Connect(OpenIddict 7.7) — `/connect/authorize`(PKCE 필수, 로그인은 SPA 화면, Explicit 동의는 SPA `/consent` 와 영구 authorization) · `token`(인가 코드 · 리프레시 회전 · 클라이언트 자격 증명) · `userinfo` · `endsession`, 탐색 문서, `GET /api/oauth/consent`. scope 는 OIDC 표준과 권한 코드 카탈로그. 클라이언트는 구성(`Authentication:OAuthServer:Clients`)으로 기동할 때 동기화, 키는 `KeySource`(Certificates · Ephemeral). 저장소 `oauth_*`(마이그레이션 `AddOAuthServer`)
 - 소셜 로그인 — Google · Kakao · Naver(구성 섹션이 있는 공급자만, `ClientId` · `ClientSecret` 필수). 연결된 계정만 로그인(자동 가입 없음), 연결은 로그인한 사용자가. `/api/auth/external` providers · `{provider}/login` · `{provider}/link`(POST 시작) · callback · logins · 끊기(마지막 수단 409 `LAST_LOGIN_METHOD_ERROR`). 에러 코드 `EXTERNAL_LOGIN_NOT_LINKED_ERROR`(AUTH003) · `EXTERNAL_LOGIN_IN_USE_ERROR`(AUTH004). docker compose 와 통합 테스트에 mock OAuth 서버(`docker/mock-oauth2-server.json`)
