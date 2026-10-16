@@ -40,6 +40,13 @@ public static class OAuthServerServiceCollectionExtensions
             options.AllowAuthorizationCodeFlow().AllowRefreshTokenFlow().AllowClientCredentialsFlow();
             options.RequireProofKeyForCodeExchange();
             options.RegisterScopes(OAuthScopes.All.ToArray());
+            // 탐색 문서의 prompt_values_supported — 실제로 처리하는 값만 둔다(OAuthServerEndpoints 의 authorize). 계정을 여럿 두지 않으므로
+            // select_account 는 받지 않는다(받으면 OpenIddict 가 invalid_request 로 거절한다).
+            options.Configure(server =>
+            {
+                server.PromptValues.Clear();
+                server.PromptValues.UnionWith([PromptValues.None, PromptValues.Login, PromptValues.Consent]);
+            });
 
             if (server.KeySource == OAuthKeySource.Certificates)
             {

@@ -455,6 +455,7 @@ Server 는 **OAuth 2.0 인가 서버 + OpenID Connect**(OpenIddict)이기도 하
 
 - **로그인은 SPA 화면이 한다.** authorize 는 세션 쿠키로만 로그인을 확인한다. 공급자에서 돌아오는 첫 요청은 cross-site 라 SameSite=Strict 쿠키가 없으므로 SPA 로그인 화면으로 가고, SPA 는 이미 로그인돼 있으면 곧바로 같은 authorize 주소로 다시 이동한다(same-site 이동이라 쿠키가 실린다). 쿠키 정책을 느슨하게(Lax) 바꾸지 않는다.
 - **동의** — 클라이언트의 `ConsentType` 이 `Explicit` 이면 SPA `/consent` 가 묻고, 같은 요청을 `consent=accept|deny` 와 함께 `/connect/authorize` 로 POST 한다. 허락은 영구 authorization 으로 저장해 다시 묻지 않는다. `Implicit`(자사 클라이언트)은 묻지 않는다.
+- **`prompt`** — 탐색 문서에는 처리하는 값만 싣는다(`prompt_values_supported`: `none` · `login` · `consent`). `none` 은 로그인 · 동의가 필요하면 묻지 않고 `login_required` · `consent_required` 로 돌려준다. `login` 은 세션을 끊고 로그인 화면으로 보낸다 — 돌아올 주소에서는 `login` 을 빼서 다시 끊지 않는다. `consent` 는 이미 허락했거나 `Implicit` 이어도 동의 화면을 보인다. 계정을 여럿 두지 않으므로 `select_account` 는 `invalid_request` 다.
 - **scope = 권한** — scope 는 OIDC 표준 넷(`openid` · `profile` · `email` · `offline_access`)과 **권한 코드 카탈로그 전부**다. 클라이언트는 등록된 scope 만 요청할 수 있다.
 - **클라이언트는 구성으로 등록한다** — `Authentication:OAuthServer:Clients[]`(`ClientId`, `ClientSecret`(있으면 기밀 클라이언트 — 비밀값), `DisplayName`, `ConsentType`, `GrantTypes`, `RedirectUris`, `PostLogoutRedirectUris`, `Scopes`). 기동할 때 저장소와 맞춘다(만들거나 고친다). 구성에서 빠진 클라이언트는 지우지 않는다. 클라이언트 자격 증명을 쓰는 클라이언트는 비밀이 필수다.
 - **키** — `Authentication:OAuthServer:KeySource`(기본값 없음). `Certificates` 는 서명 · 암호화 X.509 인증서 둘(`SigningCertificate` · `EncryptionCertificate`, PKCS#12 base64, 비밀값)로 모든 인스턴스가 같은 키를 쓴다. `Ephemeral` 은 기동할 때마다 새 키라 **로컬 · 테스트 전용**이다(재기동하면 토큰이 무효, 인스턴스끼리 서로의 토큰을 못 읽는다). 액세스 토큰은 암호화된 JWT 다 — 이 서버만 읽는다.

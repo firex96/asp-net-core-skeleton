@@ -21,7 +21,8 @@ namespace AspNetCoreSkeletonApplication.Common.Web.OAuth;
 /// <list type="bullet">
 /// <item><b>authorize</b> — 세션 쿠키로 로그인을 확인한다. 없으면 SPA <c>/login?returnUrl=…</c> 로 보내고, SPA 가 로그인 뒤 같은 주소로 다시 이동한다
 /// (그 이동은 same-site 라 SameSite=Strict 세션 쿠키가 실린다). 동의가 필요한 클라이언트(<c>Explicit</c>)는 SPA <c>/consent</c> 로 보내고,
-/// 동의 화면이 같은 요청을 <c>consent=accept|deny</c> 와 함께 POST 한다. 허락은 영구 authorization 으로 저장해 다시 묻지 않는다.</item>
+/// 동의 화면이 같은 요청을 <c>consent=accept|deny</c> 와 함께 POST 한다. 허락은 영구 authorization 으로 저장해 다시 묻지 않는다.
+/// <c>prompt</c> 는 <c>none</c>(묻지 않고 실패) · <c>login</c>(세션을 끊고 다시 로그인) · <c>consent</c>(이미 허락했거나 Implicit 이어도 동의 화면)를 처리한다.</item>
 /// <item><b>token</b> — 인가 코드 · 리프레시 토큰은 사용자가 아직 로그인할 수 있는지 다시 본다(잠김 · 삭제면 거절). 클라이언트 자격 증명은
 /// 주체를 <c>client:{clientId}</c> 로 둔다 — 숫자가 아니므로 사용자 ID 로 오인되지 않는다.</item>
 /// </list>
@@ -50,6 +51,17 @@ public static class OAuthServerEndpoints
         var request = context.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("OpenIddict 요청을 읽지 못했다");
         var session = await context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
         var user = session.Succeeded ? await userManager.GetUserAsync(session.Principal) : null;
+        if (request.HasPromptValue(PromptValues.Login))
+        {
+            // 다시 로그인하게 한다 — 세션을 끊고, 돌아올 주소에서는 login 을 뺀다(로그인한 뒤 같은 요청이 또 세션을 끊지 않게).
+            if (user is not null)
+            {
+                await signInManager.SignOutAsync();
+            }
+
+            return TypedResults.Redirect($"/login?returnUrl={Uri.EscapeDataString(AuthorizeUrlOf(request, withoutPrompt: PromptValues.Login))}");
+        }
+
         if (user is null || !await signInManager.CanSignInAsync(user))
         {
             return request.HasPromptValue(PromptValues.None)
@@ -71,8 +83,9 @@ public static class OAuthServerEndpoints
             return Forbid(OpenIddictConstants.Errors.AccessDenied, "사용자가 허락하지 않았다");
         }
 
-        var needsConsent = await applicationManager.GetConsentTypeAsync(application) == ConsentTypes.Explicit
-                           && authorizations.Count == 0 && decision != "accept";
+        var needsConsent = decision != "accept"
+                           && (request.HasPromptValue(PromptValues.Consent)
+                               || (await applicationManager.GetConsentTypeAsync(application) == ConsentTypes.Explicit && authorizations.Count == 0));
         if (needsConsent)
         {
             return request.HasPromptValue(PromptValues.None)
@@ -195,12 +208,19 @@ public static class OAuthServerEndpoints
             }),
             [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
 
-    private static string AuthorizeUrlOf(OpenIddictRequest request) => $"/connect/authorize?{QueryOf(request)}";
+    private static string AuthorizeUrlOf(OpenIddictRequest request, string? withoutPrompt = null) =>
+        $"/connect/authorize?{QueryOf(request, withoutPrompt)}";
 
-    private static string QueryOf(OpenIddictRequest request) =>
+    /// <summary>같은 authorize 요청의 쿼리 — 동의 결정(<c>consent</c>)은 빼고, <paramref name="withoutPrompt"/> 를 주면 <c>prompt</c> 에서 그 값을 뺀다.</summary>
+    private static string QueryOf(OpenIddictRequest request, string? withoutPrompt = null) =>
         QueryString.Create(request.GetParameters()
             .Where(parameter => parameter.Key != "consent")
-            .Select(parameter => new KeyValuePair<string, StringValues>(parameter.Key, (string?)parameter.Value)))
+            .Select(parameter => new KeyValuePair<string, StringValues>(
+                parameter.Key,
+                parameter.Key == Parameters.Prompt && withoutPrompt is not null
+                    ? string.Join(' ', ((string?)parameter.Value ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(value => value != withoutPrompt))
+                    : (string?)parameter.Value))
+            .Where(parameter => parameter.Key != Parameters.Prompt || !string.IsNullOrEmpty(parameter.Value)))
             .ToUriComponent().TrimStart('?');
 
     public sealed record ConsentResponse(string ClientId, string DisplayName, IReadOnlyList<ConsentScope> Scopes);

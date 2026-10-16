@@ -46,6 +46,52 @@ public class OAuthServerTests(InfrastructureFixture infrastructure) : IAsyncLife
         Assert.Equal(["code"], Strings(discovery, "response_types_supported"));
         Assert.Equal(["authorization_code", "client_credentials", "refresh_token"], Strings(discovery, "grant_types_supported").Order());
         Assert.Contains("products.manage", Strings(discovery, "scopes_supported"));
+        Assert.Equal(["consent", "login", "none"], Strings(discovery, "prompt_values_supported").Order());
+    }
+
+    [Fact]
+    public async Task PromptLogin_EndsTheSession_AndComesBackWithoutIt()
+    {
+        var (browser, _) = await SignInAsync("prompt-login@example.com");
+
+        var response = await browser.GetAsync(OAuthFlows.AuthorizeUrl("first-party", "openid", OAuthFlows.Pkce().Challenge) + "&prompt=login", Token);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var location = response.Headers.Location!.OriginalString;
+        Assert.StartsWith("/login?returnUrl=", location, StringComparison.Ordinal);
+        var returnUrl = Uri.UnescapeDataString(location["/login?returnUrl=".Length..]);
+        Assert.StartsWith("/connect/authorize?", returnUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("prompt", returnUrl, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser.GetAsync("/api/auth/me", Token)).StatusCode);
+    }
+
+    [Fact]
+    public async Task PromptConsent_AsksEvenAnImplicitClient()
+    {
+        var (browser, _) = await SignInAsync("prompt-consent@example.com");
+        var url = OAuthFlows.AuthorizeUrl("first-party", "openid", OAuthFlows.Pkce().Challenge) + "&prompt=consent";
+
+        var asked = await browser.GetAsync(url, Token);
+
+        var consentPage = asked.Headers.Location!.OriginalString;
+        Assert.StartsWith("/consent?", consentPage, StringComparison.Ordinal);
+        var parameters = QueryHelpers.ParseQuery(new Uri(new Uri("https://spa.test"), consentPage).Query)
+            .ToDictionary(pair => pair.Key, pair => pair.Value.ToString());
+        parameters["consent"] = "accept";
+        var accepted = await browser.PostAsync("/connect/authorize", new FormUrlEncodedContent(parameters), Token);
+        Assert.NotNull(HttpUtility.ParseQueryString(accepted.Headers.Location!.Query)["code"]);
+    }
+
+    [Fact]
+    public async Task PromptSelectAccount_IsNotSupported()
+    {
+        var (browser, _) = await SignInAsync("prompt-select@example.com");
+
+        var response = await browser.GetAsync(OAuthFlows.AuthorizeUrl("first-party", "openid", OAuthFlows.Pkce().Challenge) + "&prompt=select_account", Token);
+
+        // prompt 검사는 redirect_uri 를 믿기 전에 하므로 클라이언트로 보내지 않고 400 으로 답한다.
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("invalid_request", await response.Content.ReadAsStringAsync(Token), StringComparison.Ordinal);
     }
 
     [Fact]

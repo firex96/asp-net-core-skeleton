@@ -57,6 +57,7 @@
 - Identity 역할(`identity_role` · `identity_user_role` · `identity_role_claim`, `ApplicationRole`), `Roles` · `Policies.Administrator` — 인가 도메인의 그룹 · 역할 · 권한으로 바뀌었다
 - 쓰지 않던 `LanguageExt.Core` · `FluentValidation` 패키지
 ### Fixed
+- OAuth 탐색 문서가 처리하지 않는 `prompt` 값까지 광고하던 문제 — `prompt_values_supported` 를 `none` · `login` · `consent` 로 줄이고, `login`(세션을 끊고 다시 로그인)과 `consent`(이미 허락했거나 Implicit 이어도 동의 화면)를 실제로 처리한다. `select_account` 는 `invalid_request`
 - cross-site 로 막은 OAuth 엔드포인트(`/connect/*`) 요청이 ProblemDetails 403 을 받던 문제 — OAuth 오류 형식(RFC 6749: 400 `{"error":"invalid_request","error_description":…}`)으로 답한다
 - 돌아갈 주소(returnUrl) 검사를 탭 · 줄바꿈으로 우회하는 오픈 리다이렉트 — 브라우저는 주소의 탭 · 줄바꿈을 지우므로 `/\t/evil.example` 이 `//evil.example` 로 갔다. 소셜 로그인 콜백(`SafeLocalPath`)과 SPA 세 개의 `safeReturnUrl` 이 공백 · 제어 문자가 든 주소를 거절한다
 - Identity 사용자 토큰(복구 코드 · 인증 앱 키 등)을 고쳐 쓰면 저장되지 않던 문제 — `AppDbContext` 의 NoTracking 기본값 때문에 기본 저장소가 찾은 토큰이 추적되지 않았다. `ApplicationUserStore` 가 토큰 조회만 추적 조회로 한다
