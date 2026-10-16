@@ -10,7 +10,8 @@ namespace AspNetCoreSkeletonApplication.IntegrationTests;
 
 /// <summary>
 /// EntityService 의 캐시를 실제 Redis · SQL Server 로 확인한다 — DB 를 몰래 바꿔도 캐시된 값이 나오고(적중),
-/// 변경 API 를 거치면 커밋 뒤에 태그가 무효화되어 새 값이 나오며(무효화), 다른 인스턴스도 Redis(L2) 로 같은 값을 본다.
+/// 변경 API 를 거치면 커밋 뒤에 태그가 무효화되어 새 값이 나오며(무효화), 다른 인스턴스도 Redis(L2) 로 같은 값을 보고,
+/// 한 인스턴스의 변경은 백플레인으로 다른 인스턴스의 메모리(L1)에서도 곧바로 지워진다.
 /// </summary>
 [Collection(InfrastructureCollection.Name)]
 public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLifetime
@@ -68,6 +69,40 @@ public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLif
         await RenameBehindTheCacheAsync(id, "ChangedInDb");
 
         Assert.Equal("Shared", await GetNameAsync(_second.CreateClient(), id)); // 둘째 인스턴스는 L1 이 비어 있어 Redis 에서 읽는다
+    }
+
+    [Fact]
+    public async Task ChangeOnOneInstance_EvictsTheOtherInstancesLocalCopy()
+    {
+        var (firstClient, _) = await TestUsers.SignInAsync(_first, "cache-backplane-1@example.com", administrator: true);
+        var (secondClient, _) = await TestUsers.SignInAsync(_second, "cache-backplane-2@example.com", administrator: true);
+        var id = await CreateAsync(firstClient, "Original");
+        Assert.Equal("Original", await GetNameAsync(firstClient, id)); // 첫 인스턴스의 L1 에 들어간다
+
+        await RenameBehindTheCacheAsync(id, "ChangedInDb");
+        var changed = await secondClient.PutAsJsonAsync($"/api/products/{id}/status", new { status = "OnSale" }, TestContext.Current.CancellationToken);
+        changed.EnsureSuccessStatusCode();
+
+        // 백플레인 메시지는 Redis pub/sub 로 비동기 전달된다 — 짧게 기다리며 확인한다(L1 만료 10분을 기다리지 않는다).
+        var name = await EventuallyAsync(() => GetNameAsync(firstClient, id), expected: "ChangedInDb");
+        Assert.Equal("ChangedInDb", name);
+    }
+
+    private static async Task<string?> EventuallyAsync(Func<Task<string?>> read, string expected)
+    {
+        string? value = null;
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            value = await read();
+            if (value == expected)
+            {
+                return value;
+            }
+
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        return value;
     }
 
     private async Task RenameBehindTheCacheAsync(long id, string name)

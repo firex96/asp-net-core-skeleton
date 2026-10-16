@@ -28,7 +28,7 @@
 | SvelteKit / Svelte | 3.0 / 5 (adapter-static) |
 | Nuxt / Vue | 4.6 / 3.5 (`ssr: false`) |
 | 로컬 DB · 캐시 | SQL Server 2022 · Redis 7.4 컨테이너 (`docker-compose.yml`) |
-| 캐시 | HybridCache (`Microsoft.Extensions.Caching.Hybrid`) + Redis L2 |
+| 캐시 | FusionCache (`HybridCache` 로 노출) — 메모리 L1 + Redis L2 + Redis 백플레인 |
 
 **여기 적힌 숫자는 빌드 파일이 정본이다.** 어긋나면 `global.json` · `Directory.Packages.props` · 각 SPA `package.json` 을 따른다.
 
@@ -197,7 +197,9 @@ builder.Services.AddApiClient<ExampleApiClient, ExampleApiOptions>("Clients:Exam
 
 ## 캐시
 
-EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis(L2)** 로 캐시한다. 연결 문자열은 비밀값 `ConnectionStrings:Redis`, 로컬은 docker compose 의 Redis 다.
+EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백플레인**으로 캐시한다. 구현은 FusionCache 이고, 코드는 `HybridCache` 추상화로만 쓴다(`AsHybridCache()`). 연결 문자열은 비밀값 `ConnectionStrings:Redis`, 로컬은 docker compose 의 Redis 다.
+
+**여러 인스턴스에서도 무효화가 곧바로 닿는다.** 한 인스턴스가 키나 태그를 지우면 백플레인(Redis pub/sub)이 다른 모든 인스턴스 — 같은 `KeyPrefix` 를 쓰는 Server · InternalApi · Batch 포함 — 의 L1 에서도 지운다. 그래서 L1 만료를 따로 짧게 두지 않는다.
 
 규칙 (예외 없음):
 
@@ -208,11 +210,11 @@ EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis
 
 | 설정 (`Cache:*`) | 기본 | 뜻 |
 |---|---|---|
-| `Expiration` | 10분 | Redis 까지 포함한 만료 |
-| `LocalExpiration` | 30초 | L1 만료. **다른 인스턴스의 L1 은 무효화가 닿지 않는다** — 여러 인스턴스로 돌 때 낡은 값이 남는 시간의 상한이다 |
-| `KeyPrefix` | `asp-net-core-skeleton-application:` | Redis 키 접두사. 같은 Redis 를 여러 서비스가 쓸 때 섞이지 않게 한다 |
+| `Expiration` | 10분 | L1 · Redis 공통 만료 |
+| `KeyPrefix` | `asp-net-core-skeleton-application:` | Redis 키 접두사. 캐시 항목은 `{KeyPrefix}cache:` 아래에 둔다. 같은 Redis 를 여러 서비스가 쓸 때 섞이지 않게 한다 |
 
-여러 인스턴스에서 즉시 무효화가 필요해지면 `HybridCache` 구현을 FusionCache + Redis 백플레인으로 바꾼다 — EntityService 코드는 그대로다.
+- 백플레인 메시지는 비동기라 다른 인스턴스에 닿기까지 수 ms 가 걸린다. 같은 요청 안에서 쓰고 곧바로 다른 인스턴스로 읽는 흐름은 없게 설계한다.
+- Redis 가 잠시 끊겨도 요청은 실패하지 않는다 — FusionCache 가 L2 · 백플레인 오류를 기록하고 DB 에서 읽는다. 다시 연결되면 백플레인이 자동으로 이어진다.
 
 ## 에러 응답
 

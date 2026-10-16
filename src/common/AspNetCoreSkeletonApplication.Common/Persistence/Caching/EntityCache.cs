@@ -4,7 +4,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 namespace AspNetCoreSkeletonApplication.Common.Persistence.Caching;
 
 /// <summary>
-/// EntityService 가 쓰는 캐시. <see cref="HybridCache"/>(메모리 L1 + Redis L2)를 직접 쓰지 않고 이것을 거친다 — 규칙 두 가지를 한 곳에서 지킨다.
+/// EntityService 가 쓰는 캐시. <see cref="HybridCache"/>(FusionCache — 메모리 L1 + Redis L2 + 백플레인)를 직접 쓰지 않고 이것을 거친다 — 규칙 두 가지를 한 곳에서 지킨다.
 /// <list type="number">
 /// <item><b>없는 값은 캐시하지 않는다.</b> 조회 결과가 null 이면 캐시에 넣지 않고 null 을 돌려준다.</item>
 /// <item><b>무효화는 커밋 뒤에.</b> 트랜잭션 안에서 무효화하면 커밋 전에 다른 요청이 옛 값을 다시 캐시할 수 있다. 그래서 트랜잭션 안의 무효화는

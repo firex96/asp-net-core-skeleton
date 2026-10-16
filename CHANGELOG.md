@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 여러 인스턴스의 캐시 즉시 무효화 — `HybridCache` 구현을 FusionCache 로 바꾸고(`AsHybridCache()`) Redis 백플레인을 붙인다. 한 인스턴스의 키 · 태그 무효화가 다른 인스턴스의 L1 에서도 곧바로 지워진다. `Cache:LocalExpiration` 은 없앤다(L1 · L2 공통 `Cache:Expiration`), 캐시 키는 `{KeyPrefix}cache:` 아래
 - 인가 — 기본 정책은 로그인 필요(익명은 `[AllowAnonymous]` 로 명시), 관리자 정책 `Policies.Administrator`(Product 상태 변경 · 삭제), 규약 테스트로 역할 문자열 인가 금지
 - CSRF 방어 — Fetch Metadata(`Sec-Fetch-Site: cross-site` 인 변경 요청 403), SameSite=Strict 쿠키와 겹쳐 둔다
 - 로그인 — ASP.NET Core Identity + 쿠키(`__Host-session`, HttpOnly · Secure · SameSite=Strict), `/api/auth` register · login · logout · me, 5회 실패 시 30분 잠금(423 `ACCOUNT_LOCKED_ERROR`), 역할 `Administrator` 시드, 계정 테이블 `identity_*`(마이그레이션 `AddIdentity`)
