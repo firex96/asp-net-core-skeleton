@@ -4,6 +4,7 @@ using AspNetCoreSkeletonApplication.Common.Persistence;
 using AspNetCoreSkeletonApplication.Common.Persistence.Caching;
 using AspNetCoreSkeletonApplication.Common.Persistence.Context;
 using AspNetCoreSkeletonApplication.Common.Persistence.Interceptors;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +37,8 @@ public static class CommonServiceCollectionExtensions
                 serviceProvider.GetRequiredService<AuditSaveChangesInterceptor>(),
                 serviceProvider.GetRequiredService<SlowQueryInterceptor>()));
         services.AddScoped<IMainTransaction, MainTransaction>();
+        // AppDbContext 의 Identity 테이블 모양(스키마 3판 · 키 길이) — Identity 를 쓰지 않는 앱(Batch · InternalApi)도 같은 모델을 만든다.
+        services.Configure<IdentityOptions>(options => AppDbContext.ConfigureIdentityStore(options.Stores));
 
         // 캐시 — FusionCache: 메모리(L1) + Redis(L2) + Redis 백플레인. 코드는 HybridCache 추상화로만 쓴다(AsHybridCache).
         // 어느 인스턴스에서 무효화하든 백플레인이 모든 인스턴스의 L1 에서 같은 키 · 태그를 지운다 — 낡은 L1 이 남지 않는다.

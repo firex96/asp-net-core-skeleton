@@ -18,6 +18,13 @@ export function useSession() {
     return null
   }
 
+  /** 패스키로 로그인한다 — 브라우저가 이 사이트의 패스키를 고르게 한다. 패스키는 2단계 인증을 건너뛴다(그 자체로 다중 요소다). */
+  async function signInWithPasskey(): Promise<void> {
+    const credential = await getPasskey(await passkeyLoginOptions())
+    await passkeyLogin(credential)
+    await refresh()
+  }
+
   async function finishTwoFactor(provider: TwoFactorProvider, code: string, rememberBrowser: boolean): Promise<void> {
     await completeTwoFactor(provider, code, rememberBrowser)
     await refresh()
@@ -33,5 +40,5 @@ export function useSession() {
     user.value = null
   }
 
-  return { user, refresh, signIn, finishTwoFactor, signUp, signOut }
+  return { user, refresh, signIn, signInWithPasskey, finishTwoFactor, signUp, signOut }
 }

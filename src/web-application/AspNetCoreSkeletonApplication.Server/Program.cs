@@ -57,6 +57,7 @@ app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapSkeletonAuthEndpoints();
 app.MapSkeletonTwoFactorEndpoints();
+app.MapSkeletonPasskeyEndpoints();
 app.MapSkeletonExternalLoginEndpoints();
 app.MapSkeletonOAuthServerEndpoints();
 app.MapControllers();

@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiError } from './api-error';
+import { getPasskey } from './webauthn';
 
 export interface CurrentUser {
   id: number;
@@ -42,6 +43,12 @@ interface TwoFactorChallenge {
 
 interface RecoveryCodes {
   recoveryCodes: string[];
+}
+
+export interface Passkey {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 export interface ConsentDetails {
@@ -107,6 +114,34 @@ export class AuthService {
   async completeTwoFactor(provider: TwoFactorProvider, code: string, rememberBrowser: boolean): Promise<void> {
     await this.post('/api/auth/login/2fa', { provider, code, rememberBrowser });
     await this.refresh();
+  }
+
+  /** 패스키로 로그인한다 — 브라우저가 이 사이트의 패스키를 고르게 한다. 패스키는 2단계 인증을 건너뛴다(그 자체로 다중 요소다). */
+  async signInWithPasskey(): Promise<void> {
+    const options = (await this.postForResponse<Record<string, unknown>>('/api/auth/passkey/options')).body!;
+    await this.post('/api/auth/passkey/login', { credential: await getPasskey(options) });
+    await this.refresh();
+  }
+
+  listPasskeys(): Promise<Passkey[]> {
+    return this.get<Passkey[]>('/api/account/passkeys');
+  }
+
+  /** 패스키 등록 옵션(서버가 만든 WebAuthn 생성 옵션 JSON). */
+  async passkeyCreationOptions(): Promise<Record<string, unknown>> {
+    return (await this.postForResponse<Record<string, unknown>>('/api/account/passkeys/options')).body!;
+  }
+
+  async addPasskey(credential: string, name: string): Promise<Passkey> {
+    return (await this.postForResponse<Passkey>('/api/account/passkeys', { credential, name })).body!;
+  }
+
+  async removePasskey(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.http.delete(`/api/account/passkeys/${encodeURIComponent(id)}`));
+    } catch (error) {
+      throw ApiError.from(error);
+    }
   }
 
   twoFactorStatus(): Promise<TwoFactorStatus> {

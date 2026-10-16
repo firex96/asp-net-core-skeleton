@@ -3,10 +3,13 @@ import {
 	getCurrentUser,
 	login,
 	logout,
+	passkeyLogin,
+	passkeyLoginOptions,
 	register,
 	type CurrentUser,
 	type TwoFactorProvider
 } from './auth.js';
+import { getPasskey } from './webauthn.js';
 
 /** 화면이 함께 보는 로그인 상태. undefined = 아직 확인 전, null = 로그인 안 함. */
 export const session = $state<{ user: CurrentUser | null | undefined }>({ user: undefined });
@@ -25,6 +28,13 @@ export async function signIn(email: string, password: string): Promise<TwoFactor
 
 	await refreshSession();
 	return null;
+}
+
+/** 패스키로 로그인한다 — 브라우저가 이 사이트의 패스키를 고르게 한다. 패스키는 2단계 인증을 건너뛴다(그 자체로 다중 요소다). */
+export async function signInWithPasskey(): Promise<void> {
+	const credential = await getPasskey(await passkeyLoginOptions());
+	await passkeyLogin(credential);
+	await refreshSession();
 }
 
 export async function finishTwoFactor(provider: TwoFactorProvider, code: string, rememberBrowser: boolean): Promise<void> {

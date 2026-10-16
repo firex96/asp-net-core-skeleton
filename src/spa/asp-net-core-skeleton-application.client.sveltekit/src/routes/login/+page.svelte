@@ -14,7 +14,8 @@
 		type TwoFactorProvider
 	} from '#lib/auth.js';
 	import TwoFactorStep from '#lib/TwoFactorStep.svelte';
-	import { refreshSession, session, signIn, signUp } from '#lib/session.svelte.js';
+	import { refreshSession, session, signIn, signInWithPasskey, signUp } from '#lib/session.svelte.js';
+	import { isPasskeyCancelled, isPasskeySupported } from '#lib/webauthn.js';
 
 	// 로그인과 가입을 한 화면에서 전환한다. 로그인에 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
 	// 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 가입하면 확인 메일 안내를 보이고 로그인 화면으로 돌아온다
@@ -29,6 +30,7 @@
 	let providers = $state<ExternalProvider[]>([]);
 	let message = $state<string | null>(null);
 	let twoFactor = $state<TwoFactorProvider[] | null>(null);
+	let passkeySupported = $state(false);
 
 	const returnUrl = $derived(safeReturnUrl(page.url.searchParams.get('returnUrl')));
 	const notice = $derived(
@@ -52,6 +54,7 @@
 			}
 		}
 
+		passkeySupported = isPasskeySupported();
 		providers = await listProviders().catch(() => []);
 	});
 
@@ -95,6 +98,24 @@
 			}
 		} catch (caught) {
 			error = caught instanceof ApiError ? caught : ApiError.unexpected();
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function loginWithPasskey() {
+		busy = true;
+		error = null;
+		message = null;
+		try {
+			await signInWithPasskey();
+			await continueTo(returnUrl);
+		} catch (caught) {
+			error = isPasskeyCancelled(caught)
+				? new ApiError(0, undefined, '패스키 로그인을 취소했어요.')
+				: caught instanceof ApiError
+					? caught
+					: ApiError.unexpected();
 		} finally {
 			busy = false;
 		}
@@ -190,9 +211,12 @@
 	</form>
 
 	{#if mode === 'login'}
-		{#if providers.length > 0}
+		{#if passkeySupported || providers.length > 0}
 			<div class="divider">또는</div>
 			<div class="social">
+				{#if passkeySupported}
+					<button type="button" class="btn btn-block" disabled={busy} onclick={loginWithPasskey}>패스키로 로그인</button>
+				{/if}
 				{#each providers as provider (provider.name)}
 					<form
 						method="post"

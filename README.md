@@ -383,6 +383,8 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 | `POST /api/auth/email/resend` `{email}` | 202 — 계정이 있든 없든, 이미 확인했든 같다. 확인 전 계정이면 링크를 다시 보낸다 |
 | `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드). 이메일을 확인하지 않은 계정은 비밀번호가 맞을 때만 403 `EMAIL_NOT_CONFIRMED_ERROR`. 2단계 인증을 켠 계정은 202 `{providers}` — 세션 쿠키는 두 번째 단계가 준다(기억한 브라우저면 바로 204) |
 | `POST /api/auth/login/2fa` `{provider, code, rememberBrowser}` | 2단계 인증의 두 번째 단계 — `provider` 는 `authenticator` · `email` · `recovery`. 204 + 쿠키, 틀리면 401(잠금 횟수를 센다), 기다리는 로그인이 없으면 401. `GET` 은 기다리는 로그인의 수단 `{providers}`, `POST /email` 은 메일 코드를 보낸다(202) |
+| `POST /api/auth/passkey/options` → `POST /api/auth/passkey/login` `{credential}` | 패스키 로그인 — 옵션은 Identity 가 만든 WebAuthn 요청 옵션 JSON 그대로, `credential` 은 브라우저 세리머니 결과의 JSON 문자열. 204 + 쿠키, 실패 401, 이메일 미확인 403, 잠김 423 |
+| `/api/account/passkeys` (세션 쿠키) | `GET` 목록 `[{id, name, createdAt}]`, `POST /options`(등록용 생성 옵션) → `POST {credential, name}`(201, 확인 실패 400), `PUT /{id} {name}`, `DELETE /{id}`(마지막 로그인 수단이면 409) |
 | `/api/account/two-factor` (세션 쿠키) | `GET` 상태 `{enabled, method, recoveryCodesLeft, browserRemembered}`. `POST /authenticator/setup`(새 키 · `otpauth://` URI · QR data URI) → `/authenticator/verify {code}`(켜고 복구 코드), `/email/enable`(메일 코드로 켜고 복구 코드), `/recovery-codes`(새로 받기), `/disable {password}`, `/forget-browser`. 이미 켜져 있는데 켜면 409 |
 | `POST /api/auth/logout` | 204, 쿠키 삭제 |
 | `POST /api/auth/password/forgot` `{email}` | 202 — 계정이 있든 없든 같다(가입 여부를 드러내지 않는다). 있으면 재설정 링크 메일을 보낸다 |
@@ -396,10 +398,15 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
   - 두 번째 단계를 기다리는 사용자(`__Host-tfa`)와 기억한 브라우저 쿠키는 SameSite=Lax 다. 소셜 로그인 콜백은 공급자에서 돌아오는 cross-site 이동이라 Strict 면 기억한 브라우저 쿠키가 실리지 않는다. 소셜 로그인 뒤 두 번째 단계가 필요하면 `/login?step=two-factor` 로 보낸다.
   - 관리 API(`/api/account/two-factor`)는 세션 쿠키로만 부른다 — Bearer 토큰으로는 계정 보안을 바꾸지 못한다.
   - 토큰을 고쳐 쓰는 저장(복구 코드 · 인증 앱 키)은 `ApplicationUserStore` 가 추적 조회로 한다 — `AppDbContext` 의 NoTracking 기본값에서 Identity 기본 저장소는 값만 바꾼 토큰을 저장하지 못한다.
+- **패스키** (`Common/Web/PasskeyEndpoints`, .NET 10 Identity 내장) — 비밀번호 없는 로그인이다. 패스키는 그 자체로 다중 요소(기기 + 생체 · PIN)라 2단계 인증을 건너뛴다. 2단계 인증의 두 번째 수단으로는 쓰지 않는다(Identity 가 지원하지 않는다).
+  - RP ID 는 `App:PublicOrigin` 의 호스트다 — 요청의 Host(리버스 프록시 뒤에서는 내부 이름일 수 있다)로 정하지 않는다. 세리머니의 출처는 요청의 Origin 과 같아야 한다.
+  - 저장은 `identity_user_passkey`(Identity 스키마 3판, 마이그레이션 `AddPasskeys`). 판은 `AddCommon` 이 정한다(`AppDbContext.ConfigureIdentityStore`) — Identity 를 쓰지 않는 앱(Batch · InternalApi)과 앱 서비스 없이 만든 컨텍스트(테스트 · 도구)도 같은 모델을 만들게. 키 칼럼 길이는 1판 그대로(450) 둔다.
+  - SPA 는 `webauthn` 모듈 하나로 세리머니를 한다 — 브라우저의 `parse*FromJSON` · `toJSON` 을 쓰고, 없거나 응답을 빠뜨리면 base64url 을 직접 바꾼다. 로그인 화면의 "패스키로 로그인", 내 계정의 「패스키」 절(등록 · 지우기). 사용자가 창을 닫으면 취소로 안내한다.
+  - 브라우저 테스트는 Playwright 의 가상 인증기(`BrowserContext.Credentials`)로 등록 → 로그아웃 → 패스키 로그인을 확인한다.
 - **쿠키** — `__Host-session`, HttpOnly · Secure · SameSite=Strict, 8시간(쓰면 연장). 로그인 페이지가 없으므로 인증이 필요하면 리다이렉트 대신 401, 권한이 없으면 403 을 ProblemDetails 로 돌려준다.
 - **여러 인스턴스** — 쿠키를 암호화하는 Data Protection 키를 Redis 에 둔다(`{Cache:KeyPrefix}data-protection-keys`). 어느 인스턴스가 만든 쿠키든 다른 인스턴스가 읽는다. 키는 Redis 에 평문으로 있으므로 Redis 접근을 앱으로 제한한다.
 - **감사** — 로그인한 요청은 사용자 ID(`NameIdentifier` claim)가 감사 주체가 된다(「추적 ID 와 감사」의 1순위).
-- **계정 테이블** — Identity 정본 스키마를 `identity_` 접두사로 둔다(`identity_user`, `identity_user_login` …). 역할 테이블은 없다 — 역할은 인가 도메인이 맡는다. 프레임워크 소유라 업무 테이블 규칙(FOREIGN KEY 금지 · `BaseEntity`)의 대상이 아니다. 업무 데이터는 이 테이블에 칼럼을 더하지 않고, 사용자 ID 로 가리키는 별도 엔티티에 둔다.
+- **계정 테이블** — Identity 정본 스키마를 `identity_` 접두사로 둔다(`identity_user`, `identity_user_login`, `identity_user_passkey` …). 역할 테이블은 없다 — 역할은 인가 도메인이 맡는다. 프레임워크 소유라 업무 테이블 규칙(FOREIGN KEY 금지 · `BaseEntity`)의 대상이 아니다. 업무 데이터는 이 테이블에 칼럼을 더하지 않고, 사용자 ID 로 가리키는 별도 엔티티에 둔다.
 
 **인가** (예외 없음) — **사용자 → 그룹 → 역할 → 권한 코드**
 

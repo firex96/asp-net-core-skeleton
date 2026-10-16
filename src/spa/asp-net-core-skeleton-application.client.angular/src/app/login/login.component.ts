@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError, safeReturnUrl } from '../auth/api-error';
 import { AuthService, ExternalProvider, TwoFactorProvider } from '../auth/auth.service';
 import { externalLoginMessage, isServerPath } from '../auth/navigation';
+import { isPasskeyCancelled, isPasskeySupported } from '../auth/webauthn';
 import { TwoFactorStepComponent } from '../two-factor/two-factor-step.component';
 
 /**
@@ -30,6 +31,7 @@ export class LoginComponent implements OnInit {
   readonly providers = signal<ExternalProvider[]>([]);
   readonly notice = signal<string | null>(null);
   readonly twoFactor = signal<TwoFactorProvider[] | null>(null);
+  readonly passkeySupported = signal(false);
 
   email = '';
   password = '';
@@ -56,6 +58,7 @@ export class LoginComponent implements OnInit {
       }
     }
 
+    this.passkeySupported.set(isPasskeySupported());
     this.providers.set(await this.auth.listProviders().catch(() => []));
   }
 
@@ -93,6 +96,22 @@ export class LoginComponent implements OnInit {
       }
     } catch (error) {
       this.error.set(error instanceof ApiError ? error : ApiError.from(error));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async loginWithPasskey() {
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.auth.signInWithPasskey();
+      await this.continue();
+    } catch (error) {
+      this.error.set(isPasskeyCancelled(error)
+        ? new ApiError(0, undefined, '패스키 로그인을 취소했어요.')
+        : error instanceof ApiError ? error : ApiError.from(error));
     } finally {
       this.busy.set(false);
     }

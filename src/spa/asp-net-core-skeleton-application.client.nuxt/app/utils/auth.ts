@@ -30,6 +30,12 @@ export interface AuthenticatorSetup {
   qrCodeDataUri: string
 }
 
+export interface Passkey {
+  id: string
+  name: string
+  createdAt: string
+}
+
 export interface ConsentDetails {
   clientId: string
   displayName: string
@@ -127,6 +133,36 @@ export async function completeTwoFactor(
   fetchFn: typeof fetch = fetch,
 ): Promise<void> {
   await post(fetchFn, '/api/auth/login/2fa', { provider, code, rememberBrowser })
+}
+
+/** 패스키 로그인 옵션(서버가 만든 WebAuthn 요청 옵션 JSON). */
+export function passkeyLoginOptions(fetchFn: typeof fetch = fetch): Promise<Record<string, unknown>> {
+  return postJson(fetchFn, '/api/auth/passkey/options')
+}
+
+/** 브라우저가 고른 패스키(JSON 문자열)로 로그인한다. */
+export async function passkeyLogin(credential: string, fetchFn: typeof fetch = fetch): Promise<void> {
+  await post(fetchFn, '/api/auth/passkey/login', { credential })
+}
+
+export function listPasskeys(fetchFn: typeof fetch = fetch): Promise<Passkey[]> {
+  return get(fetchFn, '/api/account/passkeys')
+}
+
+/** 패스키 등록 옵션(서버가 만든 WebAuthn 생성 옵션 JSON). */
+export function passkeyCreationOptions(fetchFn: typeof fetch = fetch): Promise<Record<string, unknown>> {
+  return postJson(fetchFn, '/api/account/passkeys/options')
+}
+
+export function addPasskey(credential: string, name: string, fetchFn: typeof fetch = fetch): Promise<Passkey> {
+  return postJson(fetchFn, '/api/account/passkeys', { credential, name })
+}
+
+export async function removePasskey(id: string, fetchFn: typeof fetch = fetch): Promise<void> {
+  const response = await fetchFn(`/api/account/passkeys/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!response.ok) {
+    throw await ApiError.from(response)
+  }
 }
 
 export function getTwoFactorStatus(fetchFn: typeof fetch = fetch): Promise<TwoFactorStatus> {

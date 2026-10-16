@@ -15,6 +15,7 @@ internal static class IdentityModelBuilderExtensions
         modelBuilder.Entity<IdentityUserClaim<long>>().ToTable("identity_user_claim");
         modelBuilder.Entity<IdentityUserLogin<long>>().ToTable("identity_user_login");
         modelBuilder.Entity<IdentityUserToken<long>>().ToTable("identity_user_token");
+        modelBuilder.Entity<IdentityUserPasskey<long>>().ToTable("identity_user_passkey");
         return modelBuilder;
     }
 }

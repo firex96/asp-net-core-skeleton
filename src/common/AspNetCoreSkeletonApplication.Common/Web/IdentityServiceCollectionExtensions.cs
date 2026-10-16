@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace AspNetCoreSkeletonApplication.Common.Web;
 
@@ -48,6 +49,9 @@ public static class IdentityServiceCollectionExtensions
         services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(2));
         services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
         services.AddOptions<AppOptions>().BindConfiguration("App").ValidateDataAnnotations().ValidateOnStart();
+        // 패스키의 RP ID — 사용자가 여는 출처의 호스트. 요청의 Host(리버스 프록시 뒤에서는 내부 이름일 수 있다)로 정하지 않는다.
+        services.AddOptions<IdentityPasskeyOptions>()
+            .Configure<IOptions<AppOptions>>((passkeys, app) => passkeys.ServerDomain = new Uri(app.Value.PublicOrigin).Host);
 
         services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
         services.ConfigureApplicationCookie(options =>

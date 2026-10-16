@@ -163,9 +163,9 @@ public static class ExternalLoginEndpoints
             return TypedResults.NotFound();
         }
 
-        if (logins.Count == 1 && !await userManager.HasPasswordAsync(user))
+        if (logins.Count == 1 && !await userManager.HasPasswordAsync(user) && (await userManager.GetPasskeysAsync(user)).Count == 0)
         {
-            throw new LastLoginMethodException("로그인할 방법이 이것 하나뿐이라 연결을 끊을 수 없어요. 비밀번호를 정하거나 다른 계정을 먼저 연결해 주세요.");
+            throw new LastLoginMethodException("로그인할 방법이 이것 하나뿐이라 연결을 끊을 수 없어요. 비밀번호를 정하거나 다른 계정 · 패스키를 먼저 연결해 주세요.");
         }
 
         await userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);

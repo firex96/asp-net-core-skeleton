@@ -15,6 +15,7 @@ const busy = ref(false)
 const providers = ref<ExternalProvider[]>([])
 const message = ref<string | null>(null)
 const twoFactor = ref<TwoFactorProvider[] | null>(null)
+const passkeySupported = ref(false)
 
 const returnUrl = computed(() => safeReturnUrl(typeof route.query.returnUrl === 'string' ? route.query.returnUrl : null))
 const title = computed(() => (twoFactor.value ? '2단계 인증' : mode.value === 'login' ? '로그인' : '회원가입'))
@@ -57,6 +58,7 @@ onMounted(async () => {
     }
   }
 
+  passkeySupported.value = isPasskeySupported()
   providers.value = await listProviders().catch(() => [])
 })
 
@@ -92,6 +94,24 @@ async function submit() {
   }
   catch (caught) {
     error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function loginWithPasskey() {
+  busy.value = true
+  error.value = null
+  message.value = null
+  try {
+    await session.signInWithPasskey()
+    await continueTo(returnUrl.value)
+  }
+  catch (caught) {
+    error.value = isPasskeyCancelled(caught)
+      ? new ApiError(0, undefined, '패스키 로그인을 취소했어요.')
+      : caught instanceof ApiError ? caught : ApiError.unexpected()
   }
   finally {
     busy.value = false
@@ -175,11 +195,14 @@ async function resend() {
     </form>
 
     <template v-if="mode === 'login'">
-      <template v-if="providers.length > 0">
+      <template v-if="passkeySupported || providers.length > 0">
         <div class="divider">
           또는
         </div>
         <div class="social">
+          <button v-if="passkeySupported" type="button" class="btn btn-block" :disabled="busy" @click="loginWithPasskey">
+            패스키로 로그인
+          </button>
           <form v-for="provider in providers" :key="provider.name" method="post" :action="externalLoginAction(provider.name)">
             <button type="submit" :class="`btn btn-block btn-${provider.name.toLowerCase()}`">
               {{ provider.displayName }}로 계속하기

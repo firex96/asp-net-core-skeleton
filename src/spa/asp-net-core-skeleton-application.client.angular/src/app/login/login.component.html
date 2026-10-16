@@ -50,9 +50,12 @@
     </form>
 
     @if (mode() === 'login') {
-      @if (providers().length > 0) {
+      @if (passkeySupported() || providers().length > 0) {
         <div class="divider">또는</div>
         <div class="social">
+          @if (passkeySupported()) {
+            <button type="button" class="btn btn-block" [disabled]="busy()" (click)="loginWithPasskey()">패스키로 로그인</button>
+          }
           @for (provider of providers(); track provider.name) {
             <!-- ngNoForm — FormsModule 의 NgForm 이 브라우저 기본 제출을 막지 않게 한다(서버로 가는 진짜 폼 POST 다) -->
             <form ngNoForm method="post" [attr.action]="externalLoginAction(provider.name)">

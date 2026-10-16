@@ -472,3 +472,7 @@ ul.codes {
 .button-row + .form {
 	margin-top: 1.25rem;
 }
+
+.list + .form {
+	margin-top: 1rem;
+}
