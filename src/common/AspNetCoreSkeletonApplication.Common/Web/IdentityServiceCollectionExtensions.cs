@@ -35,6 +35,7 @@ public static class IdentityServiceCollectionExtensions
                 options.Lockout.AllowedForNewUsers = true;
             })
             .AddEntityFrameworkStores<AppDbContext>()
+            .AddUserStore<ApplicationUserStore>()
             .AddSignInManager()
             .AddDefaultTokenProviders()
             .AddErrorDescriber<KoreanIdentityErrorDescriber>();
