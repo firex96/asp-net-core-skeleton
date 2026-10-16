@@ -25,7 +25,7 @@ namespace AspNetCoreSkeletonApplication.Common.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("AspNetCoreSkeletonApplication.Common.Persistence.Entities.Main.ProductEntity", b =>
+            modelBuilder.Entity("AspNetCoreSkeletonApplication.Common.Product.Persistence.Entities.ProductEntity", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()

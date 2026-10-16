@@ -36,7 +36,7 @@ dotnet new aspnet-spa-skeleton -n Contoso.Shop --frontend angular --internalApi 
 
 ## Architecture
 
-- 프로젝트는 공유·배포 단위다: `Common`(공유 라이브러리) ← 앱(`Server` · `InternalApi` · `Batch`). 앱끼리는 참조하지 않는다. Batch 는 Quartz.NET(클러스터 · 영속 저장소) — README 「Batch」. 계층은 프로젝트 안의 네임스페이스다 — `Controller → MappingService → BizService → EntityService → DbContext`, 업무 판단은 순수 `Domain`. 계층별 책임·주입 허용 목록은 README 「요청 흐름」, 이름·선언 규칙과 리뷰 체크포인트는 README 「코딩 규약」이 정본이다. 규칙에 예외 케이스를 두지 않는다.
+- 프로젝트는 공유·배포 단위다: `Common`(공유 라이브러리) ← 앱(`Server` · `InternalApi` · `Batch`). 앱끼리는 참조하지 않는다. Batch 는 Quartz.NET(클러스터 · 영속 저장소) — README 「Batch」. 프로젝트 안은 도메인 → 계층 순서의 네임스페이스다(`{프로젝트}.{도메인}.{계층}`, 도메인끼리는 BizService · Dto 로만) — 계층은 `Controller → MappingService → BizService → EntityService → DbContext`, 업무 판단은 순수 `Domain`. 계층별 책임·주입 허용 목록은 README 「요청 흐름」, 이름·선언 규칙과 리뷰 체크포인트는 README 「코딩 규약」이 정본이다. 규칙에 예외 케이스를 두지 않는다.
 - Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다. 앱은 EntityService 의 Dto 로만 데이터를 본다.
 - 컴포지션 루트는 각 앱의 `Program.cs` 다. 계층 서비스는 `AddLayeredServices` 가 이름 접미사로 등록하므로 따로 등록하지 않는다.
 - 비밀값 출처 분기는 `Common/Configuration/SecretSourceExtensions.cs` 한 곳이다. 프로파일(`ASPNETCORE_ENVIRONMENT`)은 Local · Aws · Azure · Gcp 와 미지정(환경변수만)뿐이다 — dev·staging·prod 프로파일을 만들지 않는다.

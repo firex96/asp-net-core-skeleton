@@ -1,4 +1,4 @@
-using AspNetCoreSkeletonApplication.Batch.Jobs;
+using AspNetCoreSkeletonApplication.Batch.Scheduling.Jobs;
 using AspNetCoreSkeletonApplication.Common.Contexts;
 using Microsoft.Extensions.Logging.Testing;
 using NSubstitute;

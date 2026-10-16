@@ -92,10 +92,10 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 
 | 지울 것 | 함께 지워야 하는 것 |
 |---|---|
-| Server 의 WeatherForecast 한 벌 — `Controllers/WeatherForecastController`, `Services/Mapping/WeatherForecastMappingService`, `Services/Biz/WeatherForecastBizService`, `Dtos/WeatherForecastDto`, `Models/WeatherForecastModel`, `Mappers/WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
-| Product 한 벌 — Common 의 `Enums/ProductStatus`, `Dtos/Product*Dto`(상태 이력 포함), `Domain/ProductStatusTransition`, `Services/Biz/ProductBizService`, `Persistence/` 의 `Entities/Main/Product*Entity` · `Configurations/Product*EntityConfiguration` · `Mappers/Product*EntityMapper` · `Services/(I)Product*EntityService`, Server 의 `Controllers/ProductController` · `Services/Mapping/ProductMappingService` · `Models/Product*Model` · `Mappers/ProductModelMapper` (엔드포인트: GET · POST · PUT status · DELETE · GET status-history) | `AppDbContext.Products` · `ProductStatusHistories`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
-| Batch 의 `Jobs/DiscontinueStaleDraftJob`, `Configuration/DiscontinueStaleDraftJobOptions` (+ Common 의 `Domain/StaleDraftPolicy`, `ProductBizService.DiscontinueStaleDraftsAsync`, `ListStaleDraftsAsync`) | Program.cs 의 `jobs.Add<DiscontinueStaleDraftJob>()` 와 옵션 바인딩, `appsettings*.json` 의 `Batch:Jobs:DiscontinueStaleDraftJob`, 테스트의 `DiscontinueStaleDraftJobTests` · `StaleDraftPolicyTests` |
-| Server 의 `Clients/ExampleApiClient` · `ExampleApiOptions`, `Dtos/ExampleStatusDto` | Program.cs 의 `AddApiClient<ExampleApiClient, …>` 줄, `appsettings.json` 의 `Clients:ExampleApi`, `UnitTests/Clients/ExampleApiClientTests.cs` |
+| Server 의 `Weather/` 도메인 폴더 — `WeatherForecastController` · `WeatherForecastMappingService` · `WeatherForecastBizService` · `WeatherForecastDto` · `WeatherForecastModel` · `WeatherForecastMapper` | `FunctionalTests/WeatherForecastApiTests.cs`, 각 SPA 의 예제 페이지·`weather-forecast` 모듈과 테스트, SPA dev 서버 프록시의 `/weatherforecast` 경로 |
+| Product 한 벌 — Common · Server · InternalApi 의 `Product/` 도메인 폴더(Common: `ProductStatus` · `Product*Dto` · `ProductStatusTransition` · `StaleDraftPolicy` · `ProductBizService` · `Persistence/` 의 엔티티 · 구성 · 매퍼 · EntityService, Server: `ProductController` · `ProductMappingService` · `Product*Model` · `ProductModelMapper`) (엔드포인트: GET · POST · PUT status · DELETE · GET status-history) | `AppDbContext.Products` · `ProductStatusHistories`, `Persistence/Migrations/` 를 지우고 마이그레이션을 새로 만든다. 테스트의 `ProductApiTests`(기능·통합) · `ProductBizServiceTests` · `ProductStatusTransitionTests` · `Support/InMemoryProductEntityService` · `ProductWebApplicationFactory` |
+| Batch 의 `Product/Jobs/DiscontinueStaleDraftJob`, `Configuration/DiscontinueStaleDraftJobOptions` (+ Common 의 `Product/Domain/StaleDraftPolicy`, `ProductBizService.DiscontinueStaleDraftsAsync`, `ListStaleDraftsAsync`) | Program.cs 의 `jobs.Add<DiscontinueStaleDraftJob>()` 와 옵션 바인딩, `appsettings*.json` 의 `Batch:Jobs:DiscontinueStaleDraftJob`, 테스트의 `DiscontinueStaleDraftJobTests` · `StaleDraftPolicyTests` |
+| Server 의 `Example/` 도메인 폴더 — `ExampleApiClient` · `ExampleApiOptions` · `ExampleStatusDto` | Program.cs 의 `AddApiClient<ExampleApiClient, …>` 줄, `appsettings.json` 의 `Clients:ExampleApi`, `UnitTests/Clients/ExampleApiClientTests.cs` |
 | `AwsSecretSourceTests` (Aws 를 안 쓰면) | 통합 테스트 csproj 의 `AWSSDK.SecretsManager` · `Testcontainers.LocalStack` |
 
 ### 6. 뜨는지 확인한다
@@ -130,17 +130,19 @@ test/
   integration-tests/  IntegrationTests Docker 필요 (Testcontainers SQL Server · LocalStack)
 ```
 
-**프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 계층은 프로젝트 안의 폴더(네임스페이스)로 나눈다 — 「요청 흐름」 참고. 의존은 앱(`Server` · `InternalApi` · `Batch`) → `Common` 한 방향이고, 앱끼리는 서로 참조하지 않는다.
+**프로젝트는 계층이 아니라 공유·배포 단위로 나눈다.** 여러 앱이 함께 쓰는 것은 `Common`, 배포되는 앱은 각자 프로젝트다. 의존은 앱(`Server` · `InternalApi` · `Batch`) → `Common` 한 방향이고, 앱끼리는 서로 참조하지 않는다.
 
-| 프로젝트 | 폴더 | 들어가는 것 |
+**프로젝트 안은 도메인 → 계층 순서로 나눈다.** 업무 코드의 네임스페이스는 `{프로젝트}.{도메인}.{계층}` 이다(예: `Common.Product.Persistence.Services`, `Server.Product.Controllers`). 같은 도메인 이름은 프로젝트를 건너 같은 도메인이다. 계층은 「요청 흐름」 참고.
+
+| 영역 | 폴더 | 들어가는 것 |
 |---|---|---|
-| `Common` | `Configuration/` | `AddCommon` · `AddLayeredServices` (DI 등록), `SecretSourceExtensions` (비밀값 출처) |
-| | `Persistence/` | `Context/AppDbContext`, `Entities/`, `Services/` (`I~EntityService` · `~EntityService`), `Mappers/` (Entity↔Dto) |
-| | `Services/Biz/` · `Domain/` · `Dtos/` · `Enums/` | 여러 앱이 쓰는 BizService · 업무 규칙 · Dto · 열거형 |
-| `Server` | `Controllers/` · `Services/Mapping/` · `Models/` · `Mappers/` | HTTP 입출력과 화면용 변환 |
-| | `Services/Biz/` · `Dtos/` · `Clients/` | 이 앱만 쓰는 BizService · Dto · 외부 API 클라이언트 |
-| `InternalApi` | Server 와 같은 폴더 규칙 | 같은 공유 BizService 를 자기 Model 로 노출한다(예: 감사 주체 ID 까지 내보내는 `ProductModel`) |
-| `Batch` | `Jobs/` · `Configuration/` (+ Server 와 같은 폴더 규칙) | Quartz Job(`TracedJob` 상속)과 스케줄러 구성. Job 은 공유 BizService 를 부른다 — 「Batch」 참고 |
+| 업무 도메인 | `{도메인}/` 아래 `Controllers/` · `Services/Mapping/` · `Services/Biz/` · `Domain/` · `Models/` · `Dtos/` · `Enums/` · `Mappers/` · `Clients/` · `Jobs/` · `Persistence/{Entities,Configurations,Mappers,Services}/` | 그 도메인의 모든 계층. 예: `Product/`(Common · Server · InternalApi · Batch), `Weather/` · `Example/`(Server), `JobTrigger/`(Batch 웹훅) |
+| 공통 기반 (Common) | `Configuration/` · `Persistence/` · `Web/` · `Errors/` · `Contexts/` · `Constants/` · `Diagnostics/` · `Enums/` | DI 등록과 비밀값 출처, `AppDbContext` · 인터셉터 · 컨벤션 · 캐시 · 마이그레이션 · 엔티티 기반 타입(`Persistence/Entities/Backbone`), 웹 파이프라인 · 인증, 에러, 열거형 외부 코드(`EnumCodes`) |
+| 공통 기반 (Batch) | `Configuration/` · `Scheduling/` · `Security/` | 스케줄러 구성, Job 기반 타입(`Scheduling/Jobs/TracedJob`), 웹훅 · 대시보드 인증 |
+
+- 공통 기반 영역에는 계층의 **기반(abstract) 타입만** 둔다. 구체 업무 타입은 모두 도메인에 속한다.
+- 도메인끼리는 **BizService · Dto 로만** 만난다. 다른 도메인의 엔티티 · EntityService 를 직접 쓰면 그 도메인의 캐시 무효화와 판단 규칙을 우회하기 때문이다.
+- `InternalApi` 는 같은 공유 BizService 를 자기 Model 로 노출한다(예: 감사 주체 ID 까지 내보내는 `ProductModel`). `Batch` 의 Job 은 공유 BizService 를 부른다 — 「Batch」 참고.
 
 **Entity · `AppDbContext` · Entity 매퍼는 `Common` 안에서 `internal` 이다.** 앱은 DbContext 를 볼 수 없고, EntityService 의 public 메서드에 Entity 를 쓰면 접근성 불일치(CS0050 · CS0051)로 컴파일이 깨진다 — 「Entity 는 EntityService 위로 올라가지 않는다」를 컴파일러가 지킨다.
 
@@ -299,7 +301,7 @@ EntityService 의 조회를 **HybridCache — 인스턴스 메모리(L1) + Redis
 
 **Job 규칙** (예외 없음, `JobConventionTests` · `LayeringConventionTests` 가 강제)
 
-- `Jobs/` 의 `~Job` 이고 `TracedJob` 을 상속한다. `TracedJob` 이 실행마다 추적 ID(수동 실행이 넘긴 `traceId` 를 검증해 쓰거나 새로), 감사 주체(언제나 시스템 `0`), 로깅 scope(`X-Trace-Id` · `Job`)와 시작 · 끝 · 실패 로그를 정한다. 실패는 다시 던져 Quartz 실행 이력에 실패로 남긴다.
+- 도메인의 `Jobs/`(`{도메인}.Jobs`) 에 두는 `~Job` 이고 `TracedJob`(`Scheduling/Jobs/`) 을 상속한다. `TracedJob` 이 실행마다 추적 ID(수동 실행이 넘긴 `traceId` 를 검증해 쓰거나 새로), 감사 주체(언제나 시스템 `0`), 로깅 scope(`X-Trace-Id` · `Job`)와 시작 · 끝 · 실패 로그를 정한다. 실패는 다시 던져 Quartz 실행 이력에 실패로 남긴다.
 - `[DisallowConcurrentExecution]` 을 단다 — 클러스터 전체에서 같은 Job 은 한 번에 하나만 돈다.
 - 주입받는 것은 BizService · `IOptions<>` · `TimeProvider` · `ILogger<>` 뿐이다. 업무 판단은 BizService 가 Domain 으로, 쓰기는 BizService 의 `IMainTransaction` 안에서 한다.
 
@@ -354,7 +356,7 @@ dotnet user-secrets set "Batch:Dashboard:Password" "$(openssl rand -hex 16)"
 
 **새 Job 체크리스트**
 
-1. `Jobs/{이름}Job.cs` — `TracedJob` 상속, `[DisallowConcurrentExecution]`, `ExecuteJobAsync` 에서 BizService 호출
+1. `{도메인}/Jobs/{이름}Job.cs` — `TracedJob` 상속, `[DisallowConcurrentExecution]`, `ExecuteJobAsync` 에서 BizService 호출
 2. `Program.cs` 의 `AddBatchScheduler(..., jobs => jobs.Add<{이름}Job>())`
 3. `appsettings.json` 의 `Batch:Jobs:{이름}Job` — `Enabled` · `Cron`
 4. 재실행해도 결과가 같은지(멱등) 확인하는 통합 테스트 — `DiscontinueStaleDraftJobTests` 를 본뜬다
@@ -420,10 +422,11 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADM
 | `~Mapper` | Mapperly 매퍼 (`static partial`) | `.Mappers` · `.Persistence.Mappers` |
 | `~Model` | HTTP 요청 · 응답 | `.Models` |
 | `~Dto` | 계층 사이 전달 | `.Dtos` |
-| `~Entity` | DB 매핑 (`internal`) | `.Persistence.Entities.*` |
+| `~Entity` | DB 매핑 (`internal`) | `.Persistence.Entities` |
 | `~Options` | 구성 바인딩 (Options 패턴) | 쓰는 곳 |
 | `~Extensions` | DI 등록 · 확장 메서드 | `.Configuration` · `.Web` |
 
+- 네임스페이스는 `{프로젝트}.{도메인}.{계층}` 이다 — 표의 네임스페이스는 도메인 뒤에 붙는다(`Common.Product.Persistence.Services`).
 - 맨 `~Service` 는 쓰지 않는다 — 계층을 숨긴다. 업무 규칙(`.Domain`)은 접미사 없이 무엇을 판단하는지로 짓는다(`ProductStatusTransition`).
 - 메서드 동사는 한 벌이다 — `Get`(없으면 예외) · `Find`(없으면 null) · `List` · `Create` · `Update` · `Delete`.
 - 이름은 Spring 형제 스켈레톤과 같은 어휘를 쓰고, 스택 고유 개념만 .NET 이름으로 바꾼다.
@@ -453,6 +456,7 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADM
 - **매퍼** — `[Mapper] static partial class`. 계산하지 않는다 — 계산된 값은 MappingService 가 추가 매개변수로 넘긴다.
 - **열거형** — 멤버마다 `[JsonStringEnumMemberName("코드")]` 로 외부 코드를 단다. JSON 본문 · 응답, 쿼리 · 라우트 바인딩, DB 컬럼이 모두 이 코드를 쓴다(`Common/Enums/EnumCodes`). C# 멤버 이름을 바꿔도 저장된 데이터와 API 계약이 바뀌지 않는다. EF 변환기는 `AppDbContext` 가 모든 열거형 속성에 자동으로 붙이므로 엔티티 구성에 적지 않는다(길이만 `HasMaxLength`).
 - **DB** — 식별자 `BIGINT`, FOREIGN KEY 제약 없음, 열거형은 외부 코드 문자열로 저장, 조회 기본 NoTracking. 업무 테이블에는 물리 삭제 경로를 두지 않는다 — 지울 수 있는 엔티티는 `ISoftDeletable`, 이력은 `BaseCreateAuditedEntity`(지우지 않는다). 논리 삭제된 행과 유일 인덱스가 부딪히면 필터 인덱스(`HasFilter("[DeletedAt] IS NULL")`)로 둔다.
+- **테이블 이름** — 업무 엔티티는 클래스 이름에서 `Entity` 를 뺀 snake_case 다(`ProductStatusHistoryEntity` → `product_status_history`). 도메인은 테이블 이름에 넣지 않는다 — 도메인 경계가 바뀌어도 리포트 · 연동이 기대는 운영 DB 이름은 그대로 둔다. 프레임워크가 정의한 엔티티만 그 이름 접두사를 쓴다(`identity_*`, Quartz 는 `quartz` 스키마). SQL Server 예약어(`group`, `order`, `user` …)는 테이블 이름으로 쓰지 않는다 — 클래스 이름을 바꿔 피한다(`UserGroupEntity`).
 
 ### Mapperly 엄격 모드와 남은 함정
 
@@ -474,6 +478,8 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND r.NormalizedName = 'ADM
 | Domain 은 Dto · 열거형 · 에러 · System 만 참조 (시그니처 수준) | `DeclarationConventionTests` |
 | 열거형 멤버마다 중복 없는 외부 코드 | `DeclarationConventionTests` |
 | 컨트롤러는 역할 문자열이 아니라 정책으로 인가 | `AuthorizationConventionTests` |
+| 계층 네임스페이스는 도메인 아래, 공통 기반 영역에는 abstract 기반 타입만, 다른 도메인의 영속 계층 참조 금지 | `DomainConventionTests` |
+| 테이블 이름은 클래스 이름의 snake_case(프레임워크는 접두사), 예약어 금지 | `TableNamingConventionTests` (EF 모델 검사) |
 
 규약 테스트(`UnitTests/Conventions/`)는 앱 어셈블리를 리플렉션으로 훑고, 계층은 네임스페이스로 판정한다. 접미사 ↔ 네임스페이스 검사가 판정의 어긋남도 잡으므로, 검사 대상을 못 찾아 그냥 통과하는 일이 없다. 샘플을 모두 지워도 규약 테스트는 깨지지 않는다(대상 개수 하한을 두지 않는다). 새 앱을 더하면 `ConventionScan` 의 어셈블리 목록에 넣는다.
 

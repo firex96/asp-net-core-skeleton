@@ -1,9 +1,9 @@
-using AspNetCoreSkeletonApplication.Common.Dtos;
-using AspNetCoreSkeletonApplication.Common.Enums;
+using AspNetCoreSkeletonApplication.Common.Product.Dtos;
+using AspNetCoreSkeletonApplication.Common.Product.Enums;
 using AspNetCoreSkeletonApplication.Common.Errors;
 using AspNetCoreSkeletonApplication.Common.Persistence;
-using AspNetCoreSkeletonApplication.Common.Persistence.Services;
-using AspNetCoreSkeletonApplication.Common.Services.Biz;
+using AspNetCoreSkeletonApplication.Common.Product.Persistence.Services;
+using AspNetCoreSkeletonApplication.Common.Product.Services.Biz;
 using NSubstitute;
 
 namespace AspNetCoreSkeletonApplication.UnitTests.Services;

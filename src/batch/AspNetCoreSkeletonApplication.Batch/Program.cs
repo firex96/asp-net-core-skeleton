@@ -1,5 +1,5 @@
 using AspNetCoreSkeletonApplication.Batch.Configuration;
-using AspNetCoreSkeletonApplication.Batch.Jobs;
+using AspNetCoreSkeletonApplication.Batch.Product.Jobs;
 using AspNetCoreSkeletonApplication.Batch.Security;
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;

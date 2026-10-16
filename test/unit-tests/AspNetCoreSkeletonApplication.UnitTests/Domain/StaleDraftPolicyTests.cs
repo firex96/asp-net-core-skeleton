@@ -1,4 +1,4 @@
-using AspNetCoreSkeletonApplication.Common.Domain;
+using AspNetCoreSkeletonApplication.Common.Product.Domain;
 
 namespace AspNetCoreSkeletonApplication.UnitTests.Domain;
 

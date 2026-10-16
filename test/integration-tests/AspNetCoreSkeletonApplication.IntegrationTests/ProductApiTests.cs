@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using AspNetCoreSkeletonApplication.Common.Enums;
+using AspNetCoreSkeletonApplication.Common.Product.Enums;
 using AspNetCoreSkeletonApplication.Common.Persistence.Context;
 using AspNetCoreSkeletonApplication.IntegrationTests.Support;
 using Microsoft.AspNetCore.Mvc.Testing;

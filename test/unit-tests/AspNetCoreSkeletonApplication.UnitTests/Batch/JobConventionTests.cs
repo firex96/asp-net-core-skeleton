@@ -1,4 +1,4 @@
-using AspNetCoreSkeletonApplication.Batch.Jobs;
+using AspNetCoreSkeletonApplication.Batch.Scheduling.Jobs;
 using AspNetCoreSkeletonApplication.UnitTests.Conventions;
 using Quartz;
 using BatchProgram = AspNetCoreSkeletonApplication.Batch.Program;

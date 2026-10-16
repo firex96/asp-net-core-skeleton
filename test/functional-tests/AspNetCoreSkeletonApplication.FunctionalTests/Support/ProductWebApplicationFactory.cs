@@ -1,5 +1,5 @@
 using AspNetCoreSkeletonApplication.Common.Persistence;
-using AspNetCoreSkeletonApplication.Common.Persistence.Services;
+using AspNetCoreSkeletonApplication.Common.Product.Persistence.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;

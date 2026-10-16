@@ -1,8 +1,8 @@
 using System.Net;
 using AspNetCoreSkeletonApplication.Common.Constants;
-using AspNetCoreSkeletonApplication.Common.Enums;
+using AspNetCoreSkeletonApplication.Common.Product.Enums;
 using AspNetCoreSkeletonApplication.Common.Persistence.Context;
-using AspNetCoreSkeletonApplication.Common.Persistence.Entities.Main;
+using AspNetCoreSkeletonApplication.Common.Product.Persistence.Entities;
 using AspNetCoreSkeletonApplication.IntegrationTests.Support;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

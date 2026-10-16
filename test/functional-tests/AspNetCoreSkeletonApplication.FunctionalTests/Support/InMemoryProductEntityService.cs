@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using AspNetCoreSkeletonApplication.Common.Dtos;
-using AspNetCoreSkeletonApplication.Common.Enums;
+using AspNetCoreSkeletonApplication.Common.Product.Dtos;
+using AspNetCoreSkeletonApplication.Common.Product.Enums;
 using AspNetCoreSkeletonApplication.Common.Errors;
-using AspNetCoreSkeletonApplication.Common.Persistence.Services;
+using AspNetCoreSkeletonApplication.Common.Product.Persistence.Services;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests.Support;
 

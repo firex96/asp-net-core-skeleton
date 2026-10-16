@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using AspNetCoreSkeletonApplication.Server.Models;
+using AspNetCoreSkeletonApplication.Server.Weather.Models;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests;
 

@@ -1,5 +1,5 @@
-using AspNetCoreSkeletonApplication.Common.Domain;
-using AspNetCoreSkeletonApplication.Common.Enums;
+using AspNetCoreSkeletonApplication.Common.Product.Domain;
+using AspNetCoreSkeletonApplication.Common.Product.Enums;
 using AspNetCoreSkeletonApplication.Common.Errors;
 
 namespace AspNetCoreSkeletonApplication.UnitTests.Domain;

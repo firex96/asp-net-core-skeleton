@@ -29,6 +29,7 @@
 - 게이트웨이 뒤 내부 API 앱 `InternalApi` — Server 와 같은 Common 을 쓰고 SPA 를 서빙하지 않는다. 템플릿 선택지 `--internalApi`(기본 true)
 
 ### Changed
+- 업무 코드를 도메인 패키지로 — 네임스페이스는 `{프로젝트}.{도메인}.{계층}`(`Common.Product.Persistence.Services`), 공통 기반 영역에는 abstract 기반 타입만. 규약 테스트 `DomainConventionTests`(다른 도메인의 영속 계층 참조 금지) · `TableNamingConventionTests`(테이블은 클래스 이름의 snake_case, 예약어 금지)
 - 최소 API 의 검증 실패(`HttpValidationProblemDetails`)도 `NOT_VALID_ERROR` 로 분류
 - 프로젝트를 공유·배포 단위로 재편 — 빈 `ApplicationCore` · `Infrastructure.*` 를 지우고 공유 라이브러리 `Common` 을 둔다. `AppDbContext`(internal) 와 비밀값 출처 구성(`AddSecretSource<TUserSecrets>()`)이 `Common` 으로 옮겨졌다
 - 계층 `Controller → MappingService → BizService → EntityService` 를 도입하고 WeatherForecast 를 이 흐름으로 옮겼다(응답 JSON 은 같다). 계층 서비스는 `AddLayeredServices` 가 이름 접미사로 등록한다

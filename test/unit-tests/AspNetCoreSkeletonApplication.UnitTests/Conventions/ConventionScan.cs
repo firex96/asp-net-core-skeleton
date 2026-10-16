@@ -40,6 +40,31 @@ internal static partial class ConventionScan
         };
     }
 
+    /// <summary>
+    /// 도메인이 아닌 공통 기반 영역. 프로젝트 바로 아래 네임스페이스는 이 목록의 영역이거나 업무 도메인이다
+    /// (<c>{프로젝트}.{도메인}.{계층}</c>). 목록에 없는 영역은 모두 도메인으로 본다.
+    /// </summary>
+    public static readonly IReadOnlySet<string> PlatformAreas = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "Configuration", "Constants", "Contexts", "Diagnostics", "Enums", "Errors", "Persistence", "Scheduling", "Security", "Web",
+    };
+
+    /// <summary>프로젝트 루트 네임스페이스 바로 아래 segment — 업무 도메인 이름이거나 <see cref="PlatformAreas"/> 중 하나.</summary>
+    public static string? AreaOf(Type type)
+    {
+        var root = type.Assembly.GetName().Name!;
+        var ns = type.Namespace ?? string.Empty;
+        if (!ns.StartsWith(root + ".", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return ns[(root.Length + 1)..].Split('.')[0];
+    }
+
+    /// <summary>업무 도메인 이름. 공통 기반 영역이나 루트에 있는 타입은 null.</summary>
+    public static string? DomainOf(Type type) => AreaOf(type) is { } area && !PlatformAreas.Contains(area) ? area : null;
+
     /// <summary>스캔 대상 어셈블리에 정의된 타입인가 — 프레임워크 타입과 구분한다.</summary>
     public static bool IsAppType(Type type) => Assemblies.Contains(type.Assembly);
 
@@ -54,6 +79,48 @@ internal static partial class ConventionScan
             {
                 yield return argument;
             }
+        }
+    }
+
+    /// <summary>시그니처(기반 타입 · 인터페이스 · 생성자 · 메서드 · 필드 · 속성)에 드러나는 타입. 메서드 본문은 보지 않는다.</summary>
+    public static IEnumerable<Type> SignatureTypes(Type type)
+    {
+        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+        if (type.BaseType is { } baseType)
+        {
+            yield return baseType;
+        }
+
+        foreach (var implemented in type.GetInterfaces())
+        {
+            yield return implemented;
+        }
+
+        foreach (var constructor in type.GetConstructors(all))
+        {
+            foreach (var parameter in constructor.GetParameters())
+            {
+                yield return parameter.ParameterType;
+            }
+        }
+
+        foreach (var method in type.GetMethods(all))
+        {
+            yield return method.ReturnType;
+            foreach (var parameter in method.GetParameters())
+            {
+                yield return parameter.ParameterType;
+            }
+        }
+
+        foreach (var field in type.GetFields(all))
+        {
+            yield return field.FieldType;
+        }
+
+        foreach (var property in type.GetProperties(all))
+        {
+            yield return property.PropertyType;
         }
     }
 

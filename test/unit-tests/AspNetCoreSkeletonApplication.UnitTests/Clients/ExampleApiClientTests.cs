@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using AspNetCoreSkeletonApplication.Common.Contexts;
 using AspNetCoreSkeletonApplication.Common.Errors;
 using AspNetCoreSkeletonApplication.Common.Web;
-using AspNetCoreSkeletonApplication.Server.Clients;
+using AspNetCoreSkeletonApplication.Server.Example.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;

@@ -1,6 +1,6 @@
 using AspNetCoreSkeletonApplication.Common.Configuration;
 using AspNetCoreSkeletonApplication.Common.Web;
-using AspNetCoreSkeletonApplication.Server.Clients;
+using AspNetCoreSkeletonApplication.Server.Example.Clients;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);

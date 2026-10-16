@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using AspNetCoreSkeletonApplication.Common.Dtos;
-using AspNetCoreSkeletonApplication.Common.Persistence.Services;
+using AspNetCoreSkeletonApplication.Common.Product.Dtos;
+using AspNetCoreSkeletonApplication.Common.Product.Persistence.Services;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests.Support;
 

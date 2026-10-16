@@ -109,42 +109,11 @@ public class DeclarationConventionTests
         // 시그니처(생성자 · 메서드 · 필드 · 속성) 수준의 검사다 — EF · DI · ASP.NET 타입을 받거나 들고 있지 않는다.
         var violations =
             from type in ConventionScan.TypesIn(Layer.Domain)
-            from referenced in SignatureTypes(type).SelectMany(ConventionScan.Unwrap).Distinct()
+            from referenced in ConventionScan.SignatureTypes(type).SelectMany(ConventionScan.Unwrap).Distinct()
             where !IsAllowedForDomain(referenced)
             select $"{type.FullName} → {referenced.FullName}";
 
         ConventionScan.AssertNoViolations(violations);
-    }
-
-    private static IEnumerable<Type> SignatureTypes(Type type)
-    {
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
-        foreach (var constructor in type.GetConstructors(all))
-        {
-            foreach (var parameter in constructor.GetParameters())
-            {
-                yield return parameter.ParameterType;
-            }
-        }
-
-        foreach (var method in type.GetMethods(all))
-        {
-            yield return method.ReturnType;
-            foreach (var parameter in method.GetParameters())
-            {
-                yield return parameter.ParameterType;
-            }
-        }
-
-        foreach (var field in type.GetFields(all))
-        {
-            yield return field.FieldType;
-        }
-
-        foreach (var property in type.GetProperties(all))
-        {
-            yield return property.PropertyType;
-        }
     }
 
     private static bool IsAllowedForDomain(Type type)
