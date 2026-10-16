@@ -35,6 +35,9 @@
             }
           </ul>
         }
+        @if (error.code === 'EMAIL_NOT_CONFIRMED_ERROR') {
+          <p><button type="button" class="link-button" (click)="resend()">확인 메일 다시 받기</button></p>
+        }
       </div>
     }
 

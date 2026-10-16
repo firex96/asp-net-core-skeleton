@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 이메일 확인 — 이메일을 확인해야 로그인한다(`RequireConfirmedEmail`, 비밀번호 · 소셜). 가입은 로그인하지 않고 확인 링크를 메일로 보낸다(`{App:PublicOrigin}/confirm-email?userId=…&code=…`, 2시간). `POST /api/auth/email/confirm`(틀리면 400 `INVALID_TOKEN_ERROR`) · `resend`(항상 202). 확인 전 계정은 비밀번호가 맞을 때만 403 `EMAIL_NOT_CONFIRMED_ERROR`(AUTH006) — 틀리면 같은 401 이고 잠금 횟수도 센다. 기존 계정은 마이그레이션 `ConfirmExistingEmails` 가 확인된 것으로 둔다. SPA 세 개: 가입 뒤 확인 메일 안내, 로그인 화면의 "확인 메일 다시 받기", `/confirm-email` 화면
 - 메일 아웃박스 — 계정 메일을 `mail_outbox`(마이그레이션 `AddMailOutbox`)에 넣고 Server 의 백그라운드(`MailOutboxWorker`)가 SMTP 로 보낸다. `UPDLOCK · READPAST` 로 잡아 여러 인스턴스에서도 한 통은 한 곳만, 잡은 동안 `Lease`(5분), 실패하면 30초부터 두 배씩 8번까지 다시 시도(`MailRetryPolicy`)한 뒤 포기, 보냈거나 포기하면 본문을 비운다. 구성 `Mail:Outbox`(`PollInterval` · `BatchSize` · `Lease`)
 - 브라우저 테스트 `E2ETests`(Playwright for .NET 1.63, Chromium) — SPA 를 정적 빌드해 Server(Kestrel, 자체 서명 HTTPS)로 같은 출처 서빙, SPA 마다 같은 시나리오: 가입 검증 · 가입 · 로그아웃, 5회 실패 잠금, 메일 링크로 비밀번호 재설정, 소셜 계정 연결 · 로그인 · 끊기, OAuth 인가 코드(로그인 · 동의 화면 → 토큰). 실패하면 Playwright 트레이스를 남긴다
 - SPA 세 개의 계정 화면 — 비밀번호 찾기 · 재설정(메일 링크), 내 계정(권한, 소셜 계정 연결 · 끊기), OAuth 동의(같은 authorize 요청을 허용 · 거부로 POST), 로그인 화면의 소셜 버튼(폼 POST)과 결과 안내, 로그인 뒤 `/connect/…` 로 돌아갈 때는 브라우저 이동. dev 서버가 `/connect` · `/.well-known` 도 프록시하고, Nuxt 프록시는 Host 를 바꾸지 않는다

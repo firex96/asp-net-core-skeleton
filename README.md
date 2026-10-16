@@ -243,6 +243,7 @@ EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백
 | `ClientBadRequestException` | 400 `BAD_REQUEST_ERROR` (G001) | 예외 메시지 |
 | `ConflictException` | 409 `CONFLICT_ERROR` (G013) | 예외 메시지 |
 | 로그인 — 계정 잠김 | 423 `ACCOUNT_LOCKED_ERROR` (AUTH001) | 안내 문구 |
+| 로그인 — 이메일을 확인하지 않은 계정(비밀번호가 맞을 때만) | 403 `EMAIL_NOT_CONFIRMED_ERROR` (AUTH006) | 안내 문구 |
 | `ApiCallException` (외부 API 실패) | 502 `EXTERNAL_API_ERROR` (G014) | 없음 — 로그에만 남는다 |
 | DataAnnotations 검증 실패 (`[ApiController]` 자동 400) | 400 `NOT_VALID_ERROR` (G011), `errors` 에 필드별 메시지 | — |
 | 컨트롤러가 돌려준 상태 코드(`NotFound()` 등) | 상태 코드로 고른 코드 | — |
@@ -377,13 +378,16 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 
 | 엔드포인트 (`Common/Web/AuthenticationEndpoints`) | 동작 |
 |---|---|
-| `POST /api/auth/register` `{email, password}` | 201. 비밀번호 10자 이상 · 대소문자 · 숫자 · 기호(Identity 기본). 어기면 400 `NOT_VALID_ERROR` |
-| `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드) |
+| `POST /api/auth/register` `{email, password}` | 201 — 로그인하지 않고 이메일 확인 링크를 메일로 보낸다. 비밀번호 10자 이상 · 대소문자 · 숫자 · 기호(Identity 기본). 어기면 400 `NOT_VALID_ERROR` |
+| `POST /api/auth/email/confirm` `{userId, code}` | 204 — 메일 링크(`{App:PublicOrigin}/confirm-email?userId=…&code=…`)의 값으로 이메일을 확인한다. 로그인시키지 않는다. 토큰이 틀렸거나 만료(2시간)됐으면 400 `INVALID_TOKEN_ERROR` |
+| `POST /api/auth/email/resend` `{email}` | 202 — 계정이 있든 없든, 이미 확인했든 같다. 확인 전 계정이면 링크를 다시 보낸다 |
+| `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드). 이메일을 확인하지 않은 계정은 비밀번호가 맞을 때만 403 `EMAIL_NOT_CONFIRMED_ERROR` |
 | `POST /api/auth/logout` | 204, 쿠키 삭제 |
 | `POST /api/auth/password/forgot` `{email}` | 202 — 계정이 있든 없든 같다(가입 여부를 드러내지 않는다). 있으면 재설정 링크 메일을 보낸다 |
 | `POST /api/auth/password/reset` `{email, code, newPassword}` | 204. 토큰이 틀렸거나 만료 · 사용됐으면 400 `INVALID_TOKEN_ERROR`(AUTH002), 비밀번호 규칙 위반은 400 `NOT_VALID_ERROR` |
 | `GET /api/auth/me` | `{id, email, permissions}` — 실효 권한 코드(화면이 쓸 수 있는 기능을 고를 때 쓴다). 로그인하지 않았으면 401 |
 
+- **이메일을 확인해야 로그인한다**(`SignIn.RequireConfirmedEmail`) — 비밀번호 · 소셜 로그인 모두. Identity 는 비밀번호를 보기 전에 확인 여부로 거절하므로(계정이 있다는 것이 드러나고 실패 횟수도 세지 않는다), 로그인 엔드포인트가 확인 전 계정만 먼저 비밀번호를 확인한다 — 틀리면 다른 계정과 같은 401 이고 잠금 횟수도 센다. 이 기능 전에 가입한 계정은 마이그레이션 `ConfirmExistingEmails` 가 확인된 것으로 둔다. SPA 는 가입 뒤 확인 메일을 안내하고, 로그인 화면에서 "확인 메일 다시 받기" 를, `/confirm-email` 화면에서 확인을 한다.
 - **쿠키** — `__Host-session`, HttpOnly · Secure · SameSite=Strict, 8시간(쓰면 연장). 로그인 페이지가 없으므로 인증이 필요하면 리다이렉트 대신 401, 권한이 없으면 403 을 ProblemDetails 로 돌려준다.
 - **여러 인스턴스** — 쿠키를 암호화하는 Data Protection 키를 Redis 에 둔다(`{Cache:KeyPrefix}data-protection-keys`). 어느 인스턴스가 만든 쿠키든 다른 인스턴스가 읽는다. 키는 Redis 에 평문으로 있으므로 Redis 접근을 앱으로 제한한다.
 - **감사** — 로그인한 요청은 사용자 ID(`NameIdentifier` claim)가 감사 주체가 된다(「추적 ID 와 감사」의 1순위).
@@ -391,7 +395,7 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 
 **인가** (예외 없음) — **사용자 → 그룹 → 역할 → 권한 코드**
 
-- **기본은 로그인 필요다**(fallback 정책). 익명으로 열 엔드포인트는 하나씩 연다 — 컨트롤러 · 액션의 `[AllowAnonymous]`, 엔드포인트의 `.AllowAnonymous()`. Server 에서 열린 것: WeatherForecast, Product 조회(목록 · 단건 · 상태 이력), `/health`, OpenAPI · Scalar, SPA 정적 파일 · fallback, `/api/auth/register` · `login`.
+- **기본은 로그인 필요다**(fallback 정책). 익명으로 열 엔드포인트는 하나씩 연다 — 컨트롤러 · 액션의 `[AllowAnonymous]`, 엔드포인트의 `.AllowAnonymous()`. Server 에서 열린 것: WeatherForecast, Product 조회(목록 · 단건 · 상태 이력), `/health`, OpenAPI · Scalar, SPA 정적 파일 · fallback, `/api/auth` 의 가입 · 로그인 · 이메일 확인 · 비밀번호 재설정.
 - **권한 코드로 선언한다** — `[HasPermission(Permissions.Products.Manage)]`. 코드는 `Common/Authorization/Permissions` 카탈로그 하나가 정본이고(`{대상}.{동작}` 소문자), 카탈로그 밖 코드와 역할 문자열(`Roles = "…"`)은 규약 테스트가 막는다(`AuthorizationConventionTests`). 지금 코드: `products.manage`(상품 상태 변경 · 남의 상품 삭제), `authorization.manage`(그룹 · 역할 · 권한 관리).
 - **사용자에게 역할을 직접 주지 않는다.** 사용자는 그룹(`user_group_member`)에 속하고, 그룹이 역할(`user_group_role`)을, 역할이 권한 코드(`role_permission`)를 갖는다. 실효 권한은 그 합집합이다(`EffectivePermissions`).
 - **판정은 요청마다 서버가 한다** — 쿠키에 굳은 클레임을 쓰지 않는다. 조회 셋(사용자의 그룹, 그룹-역할, 역할-권한)은 캐시되고, 바뀌면 태그 무효화가 백플레인으로 모든 인스턴스에 곧바로 닿는다 — 권한을 빼면 다음 요청부터 403 이다.
@@ -409,7 +413,7 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 | 엔드포인트 (`/api/auth/external`) | 동작 |
 |---|---|
 | `GET /providers` | 켜진 공급자 `[{name, displayName}]` — SPA 가 버튼을 그린다 |
-| `POST /{provider}/login?returnUrl=` | 공급자 로그인으로 보낸다(브라우저 폼 이동). 연결된 계정이면 세션 쿠키를 받고 `returnUrl`(같은 출처 경로만)로, 아니면 `/login?error=EXTERNAL_LOGIN_NOT_LINKED_ERROR&provider=…` 로 돌아온다 |
+| `POST /{provider}/login?returnUrl=` | 공급자 로그인으로 보낸다(브라우저 폼 이동). 연결된 계정이면 세션 쿠키를 받고 `returnUrl`(같은 출처 경로만)로, 아니면 `/login?error=EXTERNAL_LOGIN_NOT_LINKED_ERROR&provider=…` 로 돌아온다(이메일을 확인하지 않은 계정은 `EMAIL_NOT_CONFIRMED_ERROR`, 잠긴 계정은 `ACCOUNT_LOCKED_ERROR`) |
 | `POST /{provider}/link` | 로그인 필요. 공급자 계정을 연결하고 `/account?linked=…` 로, 다른 사용자에게 이미 연결된 계정이면 `/account?error=EXTERNAL_LOGIN_IN_USE_ERROR` 로 돌아온다 |
 | `GET /logins` · `DELETE /{provider}` | 로그인 필요. 연결 목록 · 끊기(204). 마지막 로그인 수단(비밀번호 없음 + 마지막 연결)이면 409 `LAST_LOGIN_METHOD_ERROR` |
 
@@ -473,7 +477,7 @@ curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
 
 ## 메일
 
-계정 메일(지금은 비밀번호 재설정)은 **아웃박스**(`mail_outbox`)에 넣고, 백그라운드(`MailOutboxWorker`)가 **SMTP(MailKit)** 로 보낸다. `Common` 의 Mail 도메인이다 — `MailOutboxBizService`(넣기 · 때가 된 메일 보내기), `IMailOutboxEntityService`, 전송 `IMailClient`(`SmtpMailClient`), 재시도 규칙 `MailRetryPolicy`(Domain), Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
+계정 메일(이메일 확인 · 비밀번호 재설정)은 **아웃박스**(`mail_outbox`)에 넣고, 백그라운드(`MailOutboxWorker`)가 **SMTP(MailKit)** 로 보낸다. `Common` 의 Mail 도메인이다 — `MailOutboxBizService`(넣기 · 때가 된 메일 보내기), `IMailOutboxEntityService`, 전송 `IMailClient`(`SmtpMailClient`), 재시도 규칙 `MailRetryPolicy`(Domain), Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
 
 - **요청은 행만 넣고 끝난다** — 응답 시간이 SMTP 왕복에 묶이지 않아 가입 여부가 시간으로 드러나지 않고, SMTP 장애가 요청 실패가 되지 않는다.
 - **한 통은 한 곳만 보낸다** — 발송 루프는 인스턴스마다 하나씩 돌고, 때가 된 행을 `UPDLOCK · READPAST` 로 잡아 시도 횟수를 올린 뒤 `Mail:Outbox:Lease`(5분) 동안 다른 인스턴스가 다시 잡지 못하게 한다. SMTP 왕복은 트랜잭션 밖이다. 보낸 뒤 기록하기 전에 멈추면 기한이 지나 다시 보낸다 — **최소 한 번 전달**이다.

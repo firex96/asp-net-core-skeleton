@@ -104,7 +104,10 @@ public static class ExternalLoginEndpoints
             return TypedResults.Redirect(SafeLocalPath(properties.Items.TryGetValue(ReturnUrlKey, out var returnUrl) ? returnUrl : null));
         }
 
-        var error = result.IsLockedOut ? ErrorCode.AccountLocked.Code : ErrorCode.ExternalLoginNotLinked.Code;
+        // NotAllowed — 연결은 됐지만 이메일을 확인하지 않은 계정(RequireConfirmedEmail).
+        var error = result.IsLockedOut ? ErrorCode.AccountLocked.Code
+            : result.IsNotAllowed ? ErrorCode.EmailNotConfirmed.Code
+            : ErrorCode.ExternalLoginNotLinked.Code;
         return TypedResults.Redirect($"/login?error={error}&provider={Uri.EscapeDataString(info.LoginProvider)}");
     }
 

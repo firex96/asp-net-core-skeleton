@@ -24,6 +24,7 @@ internal static class TestUsers
         var cancellationToken = TestContext.Current.CancellationToken;
         var client = factory.CreateClient(Https);
         (await client.PostAsJsonAsync("/api/auth/register", new { email, password = Password }, cancellationToken)).EnsureSuccessStatusCode();
+        await ConfirmEmailAsync(factory, email);
 
         if (administrator)
         {
@@ -39,5 +40,18 @@ internal static class TestUsers
         (await client.PostAsJsonAsync("/api/auth/login", new { email, password = Password }, cancellationToken)).EnsureSuccessStatusCode();
         var me = JsonDocument.Parse(await client.GetStringAsync("/api/auth/me", cancellationToken)).RootElement;
         return (client, me.GetProperty("id").GetInt64());
+    }
+
+    /// <summary>메일 링크를 거치지 않고 이메일을 확인한다 — 링크가 시험 대상이 아닌 테스트에서. 토큰은 링크와 같은 Identity 토큰이다.</summary>
+    public static async Task ConfirmEmailAsync(WebApplicationFactory<Program> factory, string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await users.FindByEmailAsync(email) ?? throw new InvalidOperationException($"{email} 가 없다");
+        var result = await users.ConfirmEmailAsync(user, await users.GenerateEmailConfirmationTokenAsync(user));
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException($"{email} 를 확인하지 못했다");
+        }
     }
 }

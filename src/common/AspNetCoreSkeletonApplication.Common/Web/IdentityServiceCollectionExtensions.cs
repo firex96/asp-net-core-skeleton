@@ -18,6 +18,7 @@ public static class IdentityServiceCollectionExtensions
     /// <list type="bullet">
     /// <item>쿠키는 <c>__Host-</c> 이름, HttpOnly · Secure · SameSite=Strict. 로그인 페이지가 없으므로 인증 필요는 401, 권한 없음은 403 이다.</item>
     /// <item>계정 잠금 — 5번 틀리면 30분(형제 스켈레톤과 같은 값).</item>
+    /// <item>이메일을 확인해야 로그인한다(<c>RequireConfirmedEmail</c>) — 비밀번호 · 소셜 로그인 모두.</item>
     /// <item>기본 정책은 로그인 필요(fallback). 권한은 <see cref="HasPermissionAttribute"/> 로 선언하고, 요청마다 그룹 · 역할 · 권한으로 판정한다
     /// (<see cref="PermissionAuthorizationHandler"/>). 역할을 Identity 에 두지 않는다 — 인가 도메인이 맡는다.</item>
     /// </list>
@@ -27,6 +28,7 @@ public static class IdentityServiceCollectionExtensions
         services.AddIdentityCore<ApplicationUser>(options =>
             {
                 options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedEmail = true;
                 options.Password.RequiredLength = 10;
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
@@ -37,7 +39,7 @@ public static class IdentityServiceCollectionExtensions
             .AddDefaultTokenProviders()
             .AddErrorDescriber<KoreanIdentityErrorDescriber>();
 
-        // 비밀번호 재설정 토큰은 2시간. 재설정이 보안 스탬프를 바꾸므로 토큰은 한 번만 쓰이고, 다른 기기의 세션도 1분 안에 끊긴다.
+        // 비밀번호 재설정 · 이메일 확인 토큰은 2시간. 재설정이 보안 스탬프를 바꾸므로 재설정 토큰은 한 번만 쓰이고, 다른 기기의 세션도 1분 안에 끊긴다.
         services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(2));
         services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
         services.AddOptions<AppOptions>().BindConfiguration("App").ValidateDataAnnotations().ValidateOnStart();

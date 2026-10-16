@@ -67,6 +67,26 @@ describe('AuthService', () => {
     expect(error.fieldErrors).toEqual(['too short', 'digit']);
   });
 
+  it('only creates the account on register — signing in waits for the email confirmation', async () => {
+    const result = service.register(user.email, 'Passw0rd!');
+    httpMock.expectOne('/api/auth/register').flush(null, { status: 201, statusText: 'Created' });
+
+    await result;
+    httpMock.expectNone('/api/auth/login');
+  });
+
+  it('confirms the email with the numeric user id and can resend the mail', async () => {
+    const confirm = service.confirmEmail('42', 'code-1');
+    const confirmRequest = httpMock.expectOne('/api/auth/email/confirm');
+    expect(confirmRequest.request.body).toEqual({ userId: 42, code: 'code-1' });
+    confirmRequest.flush(null, { status: 204, statusText: 'No Content' });
+    await confirm;
+
+    const resend = service.resendConfirmation(user.email);
+    httpMock.expectOne('/api/auth/email/resend').flush(null, { status: 202, statusText: 'Accepted' });
+    await resend;
+  });
+
   it('requests a reset link and resets the password', async () => {
     const forgot = service.forgotPassword(user.email);
     const forgotRequest = httpMock.expectOne('/api/auth/password/forgot');
@@ -125,6 +145,7 @@ describe('navigation', () => {
   it('explains social login results', () => {
     expect(externalLoginMessage('EXTERNAL_LOGIN_IN_USE_ERROR', 'Naver')).toBe('이 네이버 계정은 이미 다른 회원과 연결돼 있어요.');
     expect(externalLoginMessage(null, null)).toBeNull();
+    expect(externalLoginMessage('EMAIL_NOT_CONFIRMED_ERROR', 'Google')).toContain('이메일 확인');
   });
 });
 

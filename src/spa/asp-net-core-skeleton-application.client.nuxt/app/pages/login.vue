@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// 로그인과 가입을 한 화면에서 전환한다. 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
-// 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
+// 로그인과 가입을 한 화면에서 전환한다. 로그인에 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
+// 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 가입하면 확인 메일 안내를 보이고 로그인 화면으로 돌아온다
+// (이메일을 확인해야 로그인할 수 있다). 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
 const session = useSession()
 const route = useRoute()
 
@@ -11,6 +12,7 @@ const confirmPassword = ref('')
 const error = ref<ApiError | null>(null)
 const busy = ref(false)
 const providers = ref<ExternalProvider[]>([])
+const message = ref<string | null>(null)
 
 const returnUrl = computed(() => safeReturnUrl(typeof route.query.returnUrl === 'string' ? route.query.returnUrl : null))
 const title = computed(() => (mode.value === 'login' ? '로그인' : '회원가입'))
@@ -52,6 +54,7 @@ onMounted(async () => {
 function toggleMode() {
   mode.value = mode.value === 'login' ? 'register' : 'login'
   error.value = null
+  message.value = null
 }
 
 async function submit() {
@@ -62,15 +65,36 @@ async function submit() {
 
   busy.value = true
   error.value = null
+  message.value = null
   try {
-    await (mode.value === 'login' ? session.signIn(email.value, password.value) : session.signUp(email.value, password.value))
-    await continueTo(returnUrl.value)
+    if (mode.value === 'login') {
+      await session.signIn(email.value, password.value)
+      await continueTo(returnUrl.value)
+    }
+    else {
+      await session.signUp(email.value, password.value)
+      mode.value = 'login'
+      password.value = ''
+      confirmPassword.value = ''
+      message.value = `${email.value}로 확인 메일을 보냈어요. 메일의 링크를 열어 이메일을 확인한 뒤 로그인해 주세요.`
+    }
   }
   catch (caught) {
     error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
   }
   finally {
     busy.value = false
+  }
+}
+
+async function resend() {
+  error.value = null
+  try {
+    await resendConfirmation(email.value)
+    message.value = `${email.value}로 확인 메일을 다시 보냈어요. 메일함을 확인해 주세요.`
+  }
+  catch (caught) {
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
   }
 }
 </script>
@@ -82,8 +106,8 @@ async function submit() {
       {{ mode === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.' }}
     </p>
 
-    <p v-if="notice" class="alert alert-info" role="status">
-      {{ notice }}
+    <p v-if="message ?? notice" class="alert alert-info" role="status">
+      {{ message ?? notice }}
     </p>
 
     <form class="form" @submit.prevent="submit">
@@ -118,6 +142,11 @@ async function submit() {
             {{ message }}
           </li>
         </ul>
+        <p v-if="error.code === 'EMAIL_NOT_CONFIRMED_ERROR'">
+          <button type="button" class="link-button" @click="resend">
+            확인 메일 다시 받기
+          </button>
+        </p>
       </div>
 
       <button type="submit" class="btn btn-primary btn-block" :disabled="busy">

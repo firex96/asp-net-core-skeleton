@@ -22,10 +22,10 @@ export class AppComponent implements OnInit {
     return this.router.url.split('?')[0] === '/login';
   }
 
-  /** 계정 화면들(로그인 · 비밀번호 찾기 · 재설정)에서는 돌아올 곳을 싣지 않는다 — 재설정 주소의 일회용 코드를 다른 주소로 옮기지 않는다. */
+  /** 계정 화면들(로그인 · 비밀번호 찾기 · 재설정 · 이메일 확인)에서는 돌아올 곳을 싣지 않는다 — 링크의 일회용 코드를 다른 주소로 옮기지 않는다. */
   get loginQueryParams() {
     const path = this.router.url.split('?')[0];
-    return ['/login', '/forgot-password', '/reset-password'].includes(path) ? {} : { returnUrl: this.router.url };
+    return ['/login', '/forgot-password', '/reset-password', '/confirm-email'].includes(path) ? {} : { returnUrl: this.router.url };
   }
 
   async logout() {

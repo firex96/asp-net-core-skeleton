@@ -117,6 +117,25 @@ public class ExternalLoginTests(InfrastructureFixture infrastructure) : IAsyncLi
     }
 
     [Fact]
+    public async Task LinkedButUnconfirmedAccount_IsAskedToConfirmTheEmail()
+    {
+        const string email = "unconfirmed-social@example.com";
+        var (owner, _) = await SignInWithPasswordAsync(email);
+        await RoundTripAsync(owner, "/api/auth/external/Kakao/link");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = (await users.FindByEmailAsync(email))!;
+            user.EmailConfirmed = false;
+            Assert.True((await users.UpdateAsync(user)).Succeeded);
+        }
+
+        var landing = await RoundTripAsync(NewClient(), "/api/auth/external/Kakao/login");
+
+        Assert.Equal("/login?error=EMAIL_NOT_CONFIRMED_ERROR&provider=Kakao", landing);
+    }
+
+    [Fact]
     public async Task UnknownProvider_Is404()
     {
         var response = await NewClient().PostAsync("/api/auth/external/Facebook/login", null, Token);

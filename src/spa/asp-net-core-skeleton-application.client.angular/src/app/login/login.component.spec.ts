@@ -72,6 +72,47 @@ describe('LoginComponent', () => {
     expect(component.error()?.message).toBe('비밀번호가 서로 달라요. 다시 입력해 주세요.');
   });
 
+  it('asks to confirm the email after sign-up instead of signing in', async () => {
+    const fixture = await create();
+    const component = fixture.componentInstance;
+    component.toggleMode();
+    component.email = 'new@example.com';
+    component.password = 'Passw0rd!-long';
+    component.confirmPassword = 'Passw0rd!-long';
+
+    const submitted = component.submit();
+    httpMock.expectOne('/api/auth/register').flush(null, { status: 201, statusText: 'Created' });
+    await submitted;
+    fixture.detectChanges();
+
+    expect(component.mode()).toBe('login');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role=status]')?.textContent).toContain('new@example.com로 확인 메일을 보냈어요');
+  });
+
+  it('offers to resend the confirmation mail to an unconfirmed account', async () => {
+    const fixture = await create();
+    const component = fixture.componentInstance;
+    component.email = 'new@example.com';
+    component.password = 'Passw0rd!-long';
+    const submitted = component.submit();
+    httpMock.expectOne('/api/auth/login').flush(
+      { status: 403, code: 'EMAIL_NOT_CONFIRMED_ERROR', detail: 'not confirmed' },
+      { status: 403, statusText: 'Forbidden' });
+    await submitted;
+    fixture.detectChanges();
+
+    const resend = (fixture.nativeElement as HTMLElement).querySelector('[role=alert] button') as HTMLButtonElement;
+    expect(resend.textContent).toContain('확인 메일 다시 받기');
+    resend.click();
+    const request = httpMock.expectOne('/api/auth/email/resend');
+    expect(request.request.body).toEqual({ email: 'new@example.com' });
+    request.flush(null, { status: 202, statusText: 'Accepted' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role=status]')?.textContent).toContain('다시 보냈어요');
+  });
+
   it('returns to a same-origin returnUrl after login', async () => {
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     queryParams = { returnUrl: '/products' };

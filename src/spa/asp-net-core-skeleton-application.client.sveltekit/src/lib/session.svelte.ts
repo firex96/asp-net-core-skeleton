@@ -13,9 +13,9 @@ export async function signIn(email: string, password: string): Promise<CurrentUs
 	return refreshSession();
 }
 
-export async function signUp(email: string, password: string): Promise<CurrentUser | null> {
+/** 가입만 한다 — 이메일을 확인한 뒤에 로그인한다. */
+export async function signUp(email: string, password: string): Promise<void> {
 	await register(email, password);
-	return refreshSession();
 }
 
 export async function signOut(): Promise<void> {

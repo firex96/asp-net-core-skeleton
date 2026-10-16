@@ -7,8 +7,9 @@ import { AuthService, ExternalProvider } from '../auth/auth.service';
 import { externalLoginMessage, isServerPath } from '../auth/navigation';
 
 /**
- * 로그인과 가입을 한 화면에서 전환한다. 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은 서버 주소면
- * 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
+ * 로그인과 가입을 한 화면에서 전환한다. 로그인에 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은 서버 주소면
+ * 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 가입하면 확인 메일 안내를 보이고 로그인 화면으로 돌아온다(이메일을 확인해야
+ * 로그인할 수 있다). 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
  */
 @Component({
   selector: 'app-login',
@@ -55,6 +56,7 @@ export class LoginComponent implements OnInit {
   toggleMode() {
     this.mode.update(mode => (mode === 'login' ? 'register' : 'login'));
     this.error.set(null);
+    this.notice.set(null);
   }
 
   async submit() {
@@ -65,17 +67,32 @@ export class LoginComponent implements OnInit {
 
     this.busy.set(true);
     this.error.set(null);
+    this.notice.set(null);
     try {
       if (this.mode() === 'login') {
         await this.auth.login(this.email, this.password);
+        await this.continue();
       } else {
         await this.auth.register(this.email, this.password);
+        this.mode.set('login');
+        this.password = '';
+        this.confirmPassword = '';
+        this.notice.set(`${this.email}로 확인 메일을 보냈어요. 메일의 링크를 열어 이메일을 확인한 뒤 로그인해 주세요.`);
       }
-      await this.continue();
     } catch (error) {
       this.error.set(error instanceof ApiError ? error : ApiError.from(error));
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  async resend() {
+    this.error.set(null);
+    try {
+      await this.auth.resendConfirmation(this.email);
+      this.notice.set(`${this.email}로 확인 메일을 다시 보냈어요. 메일함을 확인해 주세요.`);
+    } catch (error) {
+      this.error.set(error instanceof ApiError ? error : ApiError.from(error));
     }
   }
 

@@ -1,4 +1,7 @@
 using System.Net.Http.Json;
+using AspNetCoreSkeletonApplication.Common.Persistence.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 
 namespace AspNetCoreSkeletonApplication.E2ETests.Support;
@@ -33,12 +36,20 @@ public abstract class BrowserTest(E2EFixture fixture) : IAsyncDisposable
     /// <summary>테스트끼리 서버(DB)를 함께 쓰므로 이메일이 겹치지 않게 만든다.</summary>
     protected static string NewEmail(string spa, string purpose) => $"{purpose}-{spa}-{Guid.NewGuid():N}"[..40] + "@example.com";
 
-    /// <summary>화면을 거치지 않고 가입만 해 둔다 — 그 화면이 시험 대상이 아닐 때.</summary>
+    /// <summary>화면을 거치지 않고 가입하고 이메일도 확인해 둔다 — 가입 · 확인 화면이 시험 대상이 아닐 때.</summary>
     protected static async Task RegisterAsync(SpaServer server, string email)
     {
         using var api = server.CreateApiClient();
         (await api.PostAsJsonAsync("/api/auth/register", new { email, password = Password }, TestContext.Current.CancellationToken))
             .EnsureSuccessStatusCode();
+
+        using var scope = server.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await users.FindByEmailAsync(email) ?? throw new InvalidOperationException($"{email} 가 없다");
+        if (!(await users.ConfirmEmailAsync(user, await users.GenerateEmailConfirmationTokenAsync(user))).Succeeded)
+        {
+            throw new InvalidOperationException($"{email} 를 확인하지 못했다");
+        }
     }
 
     protected static async Task LogInAsync(IPage page, string email, string password)

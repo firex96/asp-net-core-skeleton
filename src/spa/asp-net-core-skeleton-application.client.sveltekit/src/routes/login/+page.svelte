@@ -7,13 +7,15 @@
 		externalLoginMessage,
 		isServerPath,
 		listProviders,
+		resendConfirmation,
 		safeReturnUrl,
 		type ExternalProvider
 	} from '#lib/auth.js';
 	import { refreshSession, session, signIn, signUp } from '#lib/session.svelte.js';
 
-	// 로그인과 가입을 한 화면에서 전환한다. 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
-	// 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
+	// 로그인과 가입을 한 화면에서 전환한다. 로그인에 성공하면 returnUrl(같은 출처 경로만)로 돌아간다 — OAuth 서버의 authorize 같은
+	// 서버 주소면 브라우저 이동으로 간다. 이미 로그인돼 있으면 곧바로 돌아간다. 가입하면 확인 메일 안내를 보이고 로그인 화면으로 돌아온다
+	// (이메일을 확인해야 로그인할 수 있다). 소셜 로그인은 공급자마다 폼 POST 로 시작한다(연결된 계정만).
 	let mode = $state<'login' | 'register'>('login');
 	let email = $state('');
 	let password = $state('');
@@ -21,6 +23,7 @@
 	let error = $state<ApiError | null>(null);
 	let busy = $state(false);
 	let providers = $state<ExternalProvider[]>([]);
+	let message = $state<string | null>(null);
 
 	const returnUrl = $derived(safeReturnUrl(page.url.searchParams.get('returnUrl')));
 	const notice = $derived(
@@ -52,6 +55,7 @@
 	function toggleMode() {
 		mode = mode === 'login' ? 'register' : 'login';
 		error = null;
+		message = null;
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -63,13 +67,32 @@
 
 		busy = true;
 		error = null;
+		message = null;
 		try {
-			await (mode === 'login' ? signIn(email, password) : signUp(email, password));
-			await continueTo(returnUrl);
+			if (mode === 'login') {
+				await signIn(email, password);
+				await continueTo(returnUrl);
+			} else {
+				await signUp(email, password);
+				mode = 'login';
+				password = '';
+				confirmPassword = '';
+				message = `${email}로 확인 메일을 보냈어요. 메일의 링크를 열어 이메일을 확인한 뒤 로그인해 주세요.`;
+			}
 		} catch (caught) {
 			error = caught instanceof ApiError ? caught : ApiError.unexpected();
 		} finally {
 			busy = false;
+		}
+	}
+
+	async function resend() {
+		error = null;
+		try {
+			await resendConfirmation(email);
+			message = `${email}로 확인 메일을 다시 보냈어요. 메일함을 확인해 주세요.`;
+		} catch (caught) {
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
 		}
 	}
 </script>
@@ -82,8 +105,8 @@
 	<h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
 	<p class="lead">{mode === 'login' ? '이메일과 비밀번호로 로그인해 주세요.' : '이메일로 새 계정을 만들어요.'}</p>
 
-	{#if notice}
-		<p class="alert alert-info" role="status">{notice}</p>
+	{#if message ?? notice}
+		<p class="alert alert-info" role="status">{message ?? notice}</p>
 	{/if}
 
 	<form class="form" onsubmit={submit}>
@@ -131,6 +154,9 @@
 							<li>{message}</li>
 						{/each}
 					</ul>
+				{/if}
+				{#if error.code === 'EMAIL_NOT_CONFIRMED_ERROR'}
+					<p><button type="button" class="link-button" onclick={resend}>확인 메일 다시 받기</button></p>
 				{/if}
 			</div>
 		{/if}

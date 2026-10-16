@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
 	ApiError,
+	confirmEmail,
 	externalLoginMessage,
 	forgotPassword,
 	getConsent,
@@ -9,6 +10,7 @@ import {
 	login,
 	logout,
 	register,
+	resendConfirmation,
 	resetPassword,
 	safeReturnUrl,
 	unlink
@@ -57,12 +59,12 @@ describe('login', () => {
 });
 
 describe('register', () => {
-	it('logs in after creating the account', async () => {
+	it('only creates the account — signing in waits for the email confirmation', async () => {
 		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 201 }));
 
 		await register(user.email, 'Passw0rd!', fetchFn);
 
-		expect(fetchFn.mock.calls.map(([url]) => url)).toEqual(['/api/auth/register', '/api/auth/login']);
+		expect(fetchFn.mock.calls.map(([url]) => url)).toEqual(['/api/auth/register']);
 	});
 
 	it('collects validation messages from errors', async () => {
@@ -88,6 +90,22 @@ describe('logout', () => {
 		await logout(fetchFn);
 
 		expect(fetchFn).toHaveBeenCalledWith('/api/auth/logout', { method: 'POST', headers: undefined, body: undefined });
+	});
+});
+
+describe('email confirmation', () => {
+	it('confirms with the numeric user id from the link and can resend the mail', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+
+		await confirmEmail('42', 'code-1', fetchFn);
+		await resendConfirmation(user.email, fetchFn);
+
+		expect(fetchFn.mock.calls.map(([url]) => url)).toEqual(['/api/auth/email/confirm', '/api/auth/email/resend']);
+		expect(fetchFn.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ userId: 42, code: 'code-1' }));
+	});
+
+	it('explains a social login to an unconfirmed account', () => {
+		expect(externalLoginMessage('EMAIL_NOT_CONFIRMED_ERROR', 'Google')).toContain('이메일 확인');
 	});
 });
 

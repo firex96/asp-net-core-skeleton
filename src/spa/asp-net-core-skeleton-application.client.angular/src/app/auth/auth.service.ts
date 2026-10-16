@@ -56,10 +56,19 @@ export class AuthService {
     return this.refresh();
   }
 
-  /** 가입한 뒤 같은 자격 증명으로 바로 로그인한다. */
-  async register(email: string, password: string): Promise<CurrentUser | null> {
-    await this.post('/api/auth/register', { email, password });
-    return this.login(email, password);
+  /** 계정을 만든다. 로그인하지 않는다 — 서버가 보낸 메일의 링크로 이메일을 확인해야 로그인할 수 있다. */
+  register(email: string, password: string): Promise<void> {
+    return this.post('/api/auth/register', { email, password });
+  }
+
+  /** 메일 링크(/confirm-email?userId=…&code=…)의 값으로 이메일을 확인한다. */
+  confirmEmail(userId: string, code: string): Promise<void> {
+    return this.post('/api/auth/email/confirm', { userId: Number(userId), code });
+  }
+
+  /** 확인 메일을 다시 받는다. 계정이 있든 없든 성공한다 — 서버가 가입 여부를 드러내지 않는다. */
+  resendConfirmation(email: string): Promise<void> {
+    return this.post('/api/auth/email/resend', { email });
   }
 
   async logout(): Promise<void> {

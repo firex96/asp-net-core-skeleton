@@ -24,8 +24,16 @@ internal sealed class IdentityEmailSender(MailOutboxBizService outbox) : IEmailS
             CancellationToken.None);
     }
 
-    public Task SendConfirmationLinkAsync(ApplicationUser user, string email, string confirmationLink) =>
-        throw new NotSupportedException("이메일 확인 흐름은 아직 없다 — README 「후속 과제」");
+    public Task SendConfirmationLinkAsync(ApplicationUser user, string email, string confirmationLink)
+    {
+        var encoded = WebUtility.HtmlEncode(confirmationLink);
+        return outbox.EnqueueAsync(new OutgoingMailDto(
+            email,
+            $"[{Product}] 이메일 확인 안내",
+            $"가입해 주셔서 고마워요. 아래 링크를 열어 이메일을 확인하면 로그인할 수 있어요. 링크는 2시간 동안 쓸 수 있어요.\n\n{confirmationLink}\n\n가입한 적이 없다면 이 메일은 무시해도 괜찮아요.",
+            $"<p>가입해 주셔서 고마워요. 아래 링크를 눌러 이메일을 확인하면 로그인할 수 있어요. 링크는 2시간 동안 쓸 수 있어요.</p><p><a href=\"{encoded}\">이메일 확인하기</a></p><p>가입한 적이 없다면 이 메일은 무시해도 괜찮아요.</p>"),
+            CancellationToken.None);
+    }
 
     public Task SendPasswordResetCodeAsync(ApplicationUser user, string email, string resetCode) =>
         throw new NotSupportedException("재설정은 링크로만 보낸다");

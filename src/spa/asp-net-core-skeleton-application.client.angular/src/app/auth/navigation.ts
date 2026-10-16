@@ -18,6 +18,8 @@ export function externalLoginMessage(error: string | null, provider: string | nu
       return `이 ${name} 계정은 이미 다른 회원과 연결돼 있어요.`;
     case 'ACCOUNT_LOCKED_ERROR':
       return '로그인에 여러 번 실패해서 계정이 잠겼어요. 30분 뒤에 다시 시도하거나 비밀번호를 재설정해 주세요.';
+    case 'EMAIL_NOT_CONFIRMED_ERROR':
+      return '이메일 확인을 아직 마치지 않은 계정이에요. 가입할 때 받은 메일의 링크를 열어 주세요.';
     default:
       return '소셜 로그인을 마치지 못했어요. 다시 시도해 주세요.';
   }

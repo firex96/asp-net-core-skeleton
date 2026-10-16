@@ -114,14 +114,17 @@ public class PasswordResetTests(InfrastructureFixture infrastructure) : IAsyncLi
     private Task<HttpResponseMessage> LoginAsync(string email, string password) =>
         _factory.CreateClient(TestUsers.Https).PostAsJsonAsync("/api/auth/login", new { email, password }, Token);
 
-    /// <summary>받은 최신 메일의 본문에서 재설정 링크를 꺼낸다. 메일은 아웃박스를 거쳐 백그라운드가 보내므로 올 때까지 기다린다.</summary>
+    /// <summary>
+    /// 받은 최신 재설정 메일의 본문에서 링크를 꺼낸다(가입 확인 메일은 거른다). 메일은 아웃박스를 거쳐 백그라운드가 보내므로 올 때까지 기다린다.
+    /// </summary>
     private async Task<Uri> ReadResetLinkAsync(string email)
     {
-        var search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={Uri.EscapeDataString($"to:\"{email}\"")}", Token);
+        var query = Uri.EscapeDataString($"to:\"{email}\" subject:\"비밀번호 재설정\"");
+        var search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={query}", Token);
         for (var attempt = 0; attempt < 50 && search.GetProperty("messages").GetArrayLength() == 0; attempt++)
         {
             await Task.Delay(200, Token);
-            search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={Uri.EscapeDataString($"to:\"{email}\"")}", Token);
+            search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={query}", Token);
         }
 
         var id = search.GetProperty("messages")[0].GetProperty("ID").GetString();

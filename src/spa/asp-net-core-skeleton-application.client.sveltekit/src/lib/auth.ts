@@ -84,10 +84,19 @@ export async function login(email: string, password: string, fetchFn: typeof fet
 	await post(fetchFn, '/api/auth/login', { email, password });
 }
 
-/** 가입한 뒤 같은 자격 증명으로 바로 로그인한다. */
+/** 계정을 만든다. 로그인하지 않는다 — 서버가 보낸 메일의 링크로 이메일을 확인해야 로그인할 수 있다. */
 export async function register(email: string, password: string, fetchFn: typeof fetch = fetch): Promise<void> {
 	await post(fetchFn, '/api/auth/register', { email, password });
-	await login(email, password, fetchFn);
+}
+
+/** 메일 링크(/confirm-email?userId=…&code=…)의 값으로 이메일을 확인한다. */
+export async function confirmEmail(userId: string, code: string, fetchFn: typeof fetch = fetch): Promise<void> {
+	await post(fetchFn, '/api/auth/email/confirm', { userId: Number(userId), code });
+}
+
+/** 확인 메일을 다시 받는다. 계정이 있든 없든 성공한다 — 서버가 가입 여부를 드러내지 않는다. */
+export async function resendConfirmation(email: string, fetchFn: typeof fetch = fetch): Promise<void> {
+	await post(fetchFn, '/api/auth/email/resend', { email });
 }
 
 export async function logout(fetchFn: typeof fetch = fetch): Promise<void> {
@@ -150,6 +159,8 @@ export function externalLoginMessage(error: string | null, provider: string | nu
 			return `이 ${name} 계정은 이미 다른 회원과 연결돼 있어요.`;
 		case 'ACCOUNT_LOCKED_ERROR':
 			return '로그인에 여러 번 실패해서 계정이 잠겼어요. 30분 뒤에 다시 시도하거나 비밀번호를 재설정해 주세요.';
+		case 'EMAIL_NOT_CONFIRMED_ERROR':
+			return '이메일 확인을 아직 마치지 않은 계정이에요. 가입할 때 받은 메일의 링크를 열어 주세요.';
 		default:
 			return '소셜 로그인을 마치지 못했어요. 다시 시도해 주세요.';
 	}

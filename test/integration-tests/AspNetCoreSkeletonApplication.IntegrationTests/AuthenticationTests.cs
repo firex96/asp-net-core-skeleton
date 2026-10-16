@@ -39,6 +39,7 @@ public class AuthenticationTests(InfrastructureFixture infrastructure) : IAsyncL
         var client = _first.CreateClient(Https);
 
         Assert.Equal(HttpStatusCode.Created, (await PostAsync(client, "/api/auth/register", "me@example.com", Password)).StatusCode);
+        await TestUsers.ConfirmEmailAsync(_first, "me@example.com");
         var login = await PostAsync(client, "/api/auth/login", "me@example.com", Password);
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
         var cookie = Assert.Single(login.Headers.GetValues("Set-Cookie"), value => value.StartsWith("__Host-session=", StringComparison.Ordinal));
@@ -69,6 +70,7 @@ public class AuthenticationTests(InfrastructureFixture infrastructure) : IAsyncL
     {
         var client = _first.CreateClient(Https);
         await PostAsync(client, "/api/auth/register", "locked@example.com", Password);
+        await TestUsers.ConfirmEmailAsync(_first, "locked@example.com");
 
         for (var attempt = 0; attempt < 5; attempt++)
         {
@@ -86,6 +88,7 @@ public class AuthenticationTests(InfrastructureFixture infrastructure) : IAsyncL
     {
         var client = _first.CreateClient(Https);
         await PostAsync(client, "/api/auth/register", "author@example.com", Password);
+        await TestUsers.ConfirmEmailAsync(_first, "author@example.com");
         await PostAsync(client, "/api/auth/login", "author@example.com", Password);
         var userId = (await ReadJsonAsync(await client.GetAsync("/api/auth/me", TestContext.Current.CancellationToken))).GetProperty("id").GetInt64();
 
@@ -103,6 +106,7 @@ public class AuthenticationTests(InfrastructureFixture infrastructure) : IAsyncL
     {
         var first = _first.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = Https.BaseAddress, HandleCookies = false });
         await PostAsync(first, "/api/auth/register", "roaming@example.com", Password);
+        await TestUsers.ConfirmEmailAsync(_first, "roaming@example.com");
         var login = await PostAsync(first, "/api/auth/login", "roaming@example.com", Password);
         var cookie = login.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Host-session=", StringComparison.Ordinal)).Split(';')[0];
 

@@ -12,9 +12,9 @@ export function useSession() {
     return refresh()
   }
 
-  async function signUp(email: string, password: string): Promise<CurrentUser | null> {
+  /** 가입만 한다 — 이메일을 확인한 뒤에 로그인한다. */
+  async function signUp(email: string, password: string): Promise<void> {
     await register(email, password)
-    return refresh()
   }
 
   async function signOut(): Promise<void> {
