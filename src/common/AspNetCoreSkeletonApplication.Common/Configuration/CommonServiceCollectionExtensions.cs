@@ -9,6 +9,7 @@ using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ZiggyCreatures.Caching.Fusion;
 using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
@@ -43,8 +44,6 @@ public static class CommonServiceCollectionExtensions
         services.AddStackExchangeRedisCache(_ => { });
         services.AddOptions<RedisCacheOptions>().Configure<IConfiguration>((redis, configuration) =>
             redis.Configuration = configuration.GetRequiredConnectionString("Redis"));
-        services.AddOptions<RedisBackplaneOptions>().Configure<IConfiguration>((backplane, configuration) =>
-            backplane.Configuration = configuration.GetRequiredConnectionString("Redis"));
         services.AddFusionCache()
             .WithOptions((serviceProvider, fusion) =>
             {
@@ -54,7 +53,13 @@ public static class CommonServiceCollectionExtensions
             })
             .WithSerializer(new FusionCacheSystemTextJsonSerializer())
             .WithRegisteredDistributedCache()
-            .WithStackExchangeRedisBackplane(_ => { })
+            // 백플레인은 연결 문자열을 직접 넘겨 만든다 — 옵션 패턴으로 구성하면 캐시 이름이 붙은 옵션을 읽어 설정이 닿지 않는다.
+            .WithBackplane(serviceProvider => new RedisBackplane(
+                Options.Create(new RedisBackplaneOptions
+                {
+                    Configuration = serviceProvider.GetRequiredService<IConfiguration>().GetRequiredConnectionString("Redis"),
+                }),
+                serviceProvider.GetRequiredService<ILogger<RedisBackplane>>()))
             .AsHybridCache();
         services.AddScoped<EntityCache>();
 

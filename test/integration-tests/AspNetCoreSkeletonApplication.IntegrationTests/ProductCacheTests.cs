@@ -5,6 +5,7 @@ using AspNetCoreSkeletonApplication.IntegrationTests.Support;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 
 namespace AspNetCoreSkeletonApplication.IntegrationTests;
 
@@ -87,6 +88,34 @@ public class ProductCacheTests(InfrastructureFixture infrastructure) : IAsyncLif
         var name = await EventuallyAsync(() => GetNameAsync(firstClient, id), expected: "ChangedInDb");
         Assert.Equal("ChangedInDb", name);
     }
+
+    [Fact]
+    public async Task BothInstances_SubscribeToTheBackplane()
+    {
+        // 무효화가 닿는 경로가 백플레인인지 확인한다 — 구독이 실패해도 앱은 오류를 기록하고 계속 돌기 때문에 응답만으로는 드러나지 않는다.
+        await GetNameOrNullAsync(_first.CreateClient());
+        await GetNameOrNullAsync(_second.CreateClient());
+        await using var redis = await ConnectionMultiplexer.ConnectAsync(infrastructure.RedisConnectionString);
+
+        long subscribers = 0;
+        for (var attempt = 0; attempt < 50 && subscribers < 2; attempt++)
+        {
+            var server = redis.GetServers()[0];
+            var channels = await server.SubscriptionChannelsAsync(RedisChannel.Pattern("FusionCache.Backplane*"));
+            subscribers = 0;
+            foreach (var channel in channels)
+            {
+                subscribers += await server.SubscriptionSubscriberCountAsync(channel);
+            }
+
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(subscribers >= 2, $"백플레인 구독자 {subscribers} — 두 인스턴스가 모두 구독해야 한다");
+    }
+
+    private static async Task GetNameOrNullAsync(HttpClient client) =>
+        await client.GetAsync("/api/products", TestContext.Current.CancellationToken);
 
     private static async Task<string?> EventuallyAsync(Func<Task<string?>> read, string expected)
     {
