@@ -141,7 +141,7 @@ test/
 
 | 영역 | 폴더 | 들어가는 것 |
 |---|---|---|
-| 업무 도메인 | `{도메인}/` 아래 `Controllers/` · `Services/Mapping/` · `Services/Biz/` · `Domain/` · `Models/` · `Dtos/` · `Enums/` · `Mappers/` · `Clients/` · `Jobs/` · `Persistence/{Entities,Configurations,Mappers,Services}/` | 그 도메인의 모든 계층. 예: `Product/`(Common · Server · InternalApi · Batch), `Weather/` · `Example/`(Server), `JobTrigger/`(Batch 웹훅) |
+| 업무 도메인 | `{도메인}/` 아래 `Controllers/` · `Services/Mapping/` · `Services/Biz/` · `Domain/` · `Models/` · `Dtos/` · `Enums/` · `Mappers/` · `Clients/` · `Jobs/` · `Persistence/{Entities,Configurations,Mappers,Services}/` | 그 도메인의 모든 계층. 예: `Product/`(Common · Server · InternalApi · Batch), `Mail/`(Common — 아웃박스 · SMTP 클라이언트), `Weather/` · `Example/`(Server), `JobTrigger/`(Batch 웹훅) |
 | 공통 기반 (Common) | `Configuration/` · `Persistence/` · `Web/` · `Errors/` · `Contexts/` · `Constants/` · `Diagnostics/` · `Enums/` | DI 등록과 비밀값 출처, `AppDbContext` · 인터셉터 · 컨벤션 · 캐시 · 마이그레이션 · 엔티티 기반 타입(`Persistence/Entities/Backbone`), 웹 파이프라인 · 인증, 에러, 열거형 외부 코드(`EnumCodes`) |
 | 공통 기반 (Batch) | `Configuration/` · `Scheduling/` · `Security/` | 스케줄러 구성, Job 기반 타입(`Scheduling/Jobs/TracedJob`), 웹훅 · 대시보드 인증 |
 
@@ -473,15 +473,20 @@ curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
 
 ## 메일
 
-계정 메일(지금은 비밀번호 재설정)을 **SMTP(MailKit)** 로 보낸다 — `Common/Mail` 의 `IMailSender`(`SmtpMailSender`)와 Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
+계정 메일(지금은 비밀번호 재설정)은 **아웃박스**(`mail_outbox`)에 넣고, 백그라운드(`MailOutboxWorker`)가 **SMTP(MailKit)** 로 보낸다. `Common` 의 Mail 도메인이다 — `MailOutboxBizService`(넣기 · 때가 된 메일 보내기), `IMailOutboxEntityService`, 전송 `IMailClient`(`SmtpMailClient`), 재시도 규칙 `MailRetryPolicy`(Domain), Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
+
+- **요청은 행만 넣고 끝난다** — 응답 시간이 SMTP 왕복에 묶이지 않아 가입 여부가 시간으로 드러나지 않고, SMTP 장애가 요청 실패가 되지 않는다.
+- **한 통은 한 곳만 보낸다** — 발송 루프는 인스턴스마다 하나씩 돌고, 때가 된 행을 `UPDLOCK · READPAST` 로 잡아 시도 횟수를 올린 뒤 `Mail:Outbox:Lease`(5분) 동안 다른 인스턴스가 다시 잡지 못하게 한다. SMTP 왕복은 트랜잭션 밖이다. 보낸 뒤 기록하기 전에 멈추면 기한이 지나 다시 보낸다 — **최소 한 번 전달**이다.
+- **실패하면 다시 보낸다** — 30초부터 두 배씩 기다려 8번까지(약 1시간), 그래도 안 되면 포기하고(`FailedAt`) 오류 로그를 남긴다. 마지막 오류는 `LastError` 에 남는다.
+- **보냈거나 포기하면 본문을 비운다** — 토큰이 든 링크를 DB 에 남기지 않는다. 행은 발송 기록으로 남는다(지우지 않는다).
+- **구성** `Mail:Outbox` — `PollInterval`(보낼 메일이 없을 때 쉬는 시간, 5초) · `BatchSize`(한 번에 잡는 수, 20 — 가득 차면 쉬지 않고 이어서) · `Lease`(5분).
 
 - **비밀번호 재설정** — `forgot` 이 토큰을 만들어 `{App:PublicOrigin}/reset-password?email=…&code=…` 링크를 메일로 보내고, SPA 의 재설정 화면이 `reset` 을 부른다. 토큰은 **2시간, 한 번만** 쓰인다(재설정이 보안 스탬프를 바꾼다). 재설정하면 다른 기기의 세션은 1분 안에 끊기고(`SecurityStampValidatorOptions.ValidationInterval`), 로그인 잠금도 풀린다.
 - **링크 출처는 구성으로만** — `App:PublicOrigin`. 요청의 Host · Origin 헤더로 만들면 공격자가 헤더를 바꿔 남의 재설정 토큰을 자기 서버로 받아 간다.
 - **SMTP 는 언제나 인증한다**(`Mail:Smtp:Username` · `Password` 필수) — 인증 여부로 갈리는 분기를 두지 않는다. 로컬 Mailpit 은 아무 계정이나 받도록 띄운다.
-- **본문은 로그에 남기지 않는다**(링크에 토큰이 있다). 로그에는 가린 받는 주소(`ab***@example.com`)와 제목만 남는다. 발송이 실패하면 예외 — 보냈다고 가정하지 않는다.
+- **본문은 로그에 남기지 않는다**(링크에 토큰이 있다). 로그에는 가린 받는 주소(`ab***@example.com`)와 제목만 남는다. 전송이 실패하면 `IMailClient` 가 예외를 던지고 아웃박스가 다시 시도한다 — 보냈다고 가정하지 않는다.
 - **로컬** — `docker compose up -d` 의 Mailpit 이 SMTP 1025 로 받고, 받은 메일은 http://localhost:8025 에서 본다. 밖으로 나가지 않는다. 기본 SPA 가 아닌 SPA 로 띄우면 링크 출처를 바꾼다(`App__PublicOrigin=https://localhost:61196`). 템플릿으로 만들면 고른 SPA 의 출처가 들어간다.
-- **테스트** — 통합 테스트가 Mailpit 컨테이너의 REST API(`/api/v1/search` · `/api/v1/message/{ID}`)로 메일을 읽어 링크를 따라간다.
-- 요청 처리 안에서 보내므로 계정이 있을 때만 응답이 SMTP 왕복만큼 느려진다 — 가입 여부가 시간으로 드러날 수 있다. 필요해지면 발송을 큐(Batch)로 옮긴다.
+- **테스트** — 통합 · 브라우저 테스트가 Mailpit 컨테이너의 REST API(`/api/v1/search` · `/api/v1/message/{ID}`)로 메일을 읽어 링크를 따라간다. 아웃박스를 거치므로 메일이 올 때까지 기다린다(테스트 구성은 `PollInterval` 0.2초). "보내지 않았다" 는 아웃박스에 행이 없는지로 확인한다.
 
 ## 아키텍처 선택
 

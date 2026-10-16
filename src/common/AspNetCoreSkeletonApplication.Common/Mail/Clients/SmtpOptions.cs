@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using MailKit.Security;
 
-namespace AspNetCoreSkeletonApplication.Common.Mail;
+namespace AspNetCoreSkeletonApplication.Common.Mail.Clients;
 
 /// <summary>
 /// 구성 경로 <c>Mail:Smtp</c>. 모두 필수다 — 기동할 때 검사해 빠진 키 이름을 담아 멈춘다. <c>Password</c> 는 비밀값이다.

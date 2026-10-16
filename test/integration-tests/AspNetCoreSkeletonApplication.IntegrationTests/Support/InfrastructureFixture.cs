@@ -70,6 +70,7 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         builder.UseSetting("Mail:Smtp:Username", "test");
         builder.UseSetting("Mail:Smtp:Password", "test");
         builder.UseSetting("Mail:Smtp:From", "no-reply@spa.test");
+        builder.UseSetting("Mail:Outbox:PollInterval", "00:00:00.200"); // 아웃박스 발송을 기다리는 시간을 줄인다
         builder.UseSetting("Authentication:OAuthServer:KeySource", "Ephemeral");
         foreach (var provider in new[] { "Google", "Kakao", "Naver" })
         {

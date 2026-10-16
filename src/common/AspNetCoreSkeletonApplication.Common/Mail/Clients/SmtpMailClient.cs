@@ -1,14 +1,15 @@
+using AspNetCoreSkeletonApplication.Common.Mail.Dtos;
 using MailKit.Net.Smtp;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 
-namespace AspNetCoreSkeletonApplication.Common.Mail;
+namespace AspNetCoreSkeletonApplication.Common.Mail.Clients;
 
 /// <summary>MailKit 으로 SMTP 발송. 연결은 메일마다 열고 닫는다(발송량이 적은 계정 메일 기준). 로그에는 가린 받는 주소와 제목만 남긴다.</summary>
-internal sealed partial class SmtpMailSender(IOptions<SmtpOptions> options, ILogger<SmtpMailSender> logger) : IMailSender
+internal sealed partial class SmtpMailClient(IOptions<SmtpOptions> options, ILogger<SmtpMailClient> logger) : IMailClient
 {
-    public async Task SendAsync(OutgoingMail mail, CancellationToken cancellationToken)
+    public async Task SendAsync(OutgoingMailDto mail, CancellationToken cancellationToken)
     {
         var smtp = options.Value;
         var message = new MimeMessage();

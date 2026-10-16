@@ -1,5 +1,6 @@
 using AspNetCoreSkeletonApplication.Common.Authorization.Persistence.Entities;
 using AspNetCoreSkeletonApplication.Common.Persistence.Conventions;
+using AspNetCoreSkeletonApplication.Common.Mail.Persistence.Entities;
 using AspNetCoreSkeletonApplication.Common.Product.Persistence.Entities;
 using AspNetCoreSkeletonApplication.Common.Persistence.Identity;
 using AspNetCoreSkeletonApplication.Common.Persistence.OAuth;
@@ -25,6 +26,8 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UserGroupRoleEntity> UserGroupRoles => Set<UserGroupRoleEntity>();
 
     public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
+
+    public DbSet<MailOutboxEntity> MailOutbox => Set<MailOutboxEntity>();
 
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
 

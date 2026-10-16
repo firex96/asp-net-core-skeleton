@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 메일 아웃박스 — 계정 메일을 `mail_outbox`(마이그레이션 `AddMailOutbox`)에 넣고 Server 의 백그라운드(`MailOutboxWorker`)가 SMTP 로 보낸다. `UPDLOCK · READPAST` 로 잡아 여러 인스턴스에서도 한 통은 한 곳만, 잡은 동안 `Lease`(5분), 실패하면 30초부터 두 배씩 8번까지 다시 시도(`MailRetryPolicy`)한 뒤 포기, 보냈거나 포기하면 본문을 비운다. 구성 `Mail:Outbox`(`PollInterval` · `BatchSize` · `Lease`)
 - 브라우저 테스트 `E2ETests`(Playwright for .NET 1.63, Chromium) — SPA 를 정적 빌드해 Server(Kestrel, 자체 서명 HTTPS)로 같은 출처 서빙, SPA 마다 같은 시나리오: 가입 검증 · 가입 · 로그아웃, 5회 실패 잠금, 메일 링크로 비밀번호 재설정, 소셜 계정 연결 · 로그인 · 끊기, OAuth 인가 코드(로그인 · 동의 화면 → 토큰). 실패하면 Playwright 트레이스를 남긴다
 - SPA 세 개의 계정 화면 — 비밀번호 찾기 · 재설정(메일 링크), 내 계정(권한, 소셜 계정 연결 · 끊기), OAuth 동의(같은 authorize 요청을 허용 · 거부로 POST), 로그인 화면의 소셜 버튼(폼 POST)과 결과 안내, 로그인 뒤 `/connect/…` 로 돌아갈 때는 브라우저 이동. dev 서버가 `/connect` · `/.well-known` 도 프록시하고, Nuxt 프록시는 Host 를 바꾸지 않는다
 - SPA 세 개의 로그인 화면 — `/login`(로그인 · 가입 전환, ProblemDetails 오류 · 검증 메시지, 잠금 안내), 상단 바의 로그인 상태 · 로그아웃, `returnUrl` 은 같은 출처 경로만. dev 서버가 `/api` 도 백엔드로 프록시한다. 인증 모듈 단위 테스트(Angular `AuthService`, SvelteKit · Nuxt `auth.ts`)
@@ -40,6 +41,7 @@
 - 게이트웨이 뒤 내부 API 앱 `InternalApi` — Server 와 같은 Common 을 쓰고 SPA 를 서빙하지 않는다. 템플릿 선택지 `--internalApi`(기본 true)
 
 ### Changed
+- 메일 전송을 Mail 도메인의 클라이언트 계층으로 — `IMailSender` · `SmtpMailSender` → `IMailClient` · `SmtpMailClient`(`Mail.Clients`), `OutgoingMail` → `OutgoingMailDto`. Identity 계정 메일(`IdentityEmailSender`)은 아웃박스에 넣는다
 - SPA 세 개의 화면을 다듬었다 — 의존성 없는 공통 CSS(카드형 계정 화면, 상단 바, 버튼 · 입력, 공급자 색 소셜 버튼, 알림, 라이트 · 다크), 화면 문구를 자연스러운 한국어로(`lang="ko"`, 화면별 제목), 검증 오류는 같은 문장을 한 번만, 로그인 화면에서는 상단 로그인 버튼을 숨긴다
 - 사용자에게 보이는 서버 문구를 자연스러운 한국어로 — 로그인 실패 · 잠금 · 재설정 링크 · 마지막 로그인 수단 메시지, 비밀번호 규칙 · 이메일 중복 같은 Identity 오류(`KoreanIdentityErrorDescriber`, 코드는 그대로), 재설정 메일, 동의 화면의 scope · 권한 설명, 소셜 공급자 표시 이름(카카오 · 네이버)
 - 업무 코드를 도메인 패키지로 — 네임스페이스는 `{프로젝트}.{도메인}.{계층}`(`Common.Product.Persistence.Services`), 공통 기반 영역에는 abstract 기반 타입만. 규약 테스트 `DomainConventionTests`(다른 도메인의 영속 계층 참조 금지) · `TableNamingConventionTests`(테이블은 클래스 이름의 snake_case, 예약어 금지)

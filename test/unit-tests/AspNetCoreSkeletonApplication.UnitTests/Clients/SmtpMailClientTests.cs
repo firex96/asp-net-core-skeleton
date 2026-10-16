@@ -1,8 +1,8 @@
-using AspNetCoreSkeletonApplication.Common.Mail;
+using AspNetCoreSkeletonApplication.Common.Mail.Clients;
 
-namespace AspNetCoreSkeletonApplication.UnitTests.Web;
+namespace AspNetCoreSkeletonApplication.UnitTests.Clients;
 
-public class SmtpMailSenderTests
+public class SmtpMailClientTests
 {
     [Theory]
     [InlineData("abcdef@example.com", "ab***@example.com")]
@@ -10,6 +10,6 @@ public class SmtpMailSenderTests
     [InlineData("not-an-address", "***")]
     public void Mask_HidesTheLocalPartButTheFirstTwoCharacters(string address, string expected)
     {
-        Assert.Equal(expected, SmtpMailSender.Mask(address));
+        Assert.Equal(expected, SmtpMailClient.Mask(address));
     }
 }

@@ -2,8 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Web;
+using AspNetCoreSkeletonApplication.Common.Persistence.Context;
 using AspNetCoreSkeletonApplication.IntegrationTests.Support;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AspNetCoreSkeletonApplication.IntegrationTests;
 
@@ -66,7 +69,7 @@ public class PasswordResetTests(InfrastructureFixture infrastructure) : IAsyncLi
         var forgot = await _factory.CreateClient(TestUsers.Https).PostAsJsonAsync("/api/auth/password/forgot", new { email }, Token);
 
         Assert.Equal(HttpStatusCode.Accepted, forgot.StatusCode);
-        Assert.Equal(0, await CountMessagesToAsync(email));
+        Assert.Equal(0, await CountOutboxMailsToAsync(email));
     }
 
     [Fact]
@@ -111,10 +114,16 @@ public class PasswordResetTests(InfrastructureFixture infrastructure) : IAsyncLi
     private Task<HttpResponseMessage> LoginAsync(string email, string password) =>
         _factory.CreateClient(TestUsers.Https).PostAsJsonAsync("/api/auth/login", new { email, password }, Token);
 
-    /// <summary>받은 최신 메일의 본문에서 재설정 링크를 꺼낸다. 메일은 요청 처리 안에서 보내지므로 기다리지 않는다.</summary>
+    /// <summary>받은 최신 메일의 본문에서 재설정 링크를 꺼낸다. 메일은 아웃박스를 거쳐 백그라운드가 보내므로 올 때까지 기다린다.</summary>
     private async Task<Uri> ReadResetLinkAsync(string email)
     {
         var search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={Uri.EscapeDataString($"to:\"{email}\"")}", Token);
+        for (var attempt = 0; attempt < 50 && search.GetProperty("messages").GetArrayLength() == 0; attempt++)
+        {
+            await Task.Delay(200, Token);
+            search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={Uri.EscapeDataString($"to:\"{email}\"")}", Token);
+        }
+
         var id = search.GetProperty("messages")[0].GetProperty("ID").GetString();
         var message = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/message/{id}", Token);
         var text = message.GetProperty("Text").GetString()!;
@@ -122,7 +131,10 @@ public class PasswordResetTests(InfrastructureFixture infrastructure) : IAsyncLi
         return new Uri(line);
     }
 
-    private async Task<int> CountMessagesToAsync(string email) =>
-        (await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={Uri.EscapeDataString($"to:\"{email}\"")}", Token))
-            .GetProperty("messages").GetArrayLength();
+    /// <summary>아웃박스에 들어간 메일 수 — 발송을 기다리지 않고 "보내지 않았다" 를 확인한다.</summary>
+    private async Task<int> CountOutboxMailsToAsync(string email)
+    {
+        using var scope = _factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().MailOutbox.CountAsync(mail => mail.Recipient == email, Token);
+    }
 }
