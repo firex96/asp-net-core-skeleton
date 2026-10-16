@@ -12,6 +12,10 @@ namespace AspNetCoreSkeletonApplication.E2ETests.Support;
 /// <summary>
 /// 어셈블리 전체가 한 벌을 함께 쓴다 — 컨테이너(SQL Server · Redis · Mailpit · mock OAuth), Chromium, SPA 별 서버(처음 쓸 때 빌드해 띄운다).
 /// 테스트마다 새 브라우저 컨텍스트(쿠키 없음)를 연다 — <see cref="BrowserTest"/>.
+/// <para>
+/// 화면을 눈으로 보려면 <c>E2E_HEADED=1</c> 로 돌린다 — Chromium 창을 띄우고 동작마다 <c>E2E_SLOWMO</c> 밀리초(기본 500) 쉰다.
+/// 테스트가 병렬로 돌므로 하나만 골라 돌리는 편이 보기 쉽다(README 「테스트」).
+/// </para>
 /// </summary>
 public sealed class E2EFixture : IAsyncLifetime
 {
@@ -33,7 +37,7 @@ public sealed class E2EFixture : IAsyncLifetime
         await Task.WhenAll(_infrastructure.InitializeAsync().AsTask(), Task.Run(InstallChromium));
         Mailbox = new Mailbox(_infrastructure.MailpitApi);
         _playwright = await Playwright.CreateAsync();
-        Browser = await _playwright.Chromium.LaunchAsync();
+        Browser = await _playwright.Chromium.LaunchAsync(LaunchOptions());
     }
 
     public async ValueTask DisposeAsync()
@@ -48,6 +52,17 @@ public sealed class E2EFixture : IAsyncLifetime
         Mailbox.Dispose();
         await _infrastructure.DisposeAsync();
         _certificate.Dispose();
+    }
+
+    private static BrowserTypeLaunchOptions LaunchOptions()
+    {
+        if (Environment.GetEnvironmentVariable("E2E_HEADED") is not ("1" or "true"))
+        {
+            return new();
+        }
+
+        var slowMo = int.TryParse(Environment.GetEnvironmentVariable("E2E_SLOWMO"), out var milliseconds) ? milliseconds : 500;
+        return new() { Headless = false, SlowMo = slowMo };
     }
 
     /// <summary>Playwright 가 쓰는 Chromium 을 받는다. 이미 있으면 바로 끝난다.</summary>

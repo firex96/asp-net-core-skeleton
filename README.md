@@ -640,6 +640,7 @@ DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에�
 - **한 벌을 함께 쓴다** — 컨테이너 · Chromium · SPA 별 서버(DB `e2e_{SPA}`)는 어셈블리 fixture(`E2EFixture`)가 한 번 띄우고, 테스트는 매번 새 브라우저 컨텍스트(쿠키 없음)를 연다. 서버를 함께 쓰므로 이메일은 테스트마다 새로 만든다(`NewEmail`).
 - **인증서** — fixture 가 localhost 자체 서명 인증서를 만들고 브라우저는 인증서 오류를 무시한다. 개발 인증서를 신뢰하지 않은 CI 에서도 `__Host-` 쿠키가 그대로 동작한다.
 - **Chromium** 은 fixture 가 처음 실행할 때 받는다(`Microsoft.Playwright.Program.Main(["install", "chromium"])`).
+- **화면을 눈으로 보려면** `E2E_HEADED=1` 로 돌린다 — Chromium 창을 띄우고 동작마다 `E2E_SLOWMO` 밀리초(기본 500) 쉰다. 테스트가 병렬로 돌므로 하나만 골라 돌리는 편이 보기 쉽다: `E2E_HEADED=1 dotnet test --project test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests -- --filter-method "*SignUp*"`. 패스키는 Playwright 의 가상 인증기가 답하므로 OS 의 패스키 창(Touch ID 등)은 뜨지 않는다 — 실제 창은 로컬 실행(`dotnet run`)에서 확인한다.
 - **실패하면** Playwright 트레이스가 `bin/…/playwright-traces/<테스트>.zip` 에 남는다 — `pwsh bin/Debug/net10.0/playwright.ps1 show-trace <파일>` 또는 `npx playwright show-trace <파일>` 로 화면 · 네트워크를 단계별로 본다.
 - 화면 밖에서 준비할 것(가입만 해 두기, 토큰 교환)은 `SpaServer.CreateApiClient()` 로 API 를 직접 부른다. 메일 링크는 `Mailbox.WaitForLinkAsync` 가 Mailpit 에서 꺼낸다.
 
