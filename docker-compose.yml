@@ -1,5 +1,5 @@
 # 로컬 개발용 인프라. Local 프로파일(appsettings.Local.json)의 연결 문자열과 짝이다.
-#   docker compose up -d      # 기동 — SQL Server · Redis. mssql-init 이 skeleton DB 를 만들고 끝난다
+#   docker compose up -d      # 기동 — SQL Server · Redis · Mailpit. mssql-init 이 skeleton DB 를 만들고 끝난다
 #   docker compose down -v    # 데이터까지 삭제
 services:
   mssql:
@@ -43,6 +43,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # 로컬 메일 수신함 — SMTP 1025 로 받은 메일을 웹 UI http://localhost:8025 에서 본다(밖으로 보내지 않는다).
+  # 앱은 언제나 SMTP 인증을 하므로 아무 계정이나 받게 한다.
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
 
 volumes:
   mssql-data:

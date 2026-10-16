@@ -14,6 +14,7 @@ public sealed class ErrorCode(string code, int status, string divisionCode, stri
     public static readonly ErrorCode NotValid = new("NOT_VALID_ERROR", 400, "G011", "One or more validation errors occurred");
     public static readonly ErrorCode Conflict = new("CONFLICT_ERROR", 409, "G013", "Conflict");
     public static readonly ErrorCode AccountLocked = new("ACCOUNT_LOCKED_ERROR", 423, "AUTH001", "Account Locked");
+    public static readonly ErrorCode InvalidToken = new("INVALID_TOKEN_ERROR", 400, "AUTH002", "Invalid Token");
     public static readonly ErrorCode ExternalApiError = new("EXTERNAL_API_ERROR", 502, "G014", "Bad Gateway");
     public static readonly ErrorCode InternalServerError = new("INTERNAL_SERVER_ERROR", 500, "G999", "Internal Server Error");
 

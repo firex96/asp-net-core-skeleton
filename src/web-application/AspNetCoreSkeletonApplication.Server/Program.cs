@@ -1,4 +1,5 @@
 using AspNetCoreSkeletonApplication.Common.Configuration;
+using AspNetCoreSkeletonApplication.Common.Mail;
 using AspNetCoreSkeletonApplication.Common.Web;
 using AspNetCoreSkeletonApplication.Server.Example.Clients;
 using AspNetCoreSkeletonApplication.Server.Product.Authorization;
@@ -16,6 +17,8 @@ builder.Services.AddLayeredServices(typeof(Program).Assembly);
 builder.Services.AddSkeletonWeb();
 // 로그인 — Identity + 쿠키(같은 출처 SPA), 권한 인가(그룹 · 역할 · 권한). README 「인증」 · 「인가」
 builder.Services.AddSkeletonIdentity();
+// 계정 메일(비밀번호 재설정) — SMTP. README 「메일」
+builder.Services.AddSkeletonMail();
 // 리소스 기반 인가 — 데이터에 따라 갈리는 판정(작성자 본인 등)
 builder.Services.AddScoped<IAuthorizationHandler, ProductAuthorizationHandler>();
 

@@ -2,13 +2,15 @@ using AspNetCoreSkeletonApplication.Common.Persistence.Context;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using Testcontainers.MsSql;
 using Testcontainers.Redis;
 
 namespace AspNetCoreSkeletonApplication.IntegrationTests.Support;
 
 /// <summary>
-/// SQL Server · Redis 컨테이너 한 벌을 테스트 클래스들이 함께 쓴다. 클래스마다 다른 데이터베이스 이름과 캐시 키 접두사를 써서
+/// SQL Server · Redis · Mailpit 컨테이너 한 벌을 테스트 클래스들이 함께 쓴다. 클래스마다 다른 데이터베이스 이름과 캐시 키 접두사를 써서
 /// 서로 섞이지 않게 한다 — 앱을 띄울 때는 <see cref="ConfigureApp"/> 하나로 맞춘다.
 /// </summary>
 public sealed class InfrastructureFixture : IAsyncLifetime
@@ -16,10 +18,28 @@ public sealed class InfrastructureFixture : IAsyncLifetime
     private readonly MsSqlContainer _sqlServer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     private readonly RedisContainer _redis = new RedisBuilder("redis:7.4-alpine").Build();
 
+    // 메일 수신함 — 공식 Testcontainers 모듈이 없어 일반 컨테이너로 띄운다. 앱은 언제나 SMTP 인증을 하므로 아무 계정이나 받게 한다.
+    private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:v1.31.6")
+        .WithEnvironment("MP_SMTP_AUTH_ACCEPT_ANY", "1")
+        .WithEnvironment("MP_SMTP_AUTH_ALLOW_INSECURE", "1")
+        .WithPortBinding(MailpitSmtpPort, assignRandomHostPort: true)
+        .WithPortBinding(MailpitApiPort, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(MailpitApiPort).ForPath("/livez")))
+        .Build();
+
+    private const ushort MailpitSmtpPort = 1025;
+    private const ushort MailpitApiPort = 8025;
+
+    /// <summary>앱이 메일 링크에 쓰는 SPA 출처(테스트용 가짜 주소).</summary>
+    public const string PublicOrigin = "https://spa.test";
+
     /// <summary>SQL Server 에 붙는 기본 연결 문자열(master).</summary>
     public string ConnectionString => _sqlServer.GetConnectionString();
 
     public string RedisConnectionString => _redis.GetConnectionString();
+
+    /// <summary>Mailpit REST API(<c>/api/v1/…</c>) 주소 — 받은 메일을 읽는다.</summary>
+    public Uri MailpitApi => new($"http://{_mailpit.Hostname}:{_mailpit.GetMappedPublicPort(MailpitApiPort)}/");
 
     /// <summary>같은 서버의 다른 데이터베이스. 만들어 주지는 않는다 — EnsureCreated · Migrate 가 만든다.</summary>
     public string ConnectionStringFor(string database) =>
@@ -32,6 +52,13 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         builder.UseSetting("ConnectionStrings:Default", ConnectionStringFor(database));
         builder.UseSetting("ConnectionStrings:Redis", RedisConnectionString);
         builder.UseSetting("Cache:KeyPrefix", $"{database}:");
+        builder.UseSetting("App:PublicOrigin", PublicOrigin);
+        builder.UseSetting("Mail:Smtp:Host", _mailpit.Hostname);
+        builder.UseSetting("Mail:Smtp:Port", _mailpit.GetMappedPublicPort(MailpitSmtpPort).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.UseSetting("Mail:Smtp:Security", "None");
+        builder.UseSetting("Mail:Smtp:Username", "test");
+        builder.UseSetting("Mail:Smtp:Password", "test");
+        builder.UseSetting("Mail:Smtp:From", "no-reply@spa.test");
     }
 
     /// <summary>
@@ -47,10 +74,11 @@ public sealed class InfrastructureFixture : IAsyncLifetime
         await dbContext.Database.MigrateAsync();
     }
 
-    public async ValueTask InitializeAsync() => await Task.WhenAll(_sqlServer.StartAsync(), _redis.StartAsync());
+    public async ValueTask InitializeAsync() => await Task.WhenAll(_sqlServer.StartAsync(), _redis.StartAsync(), _mailpit.StartAsync());
 
     public async ValueTask DisposeAsync()
     {
+        await _mailpit.DisposeAsync();
         await _redis.DisposeAsync();
         await _sqlServer.DisposeAsync();
     }

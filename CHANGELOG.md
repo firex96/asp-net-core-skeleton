@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 메일과 비밀번호 재설정 — `Common/Mail`(MailKit SMTP, 언제나 인증, 본문은 로그에 남기지 않음), `POST /api/auth/password/forgot`(항상 202) · `reset`(2시간 · 1회용 토큰, 400 `INVALID_TOKEN_ERROR` AUTH002, 성공 시 잠금 해제 · 다른 세션 1분 안에 무효). 필수 구성 `App:PublicOrigin` · `Mail:Smtp:*`(비밀값 `Mail:Smtp:Password`), docker compose 와 통합 테스트에 Mailpit, 템플릿이 고른 SPA 의 출처를 `App:PublicOrigin` 에 넣는다
 - 권한 인가 — 사용자 → 그룹 → 역할 → 권한 코드(`user_group` · `user_group_member` · `role` · `user_group_role` · `role_permission`, 마이그레이션 `AddAuthorizationGroups` 가 기존 Administrator 역할 사용자를 `Administrators` 그룹으로 옮긴다). `[HasPermission(Permissions.…)]` 과 동적 정책 제공자, 판정 입구 `IPermissionEvaluator`(요청마다 서버 판정, 캐시 + 백플레인으로 즉시 반영), 관리 API `/api/authorization/groups` · `roles` · `permissions`(마지막 관리자 보호 409), `/api/auth/me` 가 실효 권한을 돌려준다. 계정 조회용 Account 도메인(`UserAccountBizService`)
 - 리소스 기반 인가 샘플 — `ProductAuthorizationHandler` + Domain `ProductAccessRule`: 관리 권한이 있거나 자기 Draft 상품이면 삭제할 수 있다. 상품 응답에 `createdBy` 를 싣는다
 - 여러 인스턴스의 캐시 즉시 무효화 — `HybridCache` 구현을 FusionCache 로 바꾸고(`AsHybridCache()`) Redis 백플레인을 붙인다. 한 인스턴스의 키 · 태그 무효화가 다른 인스턴스의 L1 에서도 곧바로 지워진다. `Cache:LocalExpiration` 은 없앤다(L1 · L2 공통 `Cache:Expiration`), 캐시 키는 `{KeyPrefix}cache:` 아래

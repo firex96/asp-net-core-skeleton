@@ -46,7 +46,7 @@ internal static partial class ConventionScan
     /// </summary>
     public static readonly IReadOnlySet<string> PlatformAreas = new HashSet<string>(StringComparer.Ordinal)
     {
-        "Configuration", "Constants", "Contexts", "Diagnostics", "Enums", "Errors", "Persistence", "Scheduling", "Security", "Web",
+        "Configuration", "Constants", "Contexts", "Diagnostics", "Enums", "Errors", "Mail", "Persistence", "Scheduling", "Security", "Web",
     };
 
     /// <summary>프로젝트 루트 네임스페이스 바로 아래 segment — 업무 도메인 이름이거나 <see cref="PlatformAreas"/> 중 하나.</summary>

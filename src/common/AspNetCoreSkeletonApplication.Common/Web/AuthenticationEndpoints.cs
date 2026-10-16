@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using System.Text;
 using AspNetCoreSkeletonApplication.Common.Authorization.Services.Biz;
+using AspNetCoreSkeletonApplication.Common.Errors;
 using AspNetCoreSkeletonApplication.Common.Persistence.Identity;
 using AspNetCoreSkeletonApplication.Common.Web.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -7,11 +9,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 
 namespace AspNetCoreSkeletonApplication.Common.Web;
 
 /// <summary>
-/// 가입 · 로그인 · 로그아웃 · 현재 사용자 — <c>/api/auth</c>. Identity 를 직접 다루는 프레임워크 구성이라 계층 규칙(Controller → MappingService …)
+/// 가입 · 로그인 · 로그아웃 · 현재 사용자 · 비밀번호 재설정 — <c>/api/auth</c>. Identity 를 직접 다루는 프레임워크 구성이라 계층 규칙(Controller → MappingService …)
 /// 밖에 둔다(GlobalExceptionHandler 와 같은 자리). <c>MapIdentityApi</c> 는 쓰지 않는다 — Bearer 토큰 · 메일 흐름이 딸려 온다.
 /// </summary>
 public static class AuthenticationEndpoints
@@ -23,6 +27,8 @@ public static class AuthenticationEndpoints
         auth.MapPost("/login", LoginAsync).AllowAnonymous();
         auth.MapPost("/logout", LogoutAsync).RequireAuthorization();
         auth.MapGet("/me", MeAsync).RequireAuthorization();
+        auth.MapPost("/password/forgot", ForgotPasswordAsync).AllowAnonymous();
+        auth.MapPost("/password/reset", ResetPasswordAsync).AllowAnonymous();
         return endpoints;
     }
 
@@ -71,7 +77,71 @@ public static class AuthenticationEndpoints
             permissions.Order(StringComparer.Ordinal).ToArray()));
     }
 
+    /// <summary>
+    /// 재설정 링크를 메일로 보낸다. 계정이 있든 없든 202 다 — 응답으로 가입 여부를 알 수 없게 한다. 링크는 <c>App:PublicOrigin</c> 의
+    /// SPA 화면(<c>/reset-password?email=…&amp;code=…</c>)을 가리키고, 토큰은 2시간 동안 한 번만 쓸 수 있다.
+    /// </summary>
+    private static async Task<Accepted> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        UserManager<ApplicationUser> userManager,
+        IEmailSender<ApplicationUser> emailSender,
+        IOptions<AppOptions> app)
+    {
+        var user = await userManager.FindByEmailAsync(request.Email);
+        if (user is not null)
+        {
+            var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(await userManager.GeneratePasswordResetTokenAsync(user)));
+            var link = $"{app.Value.PublicOrigin.TrimEnd('/')}/reset-password?email={Uri.EscapeDataString(user.Email!)}&code={code}";
+            await emailSender.SendPasswordResetLinkAsync(user, user.Email!, link);
+        }
+
+        return TypedResults.Accepted((string?)null);
+    }
+
+    /// <summary>
+    /// 새 비밀번호를 정한다. 토큰이 틀렸거나 만료됐거나 이미 쓰였으면 400 <c>INVALID_TOKEN_ERROR</c>, 비밀번호 규칙을 어기면 400 <c>NOT_VALID_ERROR</c>.
+    /// 성공하면 보안 스탬프가 바뀌어 같은 토큰과 다른 기기의 세션이 무효가 되고(세션은 다음 검증 때), 로그인 잠금도 풀린다.
+    /// </summary>
+    private static async Task<Results<NoContent, ValidationProblem>> ResetPasswordAsync(
+        ResetPasswordRequest request, UserManager<ApplicationUser> userManager)
+    {
+        var user = await userManager.FindByEmailAsync(request.Email) ?? throw InvalidResetToken();
+        string token;
+        try
+        {
+            token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Code));
+        }
+        catch (FormatException)
+        {
+            throw InvalidResetToken();
+        }
+
+        var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
+        if (result.Errors.Any(error => error.Code == nameof(IdentityErrorDescriber.InvalidToken)))
+        {
+            throw InvalidResetToken();
+        }
+
+        if (!result.Succeeded)
+        {
+            return TypedResults.ValidationProblem(result.Errors
+                .GroupBy(error => error.Code)
+                .ToDictionary(group => group.Key, group => group.Select(error => error.Description).ToArray()));
+        }
+
+        await userManager.SetLockoutEndDateAsync(user, null);
+        await userManager.ResetAccessFailedCountAsync(user);
+        return TypedResults.NoContent();
+    }
+
+    private static InvalidTokenException InvalidResetToken() =>
+        new("재설정 링크가 맞지 않거나 만료됐다. 비밀번호 찾기를 다시 요청한다");
+
     public sealed record CredentialsRequest(string Email, string Password);
+
+    public sealed record ForgotPasswordRequest(string Email);
+
+    public sealed record ResetPasswordRequest(string Email, string Code, string NewPassword);
 
     public sealed record CurrentUserResponse(long Id, string Email, IReadOnlyList<string> Permissions);
 }

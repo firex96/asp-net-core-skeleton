@@ -27,7 +27,8 @@
 | Angular | 22.2 (Vitest) |
 | SvelteKit / Svelte | 3.0 / 5 (adapter-static) |
 | Nuxt / Vue | 4.6 / 3.5 (`ssr: false`) |
-| 로컬 DB · 캐시 | SQL Server 2022 · Redis 7.4 컨테이너 (`docker-compose.yml`) |
+| 로컬 DB · 캐시 · 메일 | SQL Server 2022 · Redis 7.4 · Mailpit 컨테이너 (`docker-compose.yml`) |
+| 메일 | MailKit (SMTP) |
 | 캐시 | FusionCache (`HybridCache` 로 노출) — 메모리 L1 + Redis L2 + Redis 백플레인 |
 
 **여기 적힌 숫자는 빌드 파일이 정본이다.** 어긋나면 `global.json` · `Directory.Packages.props` · 각 SPA `package.json` 을 따른다.
@@ -101,7 +102,7 @@ SPA 를 하나만 쓴다면 나머지 폴더를 지우고, 서버 csproj 의 `Ch
 ### 6. 뜨는지 확인한다
 
 ```bash
-docker compose up -d                                    # SQL Server · Redis — mssql-init 이 skeleton DB 를 만든다
+docker compose up -d                                    # SQL Server · Redis · Mailpit(http://localhost:8025) — mssql-init 이 skeleton DB 를 만든다
 dotnet tool restore                                     # dotnet-ef (dotnet-tools.json 에 버전 고정)
 ASPNETCORE_ENVIRONMENT=Local dotnet ef database update \
   --project src/common/AspNetCoreSkeletonApplication.Common \
@@ -373,6 +374,8 @@ Server 는 **ASP.NET Core Identity + 쿠키**로 로그인한다 — 같은 출�
 | `POST /api/auth/register` `{email, password}` | 201. 비밀번호 10자 이상 · 대소문자 · 숫자 · 기호(Identity 기본). 어기면 400 `NOT_VALID_ERROR` |
 | `POST /api/auth/login` `{email, password}` | 204 + 쿠키. 틀리면 401 — 이메일이 있는지 드러내지 않는다. **5번 틀리면 30분 잠기고 423 `ACCOUNT_LOCKED_ERROR`**(형제 스켈레톤과 같은 값 · 코드) |
 | `POST /api/auth/logout` | 204, 쿠키 삭제 |
+| `POST /api/auth/password/forgot` `{email}` | 202 — 계정이 있든 없든 같다(가입 여부를 드러내지 않는다). 있으면 재설정 링크 메일을 보낸다 |
+| `POST /api/auth/password/reset` `{email, code, newPassword}` | 204. 토큰이 틀렸거나 만료 · 사용됐으면 400 `INVALID_TOKEN_ERROR`(AUTH002), 비밀번호 규칙 위반은 400 `NOT_VALID_ERROR` |
 | `GET /api/auth/me` | `{id, email, permissions}` — 실효 권한 코드(화면이 쓸 수 있는 기능을 고를 때 쓴다). 로그인하지 않았으면 401 |
 
 - **쿠키** — `__Host-session`, HttpOnly · Secure · SameSite=Strict, 8시간(쓰면 연장). 로그인 페이지가 없으므로 인증이 필요하면 리다이렉트 대신 401, 권한이 없으면 403 을 ProblemDetails 로 돌려준다.
@@ -400,6 +403,18 @@ SELECT g.Id, u.Id, 0, SYSUTCDATETIME(), 0, SYSUTCDATETIME()
 FROM identity_user AS u CROSS JOIN user_group AS g
 WHERE u.NormalizedEmail = UPPER('admin@example.com') AND g.Name = 'Administrators' AND g.DeletedAt IS NULL;
 ```
+
+## 메일
+
+계정 메일(지금은 비밀번호 재설정)을 **SMTP(MailKit)** 로 보낸다 — `Common/Mail` 의 `IMailSender`(`SmtpMailSender`)와 Identity 용 `IEmailSender<ApplicationUser>`(`IdentityEmailSender`). Server 가 `AddSkeletonMail()` 로 붙인다.
+
+- **비밀번호 재설정** — `forgot` 이 토큰을 만들어 `{App:PublicOrigin}/reset-password?email=…&code=…` 링크를 메일로 보내고, SPA 의 재설정 화면이 `reset` 을 부른다. 토큰은 **2시간, 한 번만** 쓰인다(재설정이 보안 스탬프를 바꾼다). 재설정하면 다른 기기의 세션은 1분 안에 끊기고(`SecurityStampValidatorOptions.ValidationInterval`), 로그인 잠금도 풀린다.
+- **링크 출처는 구성으로만** — `App:PublicOrigin`. 요청의 Host · Origin 헤더로 만들면 공격자가 헤더를 바꿔 남의 재설정 토큰을 자기 서버로 받아 간다.
+- **SMTP 는 언제나 인증한다**(`Mail:Smtp:Username` · `Password` 필수) — 인증 여부로 갈리는 분기를 두지 않는다. 로컬 Mailpit 은 아무 계정이나 받도록 띄운다.
+- **본문은 로그에 남기지 않는다**(링크에 토큰이 있다). 로그에는 가린 받는 주소(`ab***@example.com`)와 제목만 남는다. 발송이 실패하면 예외 — 보냈다고 가정하지 않는다.
+- **로컬** — `docker compose up -d` 의 Mailpit 이 SMTP 1025 로 받고, 받은 메일은 http://localhost:8025 에서 본다. 밖으로 나가지 않는다. 기본 SPA 가 아닌 SPA 로 띄우면 링크 출처를 바꾼다(`App__PublicOrigin=https://localhost:61196`). 템플릿으로 만들면 고른 SPA 의 출처가 들어간다.
+- **테스트** — 통합 테스트가 Mailpit 컨테이너의 REST API(`/api/v1/search` · `/api/v1/message/{ID}`)로 메일을 읽어 링크를 따라간다.
+- 요청 처리 안에서 보내므로 계정이 있을 때만 응답이 SMTP 왕복만큼 느려진다 — 가입 여부가 시간으로 드러날 수 있다. 필요해지면 발송을 큐(Batch)로 옮긴다.
 
 ## 아키텍처 선택
 
@@ -512,7 +527,7 @@ WHERE u.NormalizedEmail = UPPER('admin@example.com') AND g.Name = 'Administrator
 |---|---|---|
 | `UnitTests` | 없음 | xUnit v3 |
 | `FunctionalTests` | 없음 — 앱을 메모리에 띄우고 DB 에는 붙지 않는다 | `WebApplicationFactory` |
-| `IntegrationTests` | **Docker** | Testcontainers (SQL Server · Redis · LocalStack) |
+| `IntegrationTests` | **Docker** | Testcontainers (SQL Server · Redis · Mailpit · LocalStack) |
 
 ```bash
 dotnet test --solution AspNetCoreSkeletonApplication.slnx                       # 전부 — Docker 필요
@@ -530,7 +545,7 @@ dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.Integ
 | HTTP 계약(상태 코드 · JSON · 에러 응답) | `I~EntityService` 를 메모리 구현으로 바꿔 DB 없이 | `FunctionalTests` |
 | EntityService · 트랜잭션 · 감사 필드 | 대역 없음 — SQL Server 컨테이너에 마이그레이션을 적용해 HTTP 로 끝까지 | `IntegrationTests` |
 
-DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server · Redis 컨테이너는 `[Collection(InfrastructureCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름과 캐시 키 접두사를 달리한다 — 앱은 `InfrastructureFixture.ConfigureApp(builder, "<데이터베이스>")` 한 줄로 붙인다.
+DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에서만 드러난다. 통합 테스트의 SQL Server · Redis · Mailpit 컨테이너는 `[Collection(InfrastructureCollection.Name)]` 으로 한 번만 띄워 공유하고, 클래스마다 데이터베이스 이름과 캐시 키 접두사를 달리한다 — 앱은 `InfrastructureFixture.ConfigureApp(builder, "<데이터베이스>")` 한 줄로 붙인다.
 
 SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 `npm test -- --watch=false` 로 단발 실행)다. 타입 검사는 SvelteKit · Nuxt 에서 `npm run check`.
 
@@ -542,13 +557,13 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 
 | 프로파일 | 비밀값 출처 | 필요한 것 |
 |---|---|---|
-| (없음 = `Production`) | 환경변수 (컨테이너, k8s Secret) | `ConnectionStrings__Default` · `ConnectionStrings__Redis` |
+| (없음 = `Production`) | 환경변수 (컨테이너, k8s Secret) | `ConnectionStrings__Default` · `ConnectionStrings__Redis` · (Server) `Mail__Smtp__Password` |
 | `Local` | `appsettings.Local.json` 의 docker compose 값 + user-secrets | `docker compose up -d` |
 | `Aws` | AWS Secrets Manager — JSON 비밀 하나의 키 | `Aws:SecretsManager:SecretId`, AWS SDK 기본 자격증명 체인 |
 | `Azure` | Azure Key Vault — 볼트의 모든 비밀 | `Azure:KeyVault:Endpoint`, `DefaultAzureCredential` |
 | `Gcp` | GCP Secret Manager — `Gcp:SecretManager:Secrets` 에 적은 비밀 | `Gcp:SecretManager:ProjectId`, Application Default Credentials |
 
-저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 와 대시보드 비밀번호 `Batch:Dashboard:Password` 가 더 있다**(Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` · `Batch--Dashboard--Password` 를 추가한다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
+저장소 위치 값은 각 `appsettings.<프로파일>.json` 에 적거나 환경변수(`Aws__SecretsManager__SecretId` 처럼 `:` 를 `__` 로)로 준다. **비밀값은 `ConnectionStrings:Default`(SQL Server)와 `ConnectionStrings:Redis` 둘이고, Server 는 SMTP 비밀번호 `Mail:Smtp:Password` 가, Batch 는 웹훅 API 키 `Batch:Webhook:ApiKeys:{n}:Key` 와 대시보드 비밀번호 `Batch:Dashboard:Password` 가 더 있다**(Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에 `Batch--Webhook--ApiKeys--{n}--Key` · `Batch--Dashboard--Password` 를 추가한다). 빠져 있으면 처음 쓰는 순간 빠진 키와 출처별 이름을 담아 멈춘다 — 조용히 빈 값으로 뜨지 않는다. 위치 값이 비어 있어도 같다.
 
 ### 키 이름 대응
 
@@ -559,7 +574,9 @@ SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 
 | Azure Key Vault · GCP Secret Manager 비밀 이름 | `:` → `--` | `ConnectionStrings--Default` |
 | AWS Secrets Manager JSON 비밀의 키 | 구성 키 그대로 | `{"ConnectionStrings:Default": "…"}` |
 
-비밀이 아닌 환경별 값은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — 외부 API 주소 `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`, 감사 헤더 신뢰 `Audit:TrustUserHeader` ← `Audit__TrustUserHeader`, 느린 쿼리 · 요청 임계값 `Diagnostics:*`.
+Server 는 비밀이 아니어도 배포마다 꼭 정해야 하는 값이 있다 — `App:PublicOrigin`(사용자가 여는 SPA 출처, 메일 링크에 쓴다), `Mail:Smtp:Host` · `Username` · `From`. 기본값이 없어 빠지면 기동할 때 키 이름을 담아 멈춘다.
+
+비밀이 아닌 환경별 값은 `appsettings.json` 에 기본값을 두고 환경변수로 덮어쓴다 — SMTP 포트 · 보안 `Mail:Smtp:Port`(587) · `Security`(`StartTls`), 외부 API 주소 `Clients:ExampleApi:BaseAddress` ← `Clients__ExampleApi__BaseAddress`, 감사 헤더 신뢰 `Audit:TrustUserHeader` ← `Audit__TrustUserHeader`, 느린 쿼리 · 요청 임계값 `Diagnostics:*`.
 
 평문 자격증명은 어느 appsettings 에도 적지 않는다. `appsettings.Local.json` 의 docker compose 계정만 예외다(로컬 컨테이너 전용 값). 비밀을 추가하면 이 표의 각 출처에 같은 이름으로 넣고, Gcp 를 쓰면 `appsettings.Gcp.json` 의 `Secrets` 에도 추가한다.
 
