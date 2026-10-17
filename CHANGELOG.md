@@ -66,6 +66,7 @@
 - Identity 역할(`identity_role` · `identity_user_role` · `identity_role_claim`, `ApplicationRole`), `Roles` · `Policies.Administrator` — 인가 도메인의 그룹 · 역할 · 권한으로 바뀌었다
 - 쓰지 않던 `LanguageExt.Core` · `FluentValidation` 패키지
 ### Fixed
+- CI 의 브라우저 테스트가 가끔 실패하던 문제 — 통합 테스트와 동시에 돌면, 컨테이너가 뜨고 내릴 때 러너의 네트워크 인터페이스가 바뀌어 Chromium 이 진행 중인 요청을 `net::ERR_NETWORK_CHANGED` 로 끊었다. 솔루션 전체 테스트는 `--max-parallel-test-modules 1` 로 프로젝트를 하나씩 돌린다(CI · README · CLAUDE.md)
 - SPA 세 개의 로그인 화면이 준비 요청 하나의 실패에 멈추던 문제 — 현재 사용자 조회(`/api/auth/me`)가 실패하면 초기화가 멈춰 소셜 로그인 버튼을 아예 불러오지 않았고, 공급자 목록 요청이 실패하면 버튼이 안내 없이 사라졌다. 이제 현재 사용자를 못 읽으면 로그인 안 된 것으로 보고 이어 가고, 공급자 목록을 못 받으면 "소셜 로그인 목록을 불러오지 못했어요" 를 알린다. E2E `LoginPageTests` 가 두 요청을 500 으로 바꿔 확인한다
 - OAuth 오류 설명(`error_description`)을 자연스러운 한국어로 — "로그인이 필요해요." · "사용자가 접근을 허용하지 않았어요." 등
 - OIDC `email_verified` — 이메일 확인 기능 전에는 userinfo 에서 늘 false 였고, id_token 에는 아예 없었다. 이제 확인한 계정만 로그인하므로 userinfo 와 id_token(email scope) 모두 true 를 싣는다

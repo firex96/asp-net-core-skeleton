@@ -53,9 +53,11 @@ jobs:
       - name: Chromium for browser tests
         run: pwsh test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
-      # 단위 · 기능 · 통합(Testcontainers — 러너의 Docker) · 브라우저(Playwright) 전부
+      # 단위 · 기능 · 통합(Testcontainers — 러너의 Docker) · 브라우저(Playwright) 전부. 테스트 프로젝트는 하나씩 돈다 —
+      # 통합 테스트가 컨테이너를 띄우고 내리면 리눅스 호스트의 네트워크 인터페이스가 바뀌고, 그때 Chromium 이 진행 중인 요청을
+      # net::ERR_NETWORK_CHANGED 로 끊는다.
       - name: Test
-        run: dotnet test --solution AspNetCoreSkeletonApplication.slnx
+        run: dotnet test --solution AspNetCoreSkeletonApplication.slnx --max-parallel-test-modules 1
 
       - name: Test results
         if: failure()

@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 dotnet build AspNetCoreSkeletonApplication.slnx
 
 # 테스트 — IntegrationTests 는 Docker, E2ETests 는 Docker · Node 필요
-dotnet test --solution AspNetCoreSkeletonApplication.slnx
+dotnet test --solution AspNetCoreSkeletonApplication.slnx --max-parallel-test-modules 1   # 프로젝트는 하나씩 — README 「테스트」
 dotnet test --project test/unit-tests/AspNetCoreSkeletonApplication.UnitTests
 dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.IntegrationTests -- --filter-class "*HealthCheckTests"
 dotnet test --project test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests   # 브라우저 — Docker · Node 필요, SPA 를 빌드한다

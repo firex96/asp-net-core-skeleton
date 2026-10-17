@@ -627,7 +627,7 @@ curl -k https://localhost:7274/connect/token -d grant_type=client_credentials \
 | `E2ETests` | **Docker · Node** — 브라우저 화면 흐름 | Playwright for .NET (Chromium) + 통합 테스트와 같은 컨테이너 |
 
 ```bash
-dotnet test --solution AspNetCoreSkeletonApplication.slnx                       # 전부 — Docker · Node 필요
+dotnet test --solution AspNetCoreSkeletonApplication.slnx --max-parallel-test-modules 1  # 전부 — Docker · Node 필요, 프로젝트는 하나씩
 dotnet test --project test/unit-tests/AspNetCoreSkeletonApplication.UnitTests  # 하나만
 dotnet test --project test/integration-tests/AspNetCoreSkeletonApplication.IntegrationTests -- --filter-class "*HealthCheckTests"  # 클래스만
 dotnet test --project test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests -- --filter-class "*AccountTests"     # 브라우저 시나리오만
@@ -652,10 +652,11 @@ DbContext 는 목킹하지 않는다 — 쿼리·매핑 결함은 실제 DB 에�
 - **인증서** — fixture 가 localhost 자체 서명 인증서를 만들고 브라우저는 인증서 오류를 무시한다. 개발 인증서를 신뢰하지 않은 CI 에서도 `__Host-` 쿠키가 그대로 동작한다.
 - **Chromium** 은 fixture 가 처음 실행할 때 받는다(`Microsoft.Playwright.Program.Main(["install", "chromium"])`).
 - **화면을 눈으로 보려면** `E2E_HEADED=1` 로 돌린다 — Chromium 창을 띄우고 동작마다 `E2E_SLOWMO` 밀리초(기본 500) 쉰다. 테스트가 병렬로 돌므로 하나만 골라 돌리는 편이 보기 쉽다: `E2E_HEADED=1 dotnet test --project test/e2e-tests/AspNetCoreSkeletonApplication.E2ETests -- --filter-method "*SignUp*"`. 패스키는 Playwright 의 가상 인증기가 답하므로 OS 의 패스키 창(Touch ID 등)은 뜨지 않는다 — 실제 창은 로컬 실행(`dotnet run`)에서 확인한다.
+- **다른 테스트 프로젝트와 동시에 돌리지 않는다** — 통합 테스트가 컨테이너를 띄우고 내리면 리눅스 호스트(CI 러너)의 네트워크 인터페이스가 바뀌고, Chromium 은 그때 진행 중인 요청을 `net::ERR_NETWORK_CHANGED` 로 끊는다(트레이스에 상태 -1). 그래서 솔루션 전체는 `--max-parallel-test-modules 1` 로 프로젝트를 하나씩 돌린다. 브라우저 테스트 fixture 는 브라우저를 띄우기 전에 컨테이너를 모두 띄워 두므로 프로젝트 안에서는 겹치지 않는다. Docker 가 VM 안에서 도는 macOS · Windows 에서는 드러나지 않는다.
 - **실패하면** Playwright 트레이스가 `bin/…/playwright-traces/<테스트>.zip` 에 남는다 — `pwsh bin/Debug/net10.0/playwright.ps1 show-trace <파일>` 또는 `npx playwright show-trace <파일>` 로 화면 · 네트워크를 단계별로 본다.
 - 화면 밖에서 준비할 것(가입만 해 두기, 토큰 교환)은 `SpaServer.CreateApiClient()` 로 API 를 직접 부른다. 메일 링크는 `Mailbox.WaitForLinkAsync` 가 Mailpit 에서 꺼낸다.
 
-**CI** — GitHub Actions(`.github/workflows/ci.yml`)가 `main` 푸시와 PR 마다 세 SPA 의 테스트 · 타입 검사, 솔루션 빌드, 단위 · 기능 · 통합 · 브라우저 테스트 전부를 돌린다(러너의 Docker 로 Testcontainers, Chromium 은 `playwright.ps1 install --with-deps`). 실패하면 테스트 결과와 Playwright 트레이스를 아티팩트로 올린다. 템플릿 생성 확인(최소 · 전체 조합)은 CI 에 없다 — 템플릿을 바꾸면 로컬에서 「템플릿 확인」 명령으로 본다.
+**CI** — GitHub Actions(`.github/workflows/ci.yml`)가 `main` 푸시와 PR 마다 세 SPA 의 테스트 · 타입 검사, 솔루션 빌드, 단위 · 기능 · 통합 · 브라우저 테스트 전부를 프로젝트 하나씩 돌린다(러너의 Docker 로 Testcontainers, Chromium 은 `playwright.ps1 install --with-deps`). 실패하면 테스트 결과와 Playwright 트레이스를 아티팩트로 올린다. 템플릿 생성 확인(최소 · 전체 조합)은 CI 에 없다 — 템플릿을 바꾸면 로컬에서 「템플릿 확인」 명령으로 본다.
 
 SPA 테스트는 각 폴더에서 `npm test`(세 SPA 모두 Vitest, Angular 는 `npm test -- --watch=false` 로 단발 실행)다. 타입 검사는 SvelteKit · Nuxt 에서 `npm run check`.
 
