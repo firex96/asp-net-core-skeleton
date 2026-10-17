@@ -174,4 +174,21 @@ describe('LoginComponent', () => {
 
     expect((fixture.nativeElement as HTMLElement).querySelector('.social button[type=submit]')?.textContent).toContain('Google로 계속하기');
   });
+
+  it('does not mistake a failed two-factor lookup for an expired login', async () => {
+    queryParams = { step: 'two-factor' };
+    const fixture = TestBed.createComponent(LoginComponent);
+    fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve));
+    httpMock.expectOne('/api/auth/login/2fa').flush(null, { status: 500, statusText: 'Server Error' });
+    await new Promise(resolve => setTimeout(resolve));
+    httpMock.expectOne('/api/auth/external/providers').flush([]);
+    await new Promise(resolve => setTimeout(resolve));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[role=alert]')?.textContent).toContain('요청을 처리하지 못했어요');
+    expect(element.textContent).not.toContain('로그인 시간이 지났어요');
+  });
 });

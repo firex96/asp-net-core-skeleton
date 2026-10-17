@@ -12,7 +12,14 @@
 	let error = $state<ApiError | null>(null);
 
 	onMount(async () => {
-		const user = session.user === undefined ? await refreshSession() : session.user;
+		let user;
+		try {
+			user = session.user === undefined ? await refreshSession() : session.user;
+		} catch (caught) {
+			// 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
+			return;
+		}
 		if (!user) {
 			await goto(`/login?returnUrl=${encodeURIComponent(page.url.pathname + page.url.search)}`);
 			return;

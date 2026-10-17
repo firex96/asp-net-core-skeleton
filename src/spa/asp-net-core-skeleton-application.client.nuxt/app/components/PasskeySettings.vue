@@ -9,7 +9,12 @@ const busy = ref(false)
 
 onMounted(async () => {
   supported.value = isPasskeySupported()
-  passkeys.value = await listPasskeys()
+  try {
+    passkeys.value = await listPasskeys()
+  }
+  catch (caught) {
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
+  }
 })
 
 async function add() {

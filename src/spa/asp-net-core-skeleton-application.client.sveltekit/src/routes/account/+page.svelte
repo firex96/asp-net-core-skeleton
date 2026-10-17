@@ -25,7 +25,14 @@
 	const linked = $derived(new Set(logins.map((login) => login.provider)));
 
 	onMount(async () => {
-		const user = session.user === undefined ? await refreshSession() : session.user;
+		let user;
+		try {
+			user = session.user === undefined ? await refreshSession() : session.user;
+		} catch (caught) {
+			// 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
+			return;
+		}
 		if (!user) {
 			await goto(`/login?returnUrl=${encodeURIComponent('/account')}`);
 			return;
@@ -35,7 +42,11 @@
 		notice = linkedProvider
 			? `${providerName(linkedProvider)} 계정을 연결했어요. 이제 ${providerName(linkedProvider)}로 로그인할 수 있어요.`
 			: externalLoginMessage(page.url.searchParams.get('error'), page.url.searchParams.get('provider'));
-		await load();
+		try {
+			await load();
+		} catch (caught) {
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
+		}
 	});
 
 	async function load() {
@@ -103,5 +114,7 @@
 				</li>
 			{/each}
 		</ul>
+	{:else if error}
+		<p class="alert alert-error" role="alert">{error.message}</p>
 	{/if}
 </main>

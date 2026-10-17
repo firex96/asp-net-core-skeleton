@@ -13,7 +13,11 @@
 
 	onMount(async () => {
 		supported = isPasskeySupported();
-		passkeys = await listPasskeys();
+		try {
+			passkeys = await listPasskeys();
+		} catch (caught) {
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
+		}
 	});
 
 	async function add(event: SubmitEvent) {

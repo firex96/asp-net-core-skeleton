@@ -54,9 +54,14 @@ onMounted(async () => {
   }
 
   if (queryValue('step') === 'two-factor') {
-    twoFactor.value = await getTwoFactorChallenge().catch(() => null)
-    if (!twoFactor.value) {
-      message.value = '로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.'
+    try {
+      twoFactor.value = await getTwoFactorChallenge()
+      if (!twoFactor.value) {
+        message.value = '로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.'
+      }
+    }
+    catch (caught) {
+      error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
     }
   }
 

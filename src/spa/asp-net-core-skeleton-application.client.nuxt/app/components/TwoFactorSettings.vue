@@ -9,7 +9,14 @@ const password = ref('')
 const error = ref<ApiError | null>(null)
 const busy = ref(false)
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    await load()
+  }
+  catch (caught) {
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
+  }
+})
 
 async function load() {
   status.value = await getTwoFactorStatus()

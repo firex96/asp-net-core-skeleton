@@ -60,6 +60,8 @@ import { TwoFactorSettingsComponent } from '../two-factor/two-factor-settings.co
             </li>
           }
         </ul>
+      } @else if (error(); as error) {
+        <p class="alert alert-error" role="alert">{{ error.message }}</p>
       }
     </main>
   `,
@@ -77,7 +79,14 @@ export class AccountComponent implements OnInit {
   private readonly linked = computed(() => new Set(this.logins().map(login => login.provider)));
 
   async ngOnInit() {
-    const user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
+    let user;
+    try {
+      user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
+    } catch (error) {
+      // 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+      this.error.set(error instanceof ApiError ? error : ApiError.from(error));
+      return;
+    }
     if (!user) {
       await this.router.navigateByUrl(`/login?returnUrl=${encodeURIComponent('/account')}`);
       return;
@@ -88,7 +97,11 @@ export class AccountComponent implements OnInit {
     this.notice.set(linked
       ? `${providerName(linked)} 계정을 연결했어요. 이제 ${providerName(linked)}로 로그인할 수 있어요.`
       : externalLoginMessage(query.get('error'), query.get('provider')));
-    await this.load();
+    try {
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof ApiError ? error : ApiError.from(error));
+    }
   }
 
   isLinked(provider: string): boolean {

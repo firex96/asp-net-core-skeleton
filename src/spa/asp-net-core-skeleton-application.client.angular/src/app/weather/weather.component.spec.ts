@@ -43,4 +43,14 @@ describe('WeatherComponent', () => {
 
     expect(component.forecasts).toEqual(mockForecasts);
   });
+
+  it('tells when the forecasts cannot be loaded', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    fixture.detectChanges();
+
+    httpMock.expectOne('/weatherforecast').flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')?.textContent).toContain('날씨 예보를 불러오지 못했어요');
+  });
 });

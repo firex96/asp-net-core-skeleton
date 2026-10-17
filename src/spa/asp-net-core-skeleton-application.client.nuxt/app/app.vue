@@ -9,12 +9,26 @@ const loginLink = computed(() =>
     : { path: '/login', query: { returnUrl: route.fullPath } },
 )
 
+// 현재 사용자를 못 읽으면 로그인 버튼을 보인다 — 세션 값은 그대로 둬서(미확인) 화면들이 다시 묻게 한다.
+const sessionFailed = ref(false)
+const logoutFailed = ref(false)
+
 onMounted(() => {
-  session.refresh().catch(error => console.error(error))
+  session.refresh().catch((error) => {
+    console.error(error)
+    sessionFailed.value = true
+  })
 })
 
 async function logOut() {
-  await session.signOut()
+  logoutFailed.value = false
+  try {
+    await session.signOut()
+  }
+  catch {
+    logoutFailed.value = true
+    return
+  }
   await navigateTo('/')
 }
 </script>
@@ -38,11 +52,14 @@ async function logOut() {
             로그아웃
           </button>
         </template>
-        <NuxtLink v-else-if="session.user.value === null && route.path !== '/login'" :to="loginLink" class="btn btn-primary btn-small">
+        <NuxtLink v-else-if="(session.user.value === null || sessionFailed) && route.path !== '/login'" :to="loginLink" class="btn btn-primary btn-small">
           로그인
         </NuxtLink>
       </nav>
     </header>
+    <p v-if="logoutFailed" class="alert alert-error" role="alert">
+      로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.
+    </p>
     <NuxtPage />
   </div>
 </template>

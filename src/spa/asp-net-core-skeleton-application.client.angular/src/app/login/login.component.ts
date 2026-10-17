@@ -54,9 +54,13 @@ export class LoginComponent implements OnInit {
     }
 
     if (query.get('step') === 'two-factor') {
-      this.twoFactor.set(await this.auth.twoFactorChallenge().catch(() => null));
-      if (!this.twoFactor()) {
-        this.notice.set('로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.');
+      try {
+        this.twoFactor.set(await this.auth.twoFactorChallenge());
+        if (!this.twoFactor()) {
+          this.notice.set('로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.');
+        }
+      } catch (error) {
+        this.error.set(error instanceof ApiError ? error : ApiError.from(error));
       }
     }
 

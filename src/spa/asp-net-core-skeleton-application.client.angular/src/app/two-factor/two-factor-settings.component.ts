@@ -89,7 +89,11 @@ export class TwoFactorSettingsComponent implements OnInit {
   password = '';
 
   async ngOnInit() {
-    await this.load();
+    try {
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof ApiError ? error : ApiError.from(error));
+    }
   }
 
   startAuthenticator() {

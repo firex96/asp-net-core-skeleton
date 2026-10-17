@@ -10,6 +10,10 @@
 
 	let { children }: LayoutProps = $props();
 
+	// 현재 사용자를 못 읽으면 로그인 버튼을 보인다 — 세션 값은 그대로 둬서(미확인) 화면들이 다시 묻게 한다.
+	let sessionFailed = $state(false);
+	let logoutFailed = $state(false);
+
 	// 계정 화면들(로그인 · 비밀번호 찾기 · 재설정 · 이메일 확인)에서는 돌아올 곳을 싣지 않는다 — 링크의 일회용 코드를 다른 주소로 옮기지 않는다.
 	const loginHref = $derived(
 		['/login', '/forgot-password', '/reset-password', '/confirm-email'].includes(page.url.pathname)
@@ -18,11 +22,20 @@
 	);
 
 	onMount(() => {
-		refreshSession().catch((error) => console.error(error));
+		refreshSession().catch((error) => {
+			console.error(error);
+			sessionFailed = true;
+		});
 	});
 
 	async function logOut() {
-		await signOut();
+		logoutFailed = false;
+		try {
+			await signOut();
+		} catch {
+			logoutFailed = true;
+			return;
+		}
 		await goto('/');
 	}
 </script>
@@ -40,10 +53,13 @@
 			{/if}
 			<a href="/account">{session.user.email}</a>
 			<button type="button" class="btn btn-small" onclick={logOut}>로그아웃</button>
-		{:else if session.user === null && page.url.pathname !== '/login'}
+		{:else if (session.user === null || sessionFailed) && page.url.pathname !== '/login'}
 			<a href={loginHref} class="btn btn-primary btn-small">로그인</a>
 		{/if}
 	</nav>
 </header>
+{#if logoutFailed}
+	<p class="alert alert-error" role="alert">로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.</p>
+{/if}
 
 {@render children()}

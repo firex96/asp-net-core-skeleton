@@ -27,7 +27,15 @@ const rolePermissions = ref<string[]>([])
 useHead({ title: '권한 관리' })
 
 onMounted(async () => {
-  const user = session.user.value === undefined ? await session.refresh() : session.user.value
+  let user
+  try {
+    user = session.user.value === undefined ? await session.refresh() : session.user.value
+  }
+  catch (caught) {
+    // 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
+    return
+  }
   if (!user) {
     await navigateTo(`/login?returnUrl=${encodeURIComponent('/admin')}`)
     return
@@ -152,6 +160,9 @@ function checked(event: Event): boolean {
 
     <p v-if="allowed === false" class="alert alert-error" role="alert">
       이 화면을 볼 권한이 없어요.
+    </p>
+    <p v-else-if="allowed === null && error" class="alert alert-error" role="alert">
+      {{ error.message }}
     </p>
     <template v-else-if="allowed">
       <p v-if="notice" class="alert alert-info" role="status">

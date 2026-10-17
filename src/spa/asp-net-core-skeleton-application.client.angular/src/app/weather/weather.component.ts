@@ -17,6 +17,7 @@ export class WeatherComponent implements OnInit {
   private readonly http = inject(HttpClient);
 
   public forecasts?: WeatherForecast[];
+  public failed = false;
 
   ngOnInit() {
     this.getForecasts();
@@ -29,6 +30,7 @@ export class WeatherComponent implements OnInit {
       },
       error: (error) => {
         console.error(error);
+        this.failed = true;
       }
     });
   }

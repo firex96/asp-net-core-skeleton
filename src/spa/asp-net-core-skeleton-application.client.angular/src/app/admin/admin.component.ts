@@ -20,6 +20,8 @@ import { AdminService, MANAGE_PERMISSION, Member, Permission, Role, UserGroup } 
 
       @if (allowed() === false) {
         <p class="alert alert-error" role="alert">이 화면을 볼 권한이 없어요.</p>
+      } @else if (allowed() === null && error(); as error) {
+        <p class="alert alert-error" role="alert">{{ error.message }}</p>
       } @else if (allowed()) {
         @if (notice(); as notice) {
           <p class="alert alert-info" role="status">{{ notice }}</p>
@@ -179,7 +181,14 @@ export class AdminComponent implements OnInit {
   roleDescription = '';
 
   async ngOnInit() {
-    const user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
+    let user;
+    try {
+      user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
+    } catch (error) {
+      // 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+      this.error.set(error instanceof ApiError ? error : ApiError.from(error));
+      return;
+    }
     if (!user) {
       await this.router.navigateByUrl(`/login?returnUrl=${encodeURIComponent('/admin')}`);
       return;

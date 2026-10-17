@@ -52,7 +52,14 @@
 	let rolePermissions = $state<string[]>([]);
 
 	onMount(async () => {
-		const user = session.user === undefined ? await refreshSession() : session.user;
+		let user;
+		try {
+			user = session.user === undefined ? await refreshSession() : session.user;
+		} catch (caught) {
+			// 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
+			return;
+		}
 		if (!user) {
 			await goto(`/login?returnUrl=${encodeURIComponent('/admin')}`);
 			return;
@@ -184,6 +191,8 @@
 
 	{#if allowed === false}
 		<p class="alert alert-error" role="alert">이 화면을 볼 권한이 없어요.</p>
+	{:else if allowed === null && error}
+		<p class="alert alert-error" role="alert">{error.message}</p>
 	{:else if allowed}
 		{#if notice}
 			<p class="alert alert-info" role="status">{notice}</p>

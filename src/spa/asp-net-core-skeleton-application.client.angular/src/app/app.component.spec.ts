@@ -42,4 +42,32 @@ describe('AppComponent', () => {
     expect(header.textContent).toContain('user@example.com');
     expect(header.textContent).toContain('로그아웃');
   });
+
+  it('still offers the login link when the current user cannot be read', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/auth/me').flush(null, { status: 500, statusText: 'Server Error' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const header = (fixture.nativeElement as HTMLElement).querySelector('header')!;
+    expect(header.textContent).toContain('로그인');
+  });
+
+  it('tells when logging out fails and stays signed in', async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/auth/me').flush({ id: 1, email: 'user@example.com', permissions: [] });
+    await fixture.whenStable();
+
+    const loggingOut = fixture.componentInstance.logout();
+    httpMock.expectOne('/api/auth/logout').flush(null, { status: 500, statusText: 'Server Error' });
+    await loggingOut;
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[role=alert]')?.textContent).toContain('로그아웃하지 못했어요');
+    expect(element.querySelector('header')!.textContent).toContain('user@example.com');
+  });
 });

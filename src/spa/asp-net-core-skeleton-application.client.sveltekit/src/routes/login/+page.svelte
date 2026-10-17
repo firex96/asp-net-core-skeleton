@@ -50,9 +50,13 @@
 		}
 
 		if (page.url.searchParams.get('step') === 'two-factor') {
-			twoFactor = await getTwoFactorChallenge().catch(() => null);
-			if (!twoFactor) {
-				message = '로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.';
+			try {
+				twoFactor = await getTwoFactorChallenge();
+				if (!twoFactor) {
+					message = '로그인 시간이 지났어요. 처음부터 다시 로그인해 주세요.';
+				}
+			} catch (caught) {
+				error = caught instanceof ApiError ? caught : ApiError.unexpected();
 			}
 		}
 

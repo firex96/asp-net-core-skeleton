@@ -54,7 +54,14 @@ export class ConsentComponent implements OnInit {
     .map(key => [key, this.route.snapshot.queryParamMap.get(key) ?? ''] as [string, string]);
 
   async ngOnInit() {
-    const user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
+    let user;
+    try {
+      user = this.auth.user() === undefined ? await this.auth.refresh() : this.auth.user();
+    } catch (error) {
+      // 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+      this.error.set(error instanceof ApiError ? error : ApiError.from(error));
+      return;
+    }
     if (!user) {
       await this.router.navigateByUrl(`/login?returnUrl=${encodeURIComponent(this.router.url)}`);
       return;

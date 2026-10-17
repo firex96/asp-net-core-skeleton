@@ -62,7 +62,11 @@ export class PasskeySettingsComponent implements OnInit {
 
   async ngOnInit() {
     this.supported.set(isPasskeySupported());
-    this.passkeys.set(await this.auth.listPasskeys());
+    try {
+      this.passkeys.set(await this.auth.listPasskeys());
+    } catch (error) {
+      this.error.set(error instanceof ApiError ? error : ApiError.from(error));
+    }
   }
 
   registeredOn(passkey: Passkey): string {

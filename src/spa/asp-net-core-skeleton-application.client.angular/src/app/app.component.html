@@ -7,10 +7,13 @@
       }
       <a routerLink="/account">{{ user.email }}</a>
       <button type="button" class="btn btn-small" (click)="logout()">로그아웃</button>
-    } @else if (auth.user() === null && !onLoginPage) {
+    } @else if ((auth.user() === null || sessionFailed()) && !onLoginPage) {
       <a routerLink="/login" [queryParams]="loginQueryParams" class="btn btn-primary btn-small">로그인</a>
     }
   </nav>
 </header>
+@if (logoutFailed()) {
+  <p class="alert alert-error" role="alert">로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.</p>
+}
 
 <router-outlet />

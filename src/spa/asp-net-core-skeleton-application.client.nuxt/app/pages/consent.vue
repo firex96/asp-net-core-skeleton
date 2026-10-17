@@ -11,7 +11,15 @@ const error = ref<ApiError | null>(null)
 useHead({ title: '접근 허용' })
 
 onMounted(async () => {
-  const user = session.user.value === undefined ? await session.refresh() : session.user.value
+  let user
+  try {
+    user = session.user.value === undefined ? await session.refresh() : session.user.value
+  }
+  catch (caught) {
+    // 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
+    return
+  }
   if (!user) {
     await navigateTo(`/login?returnUrl=${encodeURIComponent(route.fullPath)}`)
     return

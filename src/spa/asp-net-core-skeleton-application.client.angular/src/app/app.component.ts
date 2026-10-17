@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
 import { MANAGE_PERMISSION } from './admin/admin.service';
@@ -14,9 +14,15 @@ export class AppComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly managePermission = MANAGE_PERMISSION;
   private readonly router = inject(Router);
+  /** 현재 사용자를 못 읽으면 로그인 버튼을 보인다 — 세션 값은 그대로 둬서(미확인) 화면들이 다시 묻게 한다. */
+  readonly sessionFailed = signal(false);
+  readonly logoutFailed = signal(false);
 
   ngOnInit() {
-    this.auth.refresh().catch(error => console.error(error));
+    this.auth.refresh().catch(error => {
+      console.error(error);
+      this.sessionFailed.set(true);
+    });
   }
 
   /** 로그인 화면에서는 상단 로그인 버튼을 감춘다. */
@@ -31,7 +37,13 @@ export class AppComponent implements OnInit {
   }
 
   async logout() {
-    await this.auth.logout();
+    this.logoutFailed.set(false);
+    try {
+      await this.auth.logout();
+    } catch {
+      this.logoutFailed.set(true);
+      return;
+    }
     await this.router.navigateByUrl('/');
   }
 }

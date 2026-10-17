@@ -16,7 +16,15 @@ function queryValue(name: string): string | null {
 }
 
 onMounted(async () => {
-  const user = session.user.value === undefined ? await session.refresh() : session.user.value
+  let user
+  try {
+    user = session.user.value === undefined ? await session.refresh() : session.user.value
+  }
+  catch (caught) {
+    // 로그인했는지 모른다 — 로그인 화면으로 보내지 않고 알린다
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
+    return
+  }
   if (!user) {
     await navigateTo(`/login?returnUrl=${encodeURIComponent('/account')}`)
     return
@@ -26,7 +34,12 @@ onMounted(async () => {
   notice.value = linkedProvider
     ? `${providerName(linkedProvider)} 계정을 연결했어요. 이제 ${providerName(linkedProvider)}로 로그인할 수 있어요.`
     : externalLoginMessage(queryValue('error'), queryValue('provider'))
-  await load()
+  try {
+    await load()
+  }
+  catch (caught) {
+    error.value = caught instanceof ApiError ? caught : ApiError.unexpected()
+  }
 })
 
 async function load() {
@@ -99,5 +112,8 @@ async function remove(provider: string) {
         </li>
       </ul>
     </template>
+    <p v-else-if="error" class="alert alert-error" role="alert">
+      {{ error.message }}
+    </p>
   </main>
 </template>

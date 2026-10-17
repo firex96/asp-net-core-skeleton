@@ -23,7 +23,13 @@
 	let error = $state<ApiError | null>(null);
 	let busy = $state(false);
 
-	onMount(load);
+	onMount(async () => {
+		try {
+			await load();
+		} catch (caught) {
+			error = caught instanceof ApiError ? caught : ApiError.unexpected();
+		}
+	});
 
 	async function load() {
 		status = await getTwoFactorStatus();
