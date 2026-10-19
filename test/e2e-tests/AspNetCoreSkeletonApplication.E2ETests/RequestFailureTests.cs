@@ -94,5 +94,30 @@ public class RequestFailureTests(E2EFixture fixture) : BrowserTest(fixture)
         await Expect(page.Locator("main")).Not.ToContainTextAsync("로그인 시간이 지났어요");
     }
 
+    [Theory]
+    [MemberData(nameof(SpaClient.Names), MemberType = typeof(SpaClient))]
+    public async Task NewGroupOpenFailure_ShowsOnlyTheError(string spa)
+    {
+        var server = await Fixture.ServerAsync(spa);
+        var email = NewEmail(spa, "group");
+        await RegisterAsync(server, email);
+        await GrantAdministratorAsync(server, email);
+        var page = await OpenAsync(server);
+        await LogInAsync(page, email, Password);
+        await Expect(SignedInAs(page, email)).ToBeVisibleAsync();
+        await page.GotoAsync("/admin");
+        await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "권한 관리" })).ToBeVisibleAsync();
+        await FailAsync(page, "**/api/authorization/groups/*/members");
+
+        var name = $"열리지 않는 그룹 {spa}";
+        await page.GetByLabel("새 그룹 이름").FillAsync(name);
+        await page.GetByRole(AriaRole.Button, new() { Name = "그룹 만들기" }).ClickAsync();
+
+        // 그룹은 만들어져 목록에 있지만, 열지 못했으니 만들었다는 안내는 없다
+        await Expect(Error(page)).ToContainTextAsync(GenericError);
+        await Expect(page.Locator("main").GetByText(name)).ToBeVisibleAsync();
+        await Expect(Notice(page)).ToBeHiddenAsync();
+    }
+
     private static Task FailAsync(IPage page, string url) => page.RouteAsync(url, route => route.FulfillAsync(new() { Status = 500 }));
 }

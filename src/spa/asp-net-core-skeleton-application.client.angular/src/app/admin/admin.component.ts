@@ -206,14 +206,17 @@ export class AdminComponent implements OnInit {
   }
 
   openGroup(target: UserGroup) {
-    return this.run(async () => {
-      const [members, roles] = await Promise.all([this.admin.listMembers(target.id), this.admin.listGroupRoles(target.id)]);
-      this.members.set(members);
-      this.groupRoleIds.set(roles.map(role => role.id));
-      this.group.set(target);
-      this.groupName = target.name;
-      this.groupDescription = target.description;
-    });
+    return this.run(() => this.loadGroup(target));
+  }
+
+  /** 실패를 삼키지 않는다 — 부르는 쪽의 run 이 알린다. */
+  private async loadGroup(target: UserGroup) {
+    const [members, roles] = await Promise.all([this.admin.listMembers(target.id), this.admin.listGroupRoles(target.id)]);
+    this.members.set(members);
+    this.groupRoleIds.set(roles.map(role => role.id));
+    this.group.set(target);
+    this.groupName = target.name;
+    this.groupDescription = target.description;
   }
 
   submitNewGroup() {
@@ -222,7 +225,7 @@ export class AdminComponent implements OnInit {
       this.newGroupName = '';
       this.newGroupDescription = '';
       await this.reloadGroups();
-      await this.openGroup(created);
+      await this.loadGroup(created);
     }, '그룹을 만들었어요.');
   }
 

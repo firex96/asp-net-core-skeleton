@@ -69,24 +69,25 @@ async function reloadRoles() {
   roles.value = await listRoles()
 }
 
-async function openGroup(target: UserGroup) {
-  await run(async () => {
-    [members.value, groupRoleIds.value] = await Promise.all([
-      listMembers(target.id),
-      listGroupRoles(target.id).then(assigned => assigned.map(role => role.id)),
-    ])
-    group.value = target
-    groupName.value = target.name
-    groupDescription.value = target.description
-  })
+/** 실패를 삼키지 않는다 — 부르는 쪽의 run 이 알린다. */
+async function loadGroup(target: UserGroup) {
+  [members.value, groupRoleIds.value] = await Promise.all([
+    listMembers(target.id),
+    listGroupRoles(target.id).then(assigned => assigned.map(role => role.id)),
+  ])
+  group.value = target
+  groupName.value = target.name
+  groupDescription.value = target.description
 }
+
+const openGroup = (target: UserGroup) => run(() => loadGroup(target))
 
 const submitNewGroup = () => run(async () => {
   const created = await createGroup(newGroupName.value, newGroupDescription.value)
   newGroupName.value = ''
   newGroupDescription.value = ''
   await reloadGroups()
-  await openGroup(created)
+  await loadGroup(created)
 }, '그룹을 만들었어요.')
 
 const saveGroup = () => run(async () => {

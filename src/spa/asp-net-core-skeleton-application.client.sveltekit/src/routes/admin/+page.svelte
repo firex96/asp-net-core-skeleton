@@ -87,17 +87,18 @@
 	const reloadGroups = async () => (groups = await listGroups());
 	const reloadRoles = async () => (roles = await listRoles());
 
-	async function openGroup(target: UserGroup) {
-		await run(async () => {
-			[members, groupRoleIds] = await Promise.all([
-				listMembers(target.id),
-				listGroupRoles(target.id).then((assigned) => assigned.map((role) => role.id))
-			]);
-			group = target;
-			groupName = target.name;
-			groupDescription = target.description;
-		});
+	/** 실패를 삼키지 않는다 — 부르는 쪽의 run 이 알린다. */
+	async function loadGroup(target: UserGroup) {
+		[members, groupRoleIds] = await Promise.all([
+			listMembers(target.id),
+			listGroupRoles(target.id).then((assigned) => assigned.map((role) => role.id))
+		]);
+		group = target;
+		groupName = target.name;
+		groupDescription = target.description;
 	}
+
+	const openGroup = (target: UserGroup) => run(() => loadGroup(target));
 
 	const submitNewGroup = (event: SubmitEvent) => {
 		event.preventDefault();
@@ -106,7 +107,7 @@
 			newGroupName = '';
 			newGroupDescription = '';
 			await reloadGroups();
-			await openGroup(created);
+			await loadGroup(created);
 		}, '그룹을 만들었어요.');
 	};
 
