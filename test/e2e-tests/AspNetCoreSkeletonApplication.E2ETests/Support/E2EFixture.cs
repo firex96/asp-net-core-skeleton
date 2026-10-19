@@ -22,11 +22,13 @@ public sealed class E2EFixture : IAsyncLifetime
     private readonly InfrastructureFixture _infrastructure = new();
     private readonly ConcurrentDictionary<string, Lazy<Task<SpaServer>>> _servers = new();
     private readonly X509Certificate2 _certificate = LocalhostCertificate();
-    private IPlaywright _playwright = null!;
+    private IPlaywright? _playwright;
+    private IBrowser? _browser;
+    private Mailbox? _mailbox;
 
-    public IBrowser Browser { get; private set; } = null!;
+    public IBrowser Browser => _browser!;
 
-    public Mailbox Mailbox { get; private set; } = null!;
+    public Mailbox Mailbox => _mailbox!;
 
     /// <summary>SPA 하나의 서버. 처음 부르면 빌드 · 기동하고, 그 뒤로는 같은 서버를 돌려준다.</summary>
     public Task<SpaServer> ServerAsync(string spa) =>
@@ -35,11 +37,12 @@ public sealed class E2EFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await Task.WhenAll(_infrastructure.InitializeAsync().AsTask(), Task.Run(InstallChromium));
-        Mailbox = new Mailbox(_infrastructure.MailpitApi);
+        _mailbox = new Mailbox(_infrastructure.MailpitApi);
         _playwright = await Playwright.CreateAsync();
-        Browser = await _playwright.Chromium.LaunchAsync(LaunchOptions());
+        _browser = await _playwright.Chromium.LaunchAsync(LaunchOptions());
     }
 
+    /// <summary>준비가 중간에 실패해도 원래 오류만 드러나게, 만든 것만 정리한다.</summary>
     public async ValueTask DisposeAsync()
     {
         foreach (var server in _servers.Values.Where(server => server.IsValueCreated && server.Value.IsCompletedSuccessfully))
@@ -47,9 +50,13 @@ public sealed class E2EFixture : IAsyncLifetime
             await server.Value.Result.DisposeAsync();
         }
 
-        await Browser.DisposeAsync();
-        _playwright.Dispose();
-        Mailbox.Dispose();
+        if (_browser is not null)
+        {
+            await _browser.DisposeAsync();
+        }
+
+        _playwright?.Dispose();
+        _mailbox?.Dispose();
         await _infrastructure.DisposeAsync();
         _certificate.Dispose();
     }
