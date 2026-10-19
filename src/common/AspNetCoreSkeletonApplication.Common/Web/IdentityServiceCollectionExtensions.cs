@@ -43,6 +43,9 @@ public static class IdentityServiceCollectionExtensions
             .AddUserStore<ApplicationUserStore>()
             .AddSignInManager()
             .AddDefaultTokenProviders()
+            // 2단계 인증 코드(인증 앱 · 메일)는 한 번만 받아들인다 — 같은 이름의 기본 공급자를 바꾼다
+            .AddTokenProvider<SingleUseAuthenticatorTokenProvider>(TokenOptions.DefaultAuthenticatorProvider)
+            .AddTokenProvider<SingleUseEmailTokenProvider>(TokenOptions.DefaultEmailProvider)
             .AddErrorDescriber<KoreanIdentityErrorDescriber>();
 
         // 비밀번호 재설정 · 이메일 확인 토큰은 2시간. 재설정이 보안 스탬프를 바꾸므로 재설정 토큰은 한 번만 쓰이고, 다른 기기의 세션도 1분 안에 끊긴다.

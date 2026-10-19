@@ -53,8 +53,81 @@ public class TwoFactorTests(InfrastructureFixture infrastructure) : IAsyncLifeti
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SecondStepAsync(browser, "authenticator", "000000")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await SecondStepAsync(browser, "email", "123456")).StatusCode); // 인증 앱 계정은 메일 코드를 받지 않는다
-        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(browser, "authenticator", Totp.Code(key))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(browser, "authenticator", Totp.NextCode(key))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/api/auth/me", Token)).StatusCode);
+    }
+
+    [Fact]
+    public async Task AuthenticatorCode_WorksOnce()
+    {
+        const string email = "authenticator-once@example.com";
+        var (owner, _) = await TestUsers.SignInAsync(_factory, email, administrator: false);
+        var key = await RegisterAuthenticatorAsync(owner);
+        var code = Totp.NextCode(key);
+
+        var first = NewBrowser();
+        await LoginAsync(first, email);
+        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(first, "authenticator", code)).StatusCode);
+
+        var second = NewBrowser();
+        await LoginAsync(second, email);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SecondStepAsync(second, "authenticator", code)).StatusCode);
+    }
+
+    [Fact]
+    public async Task EarlierCode_AfterALaterOne_IsRefused()
+    {
+        const string email = "authenticator-earlier@example.com";
+        var (owner, _) = await TestUsers.SignInAsync(_factory, email, administrator: false);
+        var key = await RegisterAuthenticatorAsync(owner);
+        var earlier = Totp.NextCode(key);
+        var later = Totp.Code(key, DateTimeOffset.UtcNow.AddSeconds(60));
+
+        var first = NewBrowser();
+        await LoginAsync(first, email);
+        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(first, "authenticator", later)).StatusCode);
+
+        // 아직 허용 범위 안이고 쓰인 적도 없지만, 통과한 단계보다 이르다
+        var second = NewBrowser();
+        await LoginAsync(second, email);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SecondStepAsync(second, "authenticator", earlier)).StatusCode);
+    }
+
+    [Fact]
+    public async Task SameCode_AtTheSameTime_SignsInOnce()
+    {
+        const string email = "authenticator-race@example.com";
+        var (owner, _) = await TestUsers.SignInAsync(_factory, email, administrator: false);
+        var key = await RegisterAuthenticatorAsync(owner);
+        var browsers = Enumerable.Range(0, 8).Select(_ => NewBrowser()).ToArray();
+        foreach (var browser in browsers)
+        {
+            await LoginAsync(browser, email);
+        }
+
+        var code = Totp.NextCode(key);
+        var results = await Task.WhenAll(browsers.Select(browser => SecondStepAsync(browser, "authenticator", code)));
+
+        AssertSignedInOnce(results);
+    }
+
+    [Fact]
+    public async Task SameEmailCode_AtTheSameTime_SignsInOnce()
+    {
+        const string email = "email-race@example.com";
+        var (owner, _) = await TestUsers.SignInAsync(_factory, email, administrator: false);
+        await owner.PostAsync("/api/account/two-factor/email/enable", null, Token);
+        var browsers = Enumerable.Range(0, 8).Select(_ => NewBrowser()).ToArray();
+        foreach (var browser in browsers)
+        {
+            await LoginAsync(browser, email);
+        }
+
+        await browsers[0].PostAsync("/api/auth/login/2fa/email", null, Token);
+        var code = await ReadSignInCodeAsync(email);
+        var results = await Task.WhenAll(browsers.Select(browser => SecondStepAsync(browser, "email", code)));
+
+        AssertSignedInOnce(results);
     }
 
     [Fact]
@@ -72,6 +145,31 @@ public class TwoFactorTests(InfrastructureFixture infrastructure) : IAsyncLifeti
 
         Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(browser, "email", code)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/api/auth/me", Token)).StatusCode);
+    }
+
+    [Fact]
+    public async Task EmailCode_WorksOnce()
+    {
+        const string email = "email-once@example.com";
+        var (owner, _) = await TestUsers.SignInAsync(_factory, email, administrator: false);
+        await owner.PostAsync("/api/account/two-factor/email/enable", null, Token);
+
+        var first = NewBrowser();
+        await LoginAsync(first, email);
+        await first.PostAsync("/api/auth/login/2fa/email", null, Token);
+        var code = await ReadSignInCodeAsync(email);
+        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(first, "email", code)).StatusCode);
+
+        // 새 코드를 받지 않고 받은 코드를 다시 낸다 — 아직 시간 안이지만 쓰인 코드다
+        var second = NewBrowser();
+        await LoginAsync(second, email);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SecondStepAsync(second, "email", code)).StatusCode);
+
+        // 곧바로 다시 받은 코드는 새 코드라 통과한다
+        await second.PostAsync("/api/auth/login/2fa/email", null, Token);
+        var fresh = await ReadSignInCodeAsync(email, count: 2);
+        Assert.NotEqual(code, fresh);
+        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(second, "email", fresh)).StatusCode);
     }
 
     [Fact]
@@ -102,7 +200,7 @@ public class TwoFactorTests(InfrastructureFixture infrastructure) : IAsyncLifeti
 
         var browser = NewBrowser();
         await LoginAsync(browser, email);
-        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(browser, "authenticator", Totp.Code(key), rememberBrowser: true)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SecondStepAsync(browser, "authenticator", Totp.NextCode(key), rememberBrowser: true)).StatusCode);
         Assert.True((await StatusAsync(browser)).GetProperty("browserRemembered").GetBoolean());
         await browser.PostAsync("/api/auth/logout", null, Token);
 
@@ -166,6 +264,13 @@ public class TwoFactorTests(InfrastructureFixture infrastructure) : IAsyncLifeti
         return key;
     }
 
+    /// <summary>하나만 들어가고, 나머지는 틀린 코드(401) — 그사이 잠겼으면 423 이다. 서버 오류로 끝나지 않는다.</summary>
+    private static void AssertSignedInOnce(HttpResponseMessage[] results)
+    {
+        Assert.Single(results, result => result.StatusCode == HttpStatusCode.NoContent);
+        Assert.All(results, result => Assert.Contains(result.StatusCode, new[] { HttpStatusCode.NoContent, HttpStatusCode.Unauthorized, HttpStatusCode.Locked }));
+    }
+
     private static async Task<JsonElement> StatusAsync(HttpClient client) =>
         await ReadJsonAsync(await client.GetAsync("/api/account/two-factor", Token));
 
@@ -175,14 +280,14 @@ public class TwoFactorTests(InfrastructureFixture infrastructure) : IAsyncLifeti
     private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response) =>
         await response.Content.ReadFromJsonAsync<JsonElement>(Token);
 
-    /// <summary>로그인 확인 코드 메일의 6자리 코드. 아웃박스를 거쳐 오므로 올 때까지 기다린다.</summary>
-    private async Task<string> ReadSignInCodeAsync(string email)
+    /// <summary>가장 최근 로그인 확인 코드 메일의 6자리 코드. 아웃박스를 거쳐 오므로 <paramref name="count"/> 번째 메일이 올 때까지 기다린다.</summary>
+    private async Task<string> ReadSignInCodeAsync(string email, int count = 1)
     {
         var query = Uri.EscapeDataString($"to:\"{email}\" subject:\"로그인 확인 코드\"");
         for (var attempt = 0; attempt < 50; attempt++)
         {
             var search = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/search?query={query}", Token);
-            if (search.GetProperty("messages").GetArrayLength() > 0)
+            if (search.GetProperty("messages").GetArrayLength() >= count)
             {
                 var id = search.GetProperty("messages")[0].GetProperty("ID").GetString();
                 var message = await _mailpit.GetFromJsonAsync<JsonElement>($"api/v1/message/{id}", Token);

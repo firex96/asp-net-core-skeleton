@@ -36,7 +36,7 @@ public class TwoFactorTests(E2EFixture fixture) : BrowserTest(fixture)
         await page.GetByLabel("확인 코드").FillAsync("000000");
         await page.GetByRole(AriaRole.Button, new() { Name = "확인", Exact = true }).ClickAsync();
         await Expect(Error(page)).ToContainTextAsync("코드가 맞지 않아요");
-        await page.GetByLabel("확인 코드").FillAsync(Totp.Code(key));
+        await page.GetByLabel("확인 코드").FillAsync(Totp.NextCode(key)); // 켤 때 쓴 코드는 다시 받지 않는다
         await page.GetByRole(AriaRole.Button, new() { Name = "확인", Exact = true }).ClickAsync();
 
         await Expect(SignedInAs(page, email)).ToBeVisibleAsync();

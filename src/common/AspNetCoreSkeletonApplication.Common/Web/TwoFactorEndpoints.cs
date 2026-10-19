@@ -32,8 +32,8 @@ public static class TwoFactorEndpoints
     private const string Issuer = "AspNetCoreSkeletonApplication";
     private const int RecoveryCodeCount = 10;
 
-    // UserStore 가 인증 앱 키를 두는 자리 — Identity 의 내부 이름이다(UserStoreBase).
-    private const string InternalLoginProvider = "[AspNetUserStore]";
+    // UserStore 가 인증 앱 키를 두는 자리 — Identity 의 내부 이름이다(UserStoreBase). 한 번 쓴 코드의 기록도 여기 둔다.
+    internal const string InternalLoginProvider = "[AspNetUserStore]";
     private const string AuthenticatorKeyTokenName = "AuthenticatorKey";
 
     public static IEndpointRouteBuilder MapSkeletonTwoFactorEndpoints(this IEndpointRouteBuilder endpoints)

@@ -17,6 +17,9 @@ public static class Totp
         return (binary % 1_000_000).ToString("D6", System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    /// <summary>30초 뒤의 코드 — 서버가 앞뒤 2단계를 받아들이므로 지금도 맞고, 방금 쓴 지금 코드와는 다른 단계다(코드는 한 번만 쓰인다).</summary>
+    public static string NextCode(string base32Key) => Code(base32Key, DateTimeOffset.UtcNow.AddSeconds(30));
+
     private static byte[] Base32Decode(string value)
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
