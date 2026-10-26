@@ -34,8 +34,8 @@ internal sealed class StringEnumModelBinderProvider : IModelBinderProvider
             }
             else
             {
-                bindingContext.ModelState.TryAddModelError(
-                    bindingContext.ModelName, $"'{result.FirstValue}' 는 {enumType.Name} 의 코드가 아니다");
+                // 응답 errors 에 그대로 나간다 — 요청 값 · 타입 이름을 싣지 않는다
+                bindingContext.ModelState.TryAddModelError(bindingContext.ModelName, ErrorMessages.UnsupportedCode);
             }
 
             return Task.CompletedTask;

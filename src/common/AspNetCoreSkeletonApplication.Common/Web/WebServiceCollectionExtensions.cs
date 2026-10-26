@@ -41,6 +41,21 @@ public static class WebServiceCollectionExtensions
         services.Configure<MvcOptions>(options =>
             options.ModelBinderProviders.Insert(0, new StringEnumModelBinderProvider()));
 
+        // 검증 응답 errors 의 문구는 화면에 그대로 보일 수 있는 문장이다 — .NET 기본 문구(타입 이름 · JSON 경로 · 영어)를 내보내지 않는다.
+        // 앱은 AddSkeletonWeb() 뒤에 AddControllers() 를 부르므로, MVC 기본 설정(기본 응답 팩터리 · DataAnnotations 메타데이터 제공자)보다
+        // 뒤에 적용되도록 PostConfigure 로 둔다.
+        services.PostConfigure<JsonOptions>(options => options.AllowInputFormatterExceptionMessages = false);
+        services.PostConfigure<MvcOptions>(options =>
+        {
+            KoreanModelBindingMessages.Apply(options.ModelBindingMessageProvider);
+            // DataAnnotations 제공자가 검증 특성을 넣은 뒤에 돌아야 한다 — 목록 끝에 더한다
+            options.ModelMetadataDetailsProviders.Add(new KoreanValidationMetadataProvider());
+            // 입력 모델의 참조 타입은 [Required] 를 명시한다 — 암묵 required 는 본문 매개변수 이름(「The model field is required.」)을 오류로 낸다
+            options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        });
+        services.PostConfigure<ApiBehaviorOptions>(options =>
+            options.InvalidModelStateResponseFactory = UserFacingValidationResponse.Create);
+
         return services;
     }
 

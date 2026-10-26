@@ -6,6 +6,12 @@ namespace AspNetCoreSkeletonApplication.Common.Web;
 /// </summary>
 internal static class ErrorMessages
 {
+    public const string InvalidFormat = "값의 형식이 올바르지 않아요.";
+    public const string UnsupportedCode = "지원하지 않는 값이에요.";
+    public const string ValueRequired = "값을 넣어 주세요.";
+    public const string NumberRequired = "숫자를 넣어 주세요.";
+    public const string BodyRequired = "요청 본문이 없어요.";
+
     public static string ForStatus(int status) => status switch
     {
         405 => "이 주소에서 지원하지 않는 요청 방식이에요.",

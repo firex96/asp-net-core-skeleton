@@ -24,6 +24,10 @@ public class EnumCodeBindingTests(ErrorProbeWebApplicationFactory factory) : ICl
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).RootElement;
         Assert.Equal("NOT_VALID_ERROR", problem.GetProperty("code").GetString());
+        // 문구는 화면에 그대로 보인다 — 요청 값 · C# 타입 이름을 싣지 않는다
+        Assert.Equal("지원하지 않는 값이에요.", problem.GetProperty("errors").GetProperty("color")[0].GetString());
+        Assert.DoesNotContain("ProbeColor", problem.GetRawText());
+        Assert.DoesNotContain("DarkRed", problem.GetRawText());
     }
 
     [Fact]

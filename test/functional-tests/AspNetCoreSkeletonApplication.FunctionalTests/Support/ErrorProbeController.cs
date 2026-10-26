@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using AspNetCoreSkeletonApplication.Common.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -30,7 +31,7 @@ public class ErrorProbeController : ControllerBase
     [HttpPost("validate")]
     public IActionResult Validate(ErrorProbeModel model) => Ok(model);
 
-    // 아래는 프레임워크가 만드는 상태(405 · 415 · 413 · 목록 밖 상태)를 확인한다
+    // 아래는 프레임워크가 만드는 상태(405 · 415 · 413 · 목록 밖 상태)와 검증 문구를 확인한다
 
     /// <summary>/api 아래 GET 전용 경로 — 다른 메서드는 405 다. Server 의 SPA 폴백이 이 405 를 가리지 않는지도 본다.</summary>
     [HttpGet("/api/error-probe/get-only")]
@@ -50,5 +51,13 @@ public class ErrorProbeController : ControllerBase
     [HttpGet("unavailable")]
     public IActionResult ReturnUnavailable() => StatusCode(StatusCodes.Status503ServiceUnavailable);
 
+    [HttpPost("typed")]
+    public IActionResult Typed(TypedProbeModel model) => Ok(model);
+
     public sealed record ErrorProbeModel([Required] string? Name);
+
+    public sealed record TypedProbeModel(
+        [property: JsonRequired] decimal Price,
+        [Required, StringLength(5)] string? Name,
+        [Range(1, 10)] int Count);
 }
