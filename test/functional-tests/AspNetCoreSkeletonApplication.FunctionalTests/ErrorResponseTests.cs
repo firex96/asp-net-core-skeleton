@@ -18,7 +18,7 @@ public class ErrorResponseTests(ErrorProbeWebApplicationFactory factory) : IClas
         var response = await factory.CreateClient().GetAsync($"/error-probe/{probe}", TestContext.Current.CancellationToken);
 
         Assert.Equal(status, response.StatusCode);
-        var problem = await ReadProblemAsync(response);
+        var problem = await ProblemResponse.ReadAsync(response);
         Assert.Equal(code, problem.GetProperty("code").GetString());
         Assert.Equal(divisionCode, problem.GetProperty("divisionCode").GetString());
         Assert.Equal(detail, problem.GetProperty("detail").GetString());
@@ -45,7 +45,7 @@ public class ErrorResponseTests(ErrorProbeWebApplicationFactory factory) : IClas
             "/error-probe/validate", new { name = (string?)null }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = await ReadProblemAsync(response);
+        var problem = await ProblemResponse.ReadAsync(response);
         Assert.Equal("NOT_VALID_ERROR", problem.GetProperty("code").GetString());
         Assert.Equal("G011", problem.GetProperty("divisionCode").GetString());
         Assert.True(problem.GetProperty("errors").TryGetProperty("Name", out _));
@@ -57,14 +57,7 @@ public class ErrorResponseTests(ErrorProbeWebApplicationFactory factory) : IClas
         var response = await factory.CreateClient().GetAsync("/error-probe/status-not-found", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var problem = await ReadProblemAsync(response);
+        var problem = await ProblemResponse.ReadAsync(response);
         Assert.Equal("NOT_FOUND_ERROR", problem.GetProperty("code").GetString());
-    }
-
-    private static async Task<JsonElement> ReadProblemAsync(HttpResponseMessage response)
-    {
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        return JsonDocument.Parse(body).RootElement;
     }
 }

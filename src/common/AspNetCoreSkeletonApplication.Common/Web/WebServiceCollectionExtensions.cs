@@ -22,7 +22,7 @@ public static class WebServiceCollectionExtensions
         // traceId 는 기본값(Activity.Id) 대신 응답 헤더 X-Trace-Id 와 같은 값으로 맞춘다.
         services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
         {
-            context.ProblemDetails.AddErrorCodeIfMissing();
+            context.ProblemDetails.AddErrorCodeIfMissing(context.HttpContext);
             context.ProblemDetails.Extensions[ProblemDetailsExtensions.TraceIdKey] = context.HttpContext.TraceIdentifier;
         });
         services.AddExceptionHandler<GlobalExceptionHandler>();

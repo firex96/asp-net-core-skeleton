@@ -20,9 +20,20 @@ public sealed class ErrorCode(string code, int status, string divisionCode, stri
     public static readonly ErrorCode LastLoginMethod = new("LAST_LOGIN_METHOD_ERROR", 409, "AUTH005", "Last Login Method");
     public static readonly ErrorCode EmailNotConfirmed = new("EMAIL_NOT_CONFIRMED_ERROR", 403, "AUTH006", "Email Not Confirmed");
     public static readonly ErrorCode ExternalApiError = new("EXTERNAL_API_ERROR", 502, "G014", "Bad Gateway");
+    public static readonly ErrorCode ServiceUnavailable = new("SERVICE_UNAVAILABLE_ERROR", 503, "G016", "Service Unavailable");
+
+    // 프레임워크가 정하는 상태(라우팅 405, 콘텐츠 협상 406 · 415, 요청 크기 413)의 코드 — FromStatus 가 고른다
+    public static readonly ErrorCode MethodNotAllowed = new("METHOD_NOT_ALLOWED_ERROR", 405, "G017", "Method Not Allowed");
+    public static readonly ErrorCode NotAcceptable = new("NOT_ACCEPTABLE_ERROR", 406, "G018", "Not Acceptable");
+    public static readonly ErrorCode PayloadTooLarge = new("PAYLOAD_TOO_LARGE_ERROR", 413, "G019", "Payload Too Large");
+    public static readonly ErrorCode UnsupportedMediaType = new("UNSUPPORTED_MEDIA_TYPE_ERROR", 415, "G020", "Unsupported Media Type");
     public static readonly ErrorCode InternalServerError = new("INTERNAL_SERVER_ERROR", 500, "G999", "Internal Server Error");
 
-    private static readonly ErrorCode[] ByStatus = [BadRequest, Unauthorized, Forbidden, NotFound, Conflict, AccountLocked, ExternalApiError, InternalServerError];
+    private static readonly ErrorCode[] ByStatus =
+    [
+        BadRequest, Unauthorized, Forbidden, NotFound, MethodNotAllowed, NotAcceptable, Conflict, PayloadTooLarge,
+        UnsupportedMediaType, AccountLocked, InternalServerError, ExternalApiError, ServiceUnavailable,
+    ];
 
     public string Code => code;
 
@@ -32,7 +43,11 @@ public sealed class ErrorCode(string code, int status, string divisionCode, stri
 
     public string Message => message;
 
-    /// <summary>예외 없이 만들어진 응답(프레임워크의 404 · 400 등)에 붙일 코드를 상태 코드로 고른다.</summary>
+    /// <summary>
+    /// 예외 없이 만들어진 응답(프레임워크의 404 · 405 · 415 등)에 붙일 코드를 상태 코드로 고른다. 목록에 없는 상태는 4xx 면
+    /// <see cref="BadRequest"/>, 5xx 면 <see cref="InternalServerError"/> 이고, 그때는 응답 상태도 그 코드의 상태로 맞춘다
+    /// (<c>ProblemDetailsExtensions.AddErrorCodeIfMissing</c>) — 상태와 코드가 어긋난 응답은 나가지 않는다.
+    /// </summary>
     public static ErrorCode FromStatus(int status) =>
         ByStatus.FirstOrDefault(errorCode => errorCode.Status == status)
         ?? (status >= 500 ? InternalServerError : BadRequest);

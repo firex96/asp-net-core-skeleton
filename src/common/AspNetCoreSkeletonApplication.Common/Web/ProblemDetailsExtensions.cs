@@ -18,9 +18,10 @@ internal static class ProblemDetailsExtensions
 
     /// <summary>
     /// 예외 없이 만들어진 ProblemDetails(검증 실패 400, 컨트롤러의 NotFound() 등)에도 같은 확장 필드를 붙인다.
-    /// 이미 코드가 있으면(GlobalExceptionHandler 가 만든 응답) 그대로 둔다.
+    /// 이미 코드가 있으면(GlobalExceptionHandler 가 만든 응답) 그대로 둔다. 코드가 없는 상태(418 등)는 대체 코드를 붙이고
+    /// 응답 상태 · <c>status</c> · <c>title</c> 을 그 코드의 값으로 맞춘다.
     /// </summary>
-    public static void AddErrorCodeIfMissing(this ProblemDetails problemDetails)
+    public static void AddErrorCodeIfMissing(this ProblemDetails problemDetails, HttpContext httpContext)
     {
         if (problemDetails.Extensions.ContainsKey(CodeKey))
         {
@@ -31,6 +32,17 @@ internal static class ProblemDetailsExtensions
         var errorCode = problemDetails is HttpValidationProblemDetails
             ? ErrorCode.NotValid
             : ErrorCode.FromStatus(problemDetails.Status ?? 500);
+        if (problemDetails.Status != errorCode.Status)
+        {
+            problemDetails.Status = errorCode.Status;
+            problemDetails.Title = errorCode.Message;
+            problemDetails.Type = null;
+            if (!httpContext.Response.HasStarted)
+            {
+                httpContext.Response.StatusCode = errorCode.Status;
+            }
+        }
+
         problemDetails.AddErrorCode(errorCode);
     }
 }

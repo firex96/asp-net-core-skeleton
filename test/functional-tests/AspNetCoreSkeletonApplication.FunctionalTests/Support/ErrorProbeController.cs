@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using AspNetCoreSkeletonApplication.Common.Errors;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests.Support;
@@ -28,6 +29,26 @@ public class ErrorProbeController : ControllerBase
 
     [HttpPost("validate")]
     public IActionResult Validate(ErrorProbeModel model) => Ok(model);
+
+    // 아래는 프레임워크가 만드는 상태(405 · 415 · 413 · 목록 밖 상태)를 확인한다
+
+    /// <summary>/api 아래 GET 전용 경로 — 다른 메서드는 405 다. Server 의 SPA 폴백이 이 405 를 가리지 않는지도 본다.</summary>
+    [HttpGet("/api/error-probe/get-only")]
+    public IActionResult GetOnly() => Ok();
+
+    [HttpPost("json-only")]
+    [Consumes("application/json")]
+    public IActionResult JsonOnly(ErrorProbeModel model) => Ok(model);
+
+    [HttpGet("bad-http-request")]
+    public IActionResult ThrowBadHttpRequest() =>
+        throw new BadHttpRequestException("Request body too large. The max request body size is 30000000 bytes.", StatusCodes.Status413PayloadTooLarge);
+
+    [HttpGet("teapot")]
+    public IActionResult ReturnTeapot() => StatusCode(StatusCodes.Status418ImATeapot);
+
+    [HttpGet("unavailable")]
+    public IActionResult ReturnUnavailable() => StatusCode(StatusCodes.Status503ServiceUnavailable);
 
     public sealed record ErrorProbeModel([Required] string? Name);
 }
