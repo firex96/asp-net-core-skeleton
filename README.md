@@ -256,6 +256,7 @@ EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백
 - `detail` · `errors` 의 문구는 화면에 그대로 보여도 되는 사용자 문장이다 — SPA 클라이언트가 `errors` 를 필드 오류로 그대로 보인다. .NET 기본 문구(타입 이름 · JSON 경로 · 영어 DataAnnotations 문구)는 `AddSkeletonWeb()` 이 한국어 문장으로 바꾼다 — 모델 바인딩 문구(`KoreanModelBindingMessages`), 메시지를 지정하지 않은 검증 특성(`KoreanValidationMetadataProvider`), JSON 입력 오류(`UserFacingValidationResponse`), 열거형 코드. 기술 정보는 로그에만 남는다.
 - 입력 모델의 참조 타입 필수 값은 `[Required]` 를 명시한다 — 암묵 required 는 끈다(`SuppressImplicitRequiredAttributeForNonNullableReferenceTypes`, 본문 매개변수 이름이 오류로 나가지 않게). 값 타입은 빠져도 0 이므로 `[JsonRequired]` 다.
 - 인증이 기본이라(fallback 인가 정책) 익명 요청은 경로 · 메서드 판정(404 · 405 · 415)보다 먼저 401 이다.
+- Server 의 SPA 폴백은 `/api` 밖 경로에만 응답한다 — `/api` 아래 없는 경로는 404 ProblemDetails 다. 폴백이 GET · HEAD 만 받아, 없는 `/api` 경로에 다른 메서드를 보내면 405 다.
 - 업무 실패는 `CodedException` 계열을 던진다. 메시지는 4xx 응답의 `detail` 로 그대로 나가므로 사용자에게 보여도 되는 문장으로 쓴다. 예외를 잡아서 삼키지 않는다.
 - 코드는 `Common/Errors/ErrorCode` 의 정적 필드다. 업무 코드가 필요하면 정적 필드를 더 두고 `CodedException` 을 상속한다.
 - 처리는 `Common/Web` 의 `GlobalExceptionHandler`(예외 → ProblemDetails)와 `AddProblemDetails` 의 `CustomizeProblemDetails`(예외가 아닌 응답에 코드를 붙임) 두 곳이다. 앱은 `AddSkeletonWeb()` · `UseSkeletonWeb()` 로 붙인다.

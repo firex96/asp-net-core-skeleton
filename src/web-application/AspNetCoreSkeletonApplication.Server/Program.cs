@@ -64,6 +64,8 @@ app.MapSkeletonExternalLoginEndpoints();
 app.MapSkeletonOAuthServerEndpoints();
 app.MapControllers();
 
-app.MapFallbackToFile("/index.html").AllowAnonymous();
+// SPA 화면은 /api 밖 경로에만 응답한다 — /api 아래 없는 경로는 404 ProblemDetails 다(SPA HTML 200 이 아니라).
+// 폴백은 GET · HEAD 만 받으므로 없는 /api 경로에 다른 메서드를 보내면 405 다.
+app.MapFallbackToFile("{*path:nonfile:regex(^(?!api(/|$)))}", "/index.html").AllowAnonymous();
 
 app.Run();
