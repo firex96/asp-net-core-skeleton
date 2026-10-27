@@ -32,7 +32,7 @@ public class ErrorResponseTests(ErrorProbeWebApplicationFactory factory) : IClas
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        Assert.DoesNotContain("연결 문자열", body);
+        Assert.DoesNotContain(ErrorProbeController.InternalDetail, body);
         var problem = JsonDocument.Parse(body).RootElement;
         Assert.Equal("INTERNAL_SERVER_ERROR", problem.GetProperty("code").GetString());
         Assert.Equal("G999", problem.GetProperty("divisionCode").GetString());

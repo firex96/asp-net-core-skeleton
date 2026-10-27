@@ -83,6 +83,7 @@
 - Identity 사용자 토큰(복구 코드 · 인증 앱 키 등)을 고쳐 쓰면 저장되지 않던 문제 — `AppDbContext` 의 NoTracking 기본값 때문에 기본 저장소가 찾은 토큰이 추적되지 않았다. `ApplicationUserStore` 가 토큰 조회만 추적 조회로 한다
 
 ### Security
+- 5xx 응답에 앱이 직접 준 `detail` 이 그대로 나가던 문제 — `Problem(detail: …, statusCode: 500)` · `TypedResults.Problem(…)` 의 내부 문장이 응답에 실렸다. 이제 `CustomizeProblemDetails` 가 5xx 의 `detail` 을 지운다(`NormalizeDetail`). 또 `Accept` 가 JSON 을 받지 않는 요청(`text/html` 만)에는 기본 서비스가 쓰지 못해 최소 API 가 이 정규화와 코드 없이 원래 객체를 썼다 — `IProblemDetailsService` 를 `ProblemDetailsDispatcher` 로 바꿔 그때도 같은 정규화를 거친 ProblemDetails 로 쓴다
 - 2단계 인증 코드는 한 번만 쓰인다 — Identity 기본 공급자는 받아들인 코드를 기록하지 않아, 같은 인증 앱 코드(약 2분 30초) · 메일 코드를 시간 안에 다른 브라우저에서 다시 내도 로그인됐다. 인증 앱은 통과한 시간 단계를 기억해 그 단계와 그보다 이른 코드를 받지 않고(형제 스켈레톤과 같은 규칙), 메일은 받아들인 코드를 코드를 만드는 값(modifier)에 넣어, 쓴 코드는 더는 맞지 않고 곧바로 다시 받은 코드는 새 코드다(`SingleUseTwoFactorTokenProviders`, 사용자 토큰 `LastAuthenticatorStep` · `LastEmailCode`). 동시에 온 같은 코드는 사용자 `ConcurrencyStamp` 로 하나만 들어간다. 인증 앱 등록 확인에 쓴 코드로도 바로 로그인하지 못한다
 
 ## [0.1.0] - 2026-10-15

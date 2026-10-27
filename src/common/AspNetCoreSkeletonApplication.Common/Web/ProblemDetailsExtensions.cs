@@ -47,14 +47,19 @@ internal static class ProblemDetailsExtensions
     }
 
     /// <summary>
-    /// 문장이 없는 4xx(상태 코드 응답, 컨트롤러의 NotFound() · Forbid(), 프레임워크 예외)에 상태별 사용자 문장을 싣는다.
-    /// 검증 실패는 errors 가 문장이고, 5xx 는 내부 사정이라 싣지 않는다. 이미 있는 detail 은 그대로 둔다.
+    /// detail 을 상태에 맞춘다. 5xx 는 내부 사정이라 누가 넣었든 지운다(앱이 Problem(detail: …) 로 줘도).
+    /// 문장이 없는 4xx(상태 코드 응답, 컨트롤러의 NotFound() · Forbid(), 프레임워크 예외)에는 상태별 사용자 문장을 싣는다.
+    /// 검증 실패는 errors 가 문장이고, 이미 있는 4xx detail 은 그대로 둔다.
     /// </summary>
-    public static void AddDetailIfMissing(this ProblemDetails problemDetails)
+    public static void NormalizeDetail(this ProblemDetails problemDetails)
     {
-        if (problemDetails.Detail is null
+        if (problemDetails.Status is >= StatusCodes.Status500InternalServerError)
+        {
+            problemDetails.Detail = null;
+        }
+        else if (problemDetails.Detail is null
             && problemDetails is not HttpValidationProblemDetails
-            && problemDetails.Status is >= StatusCodes.Status400BadRequest and < StatusCodes.Status500InternalServerError)
+            && problemDetails.Status is >= StatusCodes.Status400BadRequest)
         {
             problemDetails.Detail = ErrorMessages.ForStatus(problemDetails.Status.Value);
         }

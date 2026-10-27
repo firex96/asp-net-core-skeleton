@@ -223,7 +223,7 @@ EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백
 
 ## 에러 응답
 
-모든 에러 응답은 **ProblemDetails**(`application/problem+json`, RFC 9457)다. 어디서 만들어졌든 확장 필드 `code` · `divisionCode` · `traceId` 가 붙는다.
+모든 에러 응답은 **ProblemDetails**(`application/problem+json`, RFC 9457)다 — 요청의 `Accept` 가 JSON 을 받지 않아도 그렇다(`ProblemDetailsDispatcher`). 어디서 만들어졌든 확장 필드 `code` · `divisionCode` · `traceId` 가 붙는다.
 
 ```json
 {
@@ -254,13 +254,14 @@ EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백
 
 - 응답 상태와 코드는 언제나 일치한다. 상태와 코드가 어긋난 응답은 나가지 않는다.
 - 4xx 는 검증 실패(`errors`)를 빼고 언제나 `detail` 이 있다 — 문장이 없는 응답은 `CustomizeProblemDetails` 가 상태별 문장(`ErrorMessages.ForStatus`)을 채우고, 401 · 403 문장은 SPA 의 대비 문장과 같다.
+- 5xx 는 언제나 `detail` 이 없다 — 앱이 `Problem(detail: …)` · `TypedResults.Problem(…)` 으로 줘도 `CustomizeProblemDetails` 가 지운다. 내부 사정은 로그에만 남긴다.
 - `detail` · `errors` 의 문구는 화면에 그대로 보여도 되는 사용자 문장이다 — SPA 클라이언트가 `errors` 를 필드 오류로 그대로 보인다. .NET 기본 문구(타입 이름 · JSON 경로 · 영어 DataAnnotations 문구)는 `AddSkeletonWeb()` 이 한국어 문장으로 바꾼다 — 모델 바인딩 문구(`KoreanModelBindingMessages`), 메시지를 지정하지 않은 검증 특성(`KoreanValidationMetadataProvider`), JSON 입력 오류(`UserFacingValidationResponse`), 열거형 코드. 기술 정보는 로그에만 남는다.
 - 입력 모델의 참조 타입 필수 값은 `[Required]` 를 명시한다 — 암묵 required 는 끈다(`SuppressImplicitRequiredAttributeForNonNullableReferenceTypes`, 본문 매개변수 이름이 오류로 나가지 않게). 값 타입은 빠져도 0 이므로 `[JsonRequired]` 다.
 - 인증이 기본이라(fallback 인가 정책) 익명 요청은 경로 · 메서드 판정(404 · 405 · 415)보다 먼저 401 이다.
 - Server 의 SPA 폴백은 `/api` 밖 경로에만 응답한다 — `/api` 아래 없는 경로는 404 ProblemDetails 다. 폴백이 GET · HEAD 만 받아, 없는 `/api` 경로에 다른 메서드를 보내면 405 다.
 - 업무 실패는 `CodedException` 계열을 던진다. 메시지는 4xx 응답의 `detail` 로 그대로 나가므로 사용자에게 보여도 되는 문장으로 쓴다. 예외를 잡아서 삼키지 않는다.
 - 코드는 `Common/Errors/ErrorCode` 의 정적 필드다. 업무 코드가 필요하면 정적 필드를 더 두고 `CodedException` 을 상속한다.
-- 처리는 `Common/Web` 의 `GlobalExceptionHandler`(예외 → ProblemDetails)와 `AddProblemDetails` 의 `CustomizeProblemDetails`(예외가 아닌 응답에 코드를 붙이고, 문장이 없는 4xx 에 `detail` 을 채움) 두 곳이다. 앱은 `AddSkeletonWeb()` · `UseSkeletonWeb()` 로 붙인다.
+- 처리는 `Common/Web` 의 `GlobalExceptionHandler`(예외 → ProblemDetails)와 `AddProblemDetails` 의 `CustomizeProblemDetails`(예외가 아닌 응답에 코드를 붙이고, 문장이 없는 4xx 에 `detail` 을 채우고, 5xx 의 `detail` 을 지움) 두 곳이다. 앱은 `AddSkeletonWeb()` · `UseSkeletonWeb()` 로 붙인다.
 - 코드 문자열과 구분 코드는 Spring 형제 스켈레톤과 같지만 **응답 형식은 다르다** — 형제는 자체 `ErrorResponseModel` 을, 이 스켈레톤은 .NET 표준 ProblemDetails 를 쓴다.
 
 ## 추적 ID 와 감사

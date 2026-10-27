@@ -13,6 +13,9 @@ namespace AspNetCoreSkeletonApplication.FunctionalTests.Support;
 [AllowAnonymous]
 public class ErrorProbeController : ControllerBase
 {
+    /// <summary>응답에 나가면 안 되는 내부 문장 — 프로브가 싣고, 테스트는 본문에 없음을 확인한다.</summary>
+    public const string InternalDetail = "내부 연결 문자열 노출 금지";
+
     [HttpGet("not-found")]
     public IActionResult ThrowNotFound() => throw new ItemNotFoundException("상품 42 가 없다");
 
@@ -23,13 +26,18 @@ public class ErrorProbeController : ControllerBase
     public IActionResult ThrowConflict() => throw new ConflictException("판매 종료된 상품은 다시 팔 수 없다");
 
     [HttpGet("unhandled")]
-    public IActionResult ThrowUnhandled() => throw new InvalidOperationException("내부 연결 문자열 노출 금지");
+    public IActionResult ThrowUnhandled() => throw new InvalidOperationException(InternalDetail);
 
     [HttpGet("status-not-found")]
     public IActionResult ReturnNotFound() => NotFound();
 
     [HttpGet("forbidden")]
     public IActionResult ReturnForbidden() => Forbid();
+
+    /// <summary>앱이 5xx 에 내부 문장을 직접 준 경우 — detail 은 응답에 나가지 않아야 한다.</summary>
+    [HttpGet("server-problem/{status:int}")]
+    public IActionResult ReturnServerProblem(int status) =>
+        Problem(detail: InternalDetail, statusCode: status);
 
     [HttpPost("validate")]
     public IActionResult Validate(ErrorProbeModel model) => Ok(model);

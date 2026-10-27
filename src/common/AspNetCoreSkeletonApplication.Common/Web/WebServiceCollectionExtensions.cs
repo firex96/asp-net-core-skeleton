@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace AspNetCoreSkeletonApplication.Common.Web;
@@ -18,15 +20,17 @@ public static class WebServiceCollectionExtensions
 {
     public static IServiceCollection AddSkeletonWeb(this IServiceCollection services)
     {
-        // 모든 에러 응답은 ProblemDetails 다. 어디서 만들어졌든 code · divisionCode 와, 문장이 없는 4xx 의 detail 을 붙이고,
+        // 모든 에러 응답은 ProblemDetails 다. 어디서 만들어졌든 code · divisionCode 와, 문장이 없는 4xx 의 detail 을 붙이고(5xx 의 detail 은 지운다),
         // traceId 는 기본값(Activity.Id) 대신 응답 헤더 X-Trace-Id 와 같은 값으로 맞춘다.
         services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
         {
             context.ProblemDetails.AddErrorCodeIfMissing(context.HttpContext);
             // 상태를 코드에 맞춘 뒤(418 → 400) 그 상태의 문장을 고른다
-            context.ProblemDetails.AddDetailIfMissing();
+            context.ProblemDetails.NormalizeDetail();
             context.ProblemDetails.Extensions[ProblemDetailsExtensions.TraceIdKey] = context.HttpContext.TraceIdentifier;
         });
+        // Accept 가 JSON 을 받지 않아도 같은 customize 를 거친 ProblemDetails 로 쓴다(ProblemDetailsDispatcher)
+        services.Replace(ServiceDescriptor.Singleton<IProblemDetailsService, ProblemDetailsDispatcher>());
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
         services.AddOptions<AuditOptions>().BindConfiguration("Audit");

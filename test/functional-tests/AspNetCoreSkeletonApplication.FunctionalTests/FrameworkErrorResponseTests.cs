@@ -1,7 +1,11 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using AspNetCoreSkeletonApplication.Common.Web;
 using AspNetCoreSkeletonApplication.FunctionalTests.Support;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AspNetCoreSkeletonApplication.FunctionalTests;
 
@@ -75,6 +79,49 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
         await AssertProblemAsync(response, HttpStatusCode.Unauthorized, "UNAUTHORIZED_ERROR", "G015", "로그인이 필요해요.");
     }
 
+    // MVC Problem() 은 만들 때 customize 를 거친다. 최소 API TypedResults.Problem 은 IProblemDetailsService 가 쓰지 못하면
+    // (Accept 가 JSON 을 받지 않으면) 원래 객체를 그대로 JSON 으로 쓴다 — 두 경로 모두, 두 Accept 모두 확인한다
+    public static TheoryData<string, int, string, string, string> ServerProblems
+    {
+        get
+        {
+            var data = new TheoryData<string, int, string, string, string>();
+            foreach (var probe in new[] { "server-problem", "minimal-problem" })
+            {
+                foreach (var accept in new[] { "application/json", "text/html" })
+                {
+                    data.Add(probe, 500, "INTERNAL_SERVER_ERROR", "G999", accept);
+                    data.Add(probe, 502, "EXTERNAL_API_ERROR", "G014", accept);
+                    data.Add(probe, 503, "SERVICE_UNAVAILABLE_ERROR", "G016", accept);
+                }
+            }
+
+            return data;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ServerProblems))]
+    public async Task ServerProblemWithDetail_HasNoDetail(string probe, int status, string code, string divisionCode, string accept)
+    {
+        var response = await GetAsync($"/error-probe/{probe}/{status}", accept);
+
+        var problem = await AssertProblemAsync(response, (HttpStatusCode)status, code, divisionCode, detail: null);
+        Assert.DoesNotContain(ErrorProbeController.InternalDetail, problem.GetRawText());
+    }
+
+    [Fact]
+    public async Task StatusCodePage_NotAcceptingJson_IsStillProblemDetails()
+    {
+        var response = await GetAsync("/api/error-probe/no-such-path", "text/html");
+
+        await AssertProblemAsync(response, HttpStatusCode.NotFound, "NOT_FOUND_ERROR", "G009", "요청한 대상을 찾을 수 없어요.");
+    }
+
+    [Fact]
+    public void ProblemDetailsService_IsSkeletonDispatcher_AfterAddControllers() =>
+        Assert.IsType<ProblemDetailsDispatcher>(factory.Services.GetRequiredService<IProblemDetailsService>());
+
     [Fact]
     public async Task JsonTypeMismatch_IsUserSentence()
     {
@@ -119,6 +166,13 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
         var problem = await AssertValidationProblemAsync(await PostTypedAsync("""{"price":"abc"}"""));
 
         Assert.False(problem.GetProperty("errors").TryGetProperty("model", out _));
+    }
+
+    private async Task<HttpResponseMessage> GetAsync(string path, string accept)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
+        return await factory.CreateAuthenticatedClient().SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private Task<HttpResponseMessage> PostTypedAsync(string json) =>
