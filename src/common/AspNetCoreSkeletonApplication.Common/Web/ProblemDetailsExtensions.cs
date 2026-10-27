@@ -45,4 +45,18 @@ internal static class ProblemDetailsExtensions
 
         problemDetails.AddErrorCode(errorCode);
     }
+
+    /// <summary>
+    /// 문장이 없는 4xx(상태 코드 응답, 컨트롤러의 NotFound() · Forbid(), 프레임워크 예외)에 상태별 사용자 문장을 싣는다.
+    /// 검증 실패는 errors 가 문장이고, 5xx 는 내부 사정이라 싣지 않는다. 이미 있는 detail 은 그대로 둔다.
+    /// </summary>
+    public static void AddDetailIfMissing(this ProblemDetails problemDetails)
+    {
+        if (problemDetails.Detail is null
+            && problemDetails is not HttpValidationProblemDetails
+            && problemDetails.Status is >= StatusCodes.Status400BadRequest and < StatusCodes.Status500InternalServerError)
+        {
+            problemDetails.Detail = ErrorMessages.ForStatus(problemDetails.Status.Value);
+        }
+    }
 }

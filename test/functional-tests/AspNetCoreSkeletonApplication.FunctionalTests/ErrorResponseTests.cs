@@ -49,6 +49,7 @@ public class ErrorResponseTests(ErrorProbeWebApplicationFactory factory) : IClas
         Assert.Equal("NOT_VALID_ERROR", problem.GetProperty("code").GetString());
         Assert.Equal("G011", problem.GetProperty("divisionCode").GetString());
         Assert.True(problem.GetProperty("errors").TryGetProperty("Name", out _));
+        Assert.False(problem.TryGetProperty("detail", out _));
     }
 
     [Fact]
@@ -59,5 +60,6 @@ public class ErrorResponseTests(ErrorProbeWebApplicationFactory factory) : IClas
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var problem = await ProblemResponse.ReadAsync(response);
         Assert.Equal("NOT_FOUND_ERROR", problem.GetProperty("code").GetString());
+        Assert.Equal("요청한 대상을 찾을 수 없어요.", problem.GetProperty("detail").GetString());
     }
 }

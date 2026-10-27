@@ -1,7 +1,7 @@
 namespace AspNetCoreSkeletonApplication.Common.Web;
 
 /// <summary>
-/// 프레임워크가 만든 4xx 에 싣는 사용자 문장. 요청 값 · 타입 이름 · 예외 메시지를 싣지 않는다 — 원래 내용은 로그에 남는다.
+/// 문장이 없는 4xx(프레임워크 예외 · 상태 코드 응답 · 컨트롤러의 NotFound() 등)에 싣는 상태별 사용자 문장. 요청 값 · 타입 이름 · 예외 메시지를 싣지 않는다 — 원래 내용은 로그에 남는다.
 /// 업무 실패의 문장은 <c>CodedException</c> 의 메시지다.
 /// </summary>
 internal static class ErrorMessages
@@ -14,10 +14,15 @@ internal static class ErrorMessages
 
     public static string ForStatus(int status) => status switch
     {
+        401 => "로그인이 필요해요.",
+        403 => "이 작업을 할 권한이 없어요.",
+        404 => "요청한 대상을 찾을 수 없어요.",
         405 => "이 주소에서 지원하지 않는 요청 방식이에요.",
         406 => "요청한 응답 형식을 제공할 수 없어요.",
+        409 => "요청이 지금 상태와 맞지 않아요.",
         413 => "요청 본문이 너무 커요.",
         415 => "지원하지 않는 요청 본문 형식이에요.",
+        423 => "요청한 대상이 잠겨 있어요.",
         _ => "요청을 처리할 수 없어요. 보낸 값을 확인해 주세요.",
     };
 }

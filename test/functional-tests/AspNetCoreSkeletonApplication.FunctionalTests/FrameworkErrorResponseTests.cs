@@ -19,7 +19,7 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     {
         var response = await factory.CreateAuthenticatedClient().DeleteAsync("/api/error-probe/get-only", TestContext.Current.CancellationToken);
 
-        var problem = await AssertProblemAsync(response, HttpStatusCode.MethodNotAllowed, "METHOD_NOT_ALLOWED_ERROR", "G017");
+        var problem = await AssertProblemAsync(response, HttpStatusCode.MethodNotAllowed, "METHOD_NOT_ALLOWED_ERROR", "G017", "이 주소에서 지원하지 않는 요청 방식이에요.");
         Assert.Contains("GET", response.Content.Headers.Allow);
         AssertNoTechnicalText(problem);
     }
@@ -30,7 +30,7 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
         var content = new StringContent("x", Encoding.UTF8, "text/plain");
         var response = await factory.CreateAuthenticatedClient().PostAsync("/error-probe/json-only", content, TestContext.Current.CancellationToken);
 
-        await AssertProblemAsync(response, HttpStatusCode.UnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE_ERROR", "G020");
+        await AssertProblemAsync(response, HttpStatusCode.UnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE_ERROR", "G020", "지원하지 않는 요청 본문 형식이에요.");
     }
 
     [Fact]
@@ -38,8 +38,7 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     {
         var response = await factory.CreateAuthenticatedClient().GetAsync("/error-probe/bad-http-request", TestContext.Current.CancellationToken);
 
-        var problem = await AssertProblemAsync(response, HttpStatusCode.RequestEntityTooLarge, "PAYLOAD_TOO_LARGE_ERROR", "G019");
-        Assert.Equal("요청 본문이 너무 커요.", problem.GetProperty("detail").GetString());
+        var problem = await AssertProblemAsync(response, HttpStatusCode.RequestEntityTooLarge, "PAYLOAD_TOO_LARGE_ERROR", "G019", "요청 본문이 너무 커요.");
         Assert.DoesNotContain("30000000", problem.GetRawText());
     }
 
@@ -48,7 +47,7 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     {
         var response = await factory.CreateAuthenticatedClient().GetAsync("/error-probe/teapot", TestContext.Current.CancellationToken);
 
-        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "BAD_REQUEST_ERROR", "G001");
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "BAD_REQUEST_ERROR", "G001", "요청을 처리할 수 없어요. 보낸 값을 확인해 주세요.");
     }
 
     [Fact]
@@ -56,7 +55,24 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     {
         var response = await factory.CreateAuthenticatedClient().GetAsync("/error-probe/unavailable", TestContext.Current.CancellationToken);
 
-        await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, "SERVICE_UNAVAILABLE_ERROR", "G016");
+        await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, "SERVICE_UNAVAILABLE_ERROR", "G016", detail: null);
+    }
+
+    [Fact]
+    public async Task ForbidResult_Is403WithSentence()
+    {
+        var response = await factory.CreateAuthenticatedClient().GetAsync("/error-probe/forbidden", TestContext.Current.CancellationToken);
+
+        await AssertProblemAsync(response, HttpStatusCode.Forbidden, "FORBIDDEN_ERROR", "G008", "이 작업을 할 권한이 없어요.");
+    }
+
+    [Fact]
+    public async Task AnonymousUnknownApiPath_Is401WithSentence()
+    {
+        // /api 아래라 SPA 폴백이 받지 않는다 — fallback 인가 정책이 라우팅 판정보다 먼저 401 을 낸다
+        var response = await factory.CreateClient().GetAsync("/api/error-probe/no-such-path", TestContext.Current.CancellationToken);
+
+        await AssertProblemAsync(response, HttpStatusCode.Unauthorized, "UNAUTHORIZED_ERROR", "G015", "로그인이 필요해요.");
     }
 
     [Fact]
@@ -64,7 +80,7 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     {
         var response = await PostTypedAsync("""{"price":"abc","name":"a","count":1}""");
 
-        var problem = await AssertProblemAsync(response, HttpStatusCode.BadRequest, "NOT_VALID_ERROR", "G011");
+        var problem = await AssertValidationProblemAsync(response);
         var messages = AllErrorMessages(problem);
         Assert.Contains("값의 형식이 올바르지 않아요.", messages);
         AssertNoTechnicalText(problem);
@@ -75,7 +91,7 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     {
         var response = await PostTypedAsync("""{"name":"a","count":1}""");
 
-        var problem = await AssertProblemAsync(response, HttpStatusCode.BadRequest, "NOT_VALID_ERROR", "G011");
+        var problem = await AssertValidationProblemAsync(response);
         Assert.Contains("값의 형식이 올바르지 않아요.", AllErrorMessages(problem));
         AssertNoTechnicalText(problem);
     }
@@ -83,13 +99,13 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     [Fact]
     public async Task DataAnnotations_UseKoreanDefaultMessages()
     {
-        var required = await AssertProblemAsync(await PostTypedAsync("""{"price":1,"count":1}"""), HttpStatusCode.BadRequest, "NOT_VALID_ERROR", "G011");
+        var required = await AssertValidationProblemAsync(await PostTypedAsync("""{"price":1,"count":1}"""));
         Assert.Equal(["값을 넣어 주세요."], ErrorsOf(required, "Name"));
 
-        var tooLong = await AssertProblemAsync(await PostTypedAsync("""{"price":1,"name":"abcdef","count":1}"""), HttpStatusCode.BadRequest, "NOT_VALID_ERROR", "G011");
+        var tooLong = await AssertValidationProblemAsync(await PostTypedAsync("""{"price":1,"name":"abcdef","count":1}"""));
         Assert.Equal(["5자 이하로 넣어 주세요."], ErrorsOf(tooLong, "Name"));
 
-        var outOfRange = await AssertProblemAsync(await PostTypedAsync("""{"price":1,"name":"a","count":11}"""), HttpStatusCode.BadRequest, "NOT_VALID_ERROR", "G011");
+        var outOfRange = await AssertValidationProblemAsync(await PostTypedAsync("""{"price":1,"name":"a","count":11}"""));
         Assert.Equal(["1 이상 10 이하로 넣어 주세요."], ErrorsOf(outOfRange, "Count"));
 
         AssertNoTechnicalText(required);
@@ -100,7 +116,7 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
     [Fact]
     public async Task InvalidBody_HasNoBodyParameterNameError()
     {
-        var problem = await AssertProblemAsync(await PostTypedAsync("""{"price":"abc"}"""), HttpStatusCode.BadRequest, "NOT_VALID_ERROR", "G011");
+        var problem = await AssertValidationProblemAsync(await PostTypedAsync("""{"price":"abc"}"""));
 
         Assert.False(problem.GetProperty("errors").TryGetProperty("model", out _));
     }
@@ -109,13 +125,27 @@ public class FrameworkErrorResponseTests(ErrorProbeWebApplicationFactory factory
         factory.CreateAuthenticatedClient().PostAsync(
             "/error-probe/typed", new StringContent(json, Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
 
-    private static async Task<JsonElement> AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code, string divisionCode)
+    /// <summary>검증 실패 — 문장은 errors 에 있고 detail 은 없다.</summary>
+    private static Task<JsonElement> AssertValidationProblemAsync(HttpResponseMessage response) =>
+        AssertProblemAsync(response, HttpStatusCode.BadRequest, "NOT_VALID_ERROR", "G011", detail: null);
+
+    /// <summary>상태 · 코드와 detail 을 함께 확인한다. <paramref name="detail"/> 이 null 이면 detail 이 없어야 한다.</summary>
+    private static async Task<JsonElement> AssertProblemAsync(
+        HttpResponseMessage response, HttpStatusCode status, string code, string divisionCode, string? detail)
     {
         Assert.Equal(status, response.StatusCode);
         var problem = await ProblemResponse.ReadAsync(response);
         Assert.Equal((int)status, problem.GetProperty("status").GetInt32());
         Assert.Equal(code, problem.GetProperty("code").GetString());
         Assert.Equal(divisionCode, problem.GetProperty("divisionCode").GetString());
+        if (detail is null)
+        {
+            Assert.False(problem.TryGetProperty("detail", out _));
+        }
+        else
+        {
+            Assert.Equal(detail, problem.GetProperty("detail").GetString());
+        }
         return problem;
     }
 

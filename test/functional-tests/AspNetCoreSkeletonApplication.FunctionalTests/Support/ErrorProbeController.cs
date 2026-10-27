@@ -28,6 +28,9 @@ public class ErrorProbeController : ControllerBase
     [HttpGet("status-not-found")]
     public IActionResult ReturnNotFound() => NotFound();
 
+    [HttpGet("forbidden")]
+    public IActionResult ReturnForbidden() => Forbid();
+
     [HttpPost("validate")]
     public IActionResult Validate(ErrorProbeModel model) => Ok(model);
 

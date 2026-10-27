@@ -246,20 +246,21 @@ EntityService 의 조회를 **인스턴스 메모리(L1) + Redis(L2) + Redis 백
 | 로그인 — 이메일을 확인하지 않은 계정(비밀번호가 맞을 때만) | 403 `EMAIL_NOT_CONFIRMED_ERROR` (AUTH006) | 안내 문구 |
 | `ApiCallException` (외부 API 실패) | 502 `EXTERNAL_API_ERROR` (G014) | 없음 — 로그에만 남는다 |
 | 검증 실패 (`[ApiController]` 자동 400 — DataAnnotations · 모델 바인딩 · JSON 형식 오류) | 400 `NOT_VALID_ERROR` (G011), `errors` 에 필드별 사용자 문장 | — |
-| 컨트롤러가 돌려준 상태 코드(`NotFound()` 등) | 상태 코드로 고른 코드 | — |
-| 본문 없는 응답 — 인증 실패 401 · 인가 실패 403 · 없는 경로 404 · 잘못된 메서드 405 · 콘텐츠 협상 406 · 415 등 (`UseStatusCodePages`) | 401 `UNAUTHORIZED_ERROR` (G015) · 403 `FORBIDDEN_ERROR` (G008) · 405 `METHOD_NOT_ALLOWED_ERROR` (G017) · 406 `NOT_ACCEPTABLE_ERROR` (G018) · 415 `UNSUPPORTED_MEDIA_TYPE_ERROR` (G020) · 503 `SERVICE_UNAVAILABLE_ERROR` (G016) 등 상태 코드로 고른 코드 | — |
+| 컨트롤러가 돌려준 상태 코드(`NotFound()` 등) | 상태 코드로 고른 코드 | 상태별 고정 문장 |
+| 본문 없는 응답 — 인증 실패 401 · 인가 실패 403 · 없는 경로 404 · 잘못된 메서드 405 · 콘텐츠 협상 406 · 415 등 (`UseStatusCodePages`) | 401 `UNAUTHORIZED_ERROR` (G015) · 403 `FORBIDDEN_ERROR` (G008) · 405 `METHOD_NOT_ALLOWED_ERROR` (G017) · 406 `NOT_ACCEPTABLE_ERROR` (G018) · 415 `UNSUPPORTED_MEDIA_TYPE_ERROR` (G020) · 503 `SERVICE_UNAVAILABLE_ERROR` (G016) 등 상태 코드로 고른 코드 | 상태별 고정 문장 (503 등 5xx 는 없음) |
 | `BadHttpRequestException` (요청 크기 초과 413, 최소 API 의 본문 형식 오류 400 등) | 그 상태의 코드 — 413 `PAYLOAD_TOO_LARGE_ERROR` (G019) 등 | 상태별 고정 문장 — 예외 메시지(매개변수 · 타입 이름)는 내보내지 않는다 |
-| 코드가 없는 상태(418 등) | 4xx 는 400 `BAD_REQUEST_ERROR` (G001), 5xx 는 500 `INTERNAL_SERVER_ERROR` — 응답 상태도 그 코드의 상태로 바뀐다 | — |
+| 코드가 없는 상태(418 등) | 4xx 는 400 `BAD_REQUEST_ERROR` (G001), 5xx 는 500 `INTERNAL_SERVER_ERROR` — 응답 상태도 그 코드의 상태로 바뀐다 | 상태별 고정 문장 (4xx 만) |
 | 그 밖의 예외 | 500 `INTERNAL_SERVER_ERROR` (G999) | 없음 — 내부 메시지를 내보내지 않는다 |
 
 - 응답 상태와 코드는 언제나 일치한다. 상태와 코드가 어긋난 응답은 나가지 않는다.
+- 4xx 는 검증 실패(`errors`)를 빼고 언제나 `detail` 이 있다 — 문장이 없는 응답은 `CustomizeProblemDetails` 가 상태별 문장(`ErrorMessages.ForStatus`)을 채우고, 401 · 403 문장은 SPA 의 대비 문장과 같다.
 - `detail` · `errors` 의 문구는 화면에 그대로 보여도 되는 사용자 문장이다 — SPA 클라이언트가 `errors` 를 필드 오류로 그대로 보인다. .NET 기본 문구(타입 이름 · JSON 경로 · 영어 DataAnnotations 문구)는 `AddSkeletonWeb()` 이 한국어 문장으로 바꾼다 — 모델 바인딩 문구(`KoreanModelBindingMessages`), 메시지를 지정하지 않은 검증 특성(`KoreanValidationMetadataProvider`), JSON 입력 오류(`UserFacingValidationResponse`), 열거형 코드. 기술 정보는 로그에만 남는다.
 - 입력 모델의 참조 타입 필수 값은 `[Required]` 를 명시한다 — 암묵 required 는 끈다(`SuppressImplicitRequiredAttributeForNonNullableReferenceTypes`, 본문 매개변수 이름이 오류로 나가지 않게). 값 타입은 빠져도 0 이므로 `[JsonRequired]` 다.
 - 인증이 기본이라(fallback 인가 정책) 익명 요청은 경로 · 메서드 판정(404 · 405 · 415)보다 먼저 401 이다.
 - Server 의 SPA 폴백은 `/api` 밖 경로에만 응답한다 — `/api` 아래 없는 경로는 404 ProblemDetails 다. 폴백이 GET · HEAD 만 받아, 없는 `/api` 경로에 다른 메서드를 보내면 405 다.
 - 업무 실패는 `CodedException` 계열을 던진다. 메시지는 4xx 응답의 `detail` 로 그대로 나가므로 사용자에게 보여도 되는 문장으로 쓴다. 예외를 잡아서 삼키지 않는다.
 - 코드는 `Common/Errors/ErrorCode` 의 정적 필드다. 업무 코드가 필요하면 정적 필드를 더 두고 `CodedException` 을 상속한다.
-- 처리는 `Common/Web` 의 `GlobalExceptionHandler`(예외 → ProblemDetails)와 `AddProblemDetails` 의 `CustomizeProblemDetails`(예외가 아닌 응답에 코드를 붙임) 두 곳이다. 앱은 `AddSkeletonWeb()` · `UseSkeletonWeb()` 로 붙인다.
+- 처리는 `Common/Web` 의 `GlobalExceptionHandler`(예외 → ProblemDetails)와 `AddProblemDetails` 의 `CustomizeProblemDetails`(예외가 아닌 응답에 코드를 붙이고, 문장이 없는 4xx 에 `detail` 을 채움) 두 곳이다. 앱은 `AddSkeletonWeb()` · `UseSkeletonWeb()` 로 붙인다.
 - 코드 문자열과 구분 코드는 Spring 형제 스켈레톤과 같지만 **응답 형식은 다르다** — 형제는 자체 `ErrorResponseModel` 을, 이 스켈레톤은 .NET 표준 ProblemDetails 를 쓴다.
 
 ## 추적 ID 와 감사

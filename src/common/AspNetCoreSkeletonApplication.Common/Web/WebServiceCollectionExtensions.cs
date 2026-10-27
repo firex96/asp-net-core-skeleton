@@ -18,11 +18,13 @@ public static class WebServiceCollectionExtensions
 {
     public static IServiceCollection AddSkeletonWeb(this IServiceCollection services)
     {
-        // 모든 에러 응답은 ProblemDetails 다. 어디서 만들어졌든 code · divisionCode 를 붙이고,
+        // 모든 에러 응답은 ProblemDetails 다. 어디서 만들어졌든 code · divisionCode 와, 문장이 없는 4xx 의 detail 을 붙이고,
         // traceId 는 기본값(Activity.Id) 대신 응답 헤더 X-Trace-Id 와 같은 값으로 맞춘다.
         services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
         {
             context.ProblemDetails.AddErrorCodeIfMissing(context.HttpContext);
+            // 상태를 코드에 맞춘 뒤(418 → 400) 그 상태의 문장을 고른다
+            context.ProblemDetails.AddDetailIfMissing();
             context.ProblemDetails.Extensions[ProblemDetailsExtensions.TraceIdKey] = context.HttpContext.TraceIdentifier;
         });
         services.AddExceptionHandler<GlobalExceptionHandler>();

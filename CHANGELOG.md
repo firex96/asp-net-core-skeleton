@@ -66,6 +66,7 @@
 - Identity 역할(`identity_role` · `identity_user_role` · `identity_role_claim`, `ApplicationRole`), `Roles` · `Policies.Administrator` — 인가 도메인의 그룹 · 역할 · 권한으로 바뀌었다
 - 쓰지 않던 `LanguageExt.Core` · `FluentValidation` 패키지
 ### Fixed
+- 본문 없는 4xx 상태 응답(401 · 403 · 404 · 405 · 415, 컨트롤러의 `NotFound()` · `Forbid()`, 코드가 없는 418 → 400)에 `detail` 이 없던 문제 — 이제 `CustomizeProblemDetails` 가 상태별 사용자 문장(`ErrorMessages.ForStatus`)을 채운다. 검증 실패는 `errors`, 5xx 는 여전히 `detail` 이 없다. 401 · 403 문장은 SPA 의 대비 문장과 같아 화면 문구는 그대로다
 - 브라우저 테스트의 공통 준비(`E2EFixture`)가 실패하면 테스트마다 정리 실패(`NullReferenceException`)가 하나씩 더 잡히던 문제 — 만들지 못한 브라우저 · Playwright · 메일함까지 정리하려다 멈춰, 실패 수가 두 배가 되고 컨테이너 정리도 건너뛰었다. 이제 만든 것만 정리해 원래 오류만 보인다
 - SPA 세 개의 관리 화면이 그룹을 만든 뒤 새 그룹을 열지 못하면 오류와 "그룹을 만들었어요." 안내를 함께 보이던 문제 — 그룹을 여는 요청의 실패를 안쪽에서 삼켜, 바깥은 성공한 줄 알았다. 이제 오류만 보이고, 새 그룹은 목록에 있어 다시 열 수 있다. E2E `RequestFailureTests`
 - SPA 세 개의 화면이 처음 불러오는 요청 하나의 실패에 멈추던 문제 — 내 계정 · 관리 · 동의 화면은 현재 사용자 조회가 실패하면 제목만 남거나 "불러오는 중"이 계속됐고, 연결된 계정 · 2단계 인증 · 패스키 절은 빈 채로, 날씨는 "불러오는 중"으로, 상단 바는 로그인 버튼 없이 남았다. 로그아웃 실패는 처리되지 않은 예외였다. 이제 본문 · 그 절에 오류를 알리고(로그인했는지 모를 때는 로그인 화면으로 보내지 않는다), 상단 바는 로그인 버튼을 보이고, 로그아웃 실패는 상단 바 아래에 알린다. 로그인 화면의 2단계 인증 대기 조회는 만료(401)만 "로그인 시간이 지났어요"로 보고 그 밖의 실패는 일반 오류로 알린다. E2E `RequestFailureTests`
