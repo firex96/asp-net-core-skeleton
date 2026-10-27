@@ -51,6 +51,7 @@
 - 게이트웨이 뒤 내부 API 앱 `InternalApi` — Server 와 같은 Common 을 쓰고 SPA 를 서빙하지 않는다. 템플릿 선택지 `--internalApi`(기본 true)
 
 ### Changed
+- 프레임워크가 정한 상태의 응답도 그 상태의 코드로 — 405 · 406 · 413 · 415 · 503 은 400 코드(G001)이거나 500 이었다. `ErrorCode` 에 `SERVICE_UNAVAILABLE_ERROR`(G016) · `METHOD_NOT_ALLOWED_ERROR`(G017) · `NOT_ACCEPTABLE_ERROR`(G018) · `PAYLOAD_TOO_LARGE_ERROR`(G019) · `UNSUPPORTED_MEDIA_TYPE_ERROR`(G020)를 두고 `FromStatus` 가 고른다. `BadHttpRequestException`(요청 크기 초과 등)은 그 상태의 코드와 고정 문장(예외 메시지는 내보내지 않는다). 코드가 없는 상태는 4xx 400 · 5xx 500 코드와 그 상태로 — 상태와 코드가 어긋난 응답은 없다. 코드 값은 Spring 형제와 같다
 - 판매 전(Draft) 상품은 작성자와 `products.manage` 보유자만 본다 — 상품 목록에서 빠지고, 단건 · 상태 이력 · 삭제는 404(남의 Draft 삭제는 403 → 404). 권한은 컨트롤러가 권한 정책으로 판정하고(Bearer 토큰은 scope 교집합), 규칙은 Domain `ProductAccessRule.CanView`. 정책 이름 도우미 `HasPermissionAttribute.PolicyNameOf`. InternalApi · Batch 는 그대로 모두 본다
 - 메일 전송을 Mail 도메인의 클라이언트 계층으로 — `IMailSender` · `SmtpMailSender` → `IMailClient` · `SmtpMailClient`(`Mail.Clients`), `OutgoingMail` → `OutgoingMailDto`. Identity 계정 메일(`IdentityEmailSender`)은 아웃박스에 넣는다
 - SPA 세 개의 화면을 다듬었다 — 의존성 없는 공통 CSS(카드형 계정 화면, 상단 바, 버튼 · 입력, 공급자 색 소셜 버튼, 알림, 라이트 · 다크), 화면 문구를 자연스러운 한국어로(`lang="ko"`, 화면별 제목), 검증 오류는 같은 문장을 한 번만, 로그인 화면에서는 상단 로그인 버튼을 숨긴다
@@ -67,6 +68,8 @@
 - 쓰지 않던 `LanguageExt.Core` · `FluentValidation` 패키지
 ### Fixed
 - 본문 없는 4xx 상태 응답(401 · 403 · 404 · 405 · 415, 컨트롤러의 `NotFound()` · `Forbid()`, 코드가 없는 418 → 400)에 `detail` 이 없던 문제 — 이제 `CustomizeProblemDetails` 가 상태별 사용자 문장(`ErrorMessages.ForStatus`)을 채운다. 검증 실패는 `errors`, 5xx 는 여전히 `detail` 이 없다. 401 · 403 문장은 SPA 의 대비 문장과 같아 화면 문구는 그대로다
+- 검증 응답 `errors` 에 .NET 기본 문구가 나가던 문제 — JSON 입력 오류(「The JSON value could not be converted to System.Decimal. Path: $.price …」), 필수 속성 누락(타입 이름), 영어 DataAnnotations 문구, 열거형 바인더의 C# 타입 이름을 SPA 가 필드 오류로 그대로 보였다. 이제 `AddSkeletonWeb()` 이 한국어 사용자 문장으로 바꾼다(`KoreanModelBindingMessages` · `KoreanValidationMetadataProvider` · `UserFacingValidationResponse`, `PostConfigure`). 암묵 required 는 끈다 — 입력 모델은 `[Required]` 를 명시한다
+- `/api` 아래 없는 경로의 GET 이 SPA 화면(`index.html` 200)을 받던 문제 — 이제 SPA 폴백은 `/api` 밖 경로에만 응답하고, `/api` 아래 없는 경로는 404 `NOT_FOUND_ERROR` ProblemDetails 다. 메서드 불일치의 405 는 그대로다
 - 브라우저 테스트의 공통 준비(`E2EFixture`)가 실패하면 테스트마다 정리 실패(`NullReferenceException`)가 하나씩 더 잡히던 문제 — 만들지 못한 브라우저 · Playwright · 메일함까지 정리하려다 멈춰, 실패 수가 두 배가 되고 컨테이너 정리도 건너뛰었다. 이제 만든 것만 정리해 원래 오류만 보인다
 - SPA 세 개의 관리 화면이 그룹을 만든 뒤 새 그룹을 열지 못하면 오류와 "그룹을 만들었어요." 안내를 함께 보이던 문제 — 그룹을 여는 요청의 실패를 안쪽에서 삼켜, 바깥은 성공한 줄 알았다. 이제 오류만 보이고, 새 그룹은 목록에 있어 다시 열 수 있다. E2E `RequestFailureTests`
 - SPA 세 개의 화면이 처음 불러오는 요청 하나의 실패에 멈추던 문제 — 내 계정 · 관리 · 동의 화면은 현재 사용자 조회가 실패하면 제목만 남거나 "불러오는 중"이 계속됐고, 연결된 계정 · 2단계 인증 · 패스키 절은 빈 채로, 날씨는 "불러오는 중"으로, 상단 바는 로그인 버튼 없이 남았다. 로그아웃 실패는 처리되지 않은 예외였다. 이제 본문 · 그 절에 오류를 알리고(로그인했는지 모를 때는 로그인 화면으로 보내지 않는다), 상단 바는 로그인 버튼을 보이고, 로그아웃 실패는 상단 바 아래에 알린다. 로그인 화면의 2단계 인증 대기 조회는 만료(401)만 "로그인 시간이 지났어요"로 보고 그 밖의 실패는 일반 오류로 알린다. E2E `RequestFailureTests`
